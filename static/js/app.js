@@ -1,4 +1,7 @@
-// Глобальные переменные
+﻿// API Configuration
+const API_BASE = window.API_BASE_URL || 'http://localhost:5000';
+console.log('🔗 Using API:', API_BASE);
+// Global variables
 let currentResults = {
     text: null,
     url: null,
@@ -36,7 +39,7 @@ async function loadStats() {
     try {
         console.log('🔄 Загружаю статистику...');
         
-        const response = await fetch('/api/stats');
+        const response = await fetch(`${API_BASE}/api/stats`);
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -91,7 +94,7 @@ async function checkText() {
     showLoading();
     
     try {
-        const response = await fetch('/api/check', {
+        const response = await fetch(\${API_BASE}/api/`check', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -127,7 +130,7 @@ async function checkUrl() {
     document.getElementById('urlProgress').style.display = 'block';
     
     try {
-        const response = await fetch('/api/check-url', {
+        const response = await fetch(\${API_BASE}/api/`check-url', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -176,7 +179,7 @@ async function checkBatch() {
         progressText.textContent = `${completed} / ${urls.length}`;
         
         try {
-            const response = await fetch('/api/check-url', {
+            const response = await fetch(\${API_BASE}/api/`check-url', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -355,7 +358,7 @@ async function exportReport(type) {
     }
     
     try {
-        const response = await fetch('/api/export', {
+        const response = await fetch(\${API_BASE}/api/`export', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
