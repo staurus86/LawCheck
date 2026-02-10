@@ -18,8 +18,14 @@ import uuid
 from collections import defaultdict
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-in-production')
-CORS(app)
+# CORS - разрешаем все домены
+CORS(app, resources={
+    r"/api/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 # Инициализация чекера
 checker = RussianLanguageChecker()
