@@ -226,6 +226,110 @@ def get_history():
         'total': len(check_history)
     })
 
+@app.route('/api/export/txt', methods=['POST'])
+def export_txt():
+    """Экспорт отчета в TXT"""
+    try:
+        data = request.get_json()
+        result = data.get('result', {})
+        
+        # Формируем отчет
+        lines = []
+        lines.append("=" * 60)
+        lines.append("ОТЧЕТ ПРОВЕРКИ ТЕКСТА НА СООТВЕТСТВИЕ ФЗ-168")
+        lines.append("=" * 60)
+        lines.append(f"Дата проверки: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+        lines.append("")
+        
+        # Статистика
+        lines.append("СТАТИСТИКА:")
+        lines.append(f"  Всего слов: {result.get('total_words', 0)}")
+        lines.append(f"  Нормативных: {result.get('normative_count', 0)}")
+        lines.append(f"  Иностранных: {result.get('foreign_count', 0)}")
+        lines.append(f"  Ненормативных: {result.get('nenormative_count', 0)}")
+        lines.append(f"  Орфографических: {result.get('orfograf_count', 0)}")
+        lines.append(f"  Орфоэпических: {result.get('orfoep_count', 0)}")
+        lines.append("")
+        
+        # Процент соответствия
+        compliance = result.get('compliance_percentage', 0)
+        lines.append(f"ПРОЦЕНТ СООТВЕТСТВИЯ: {compliance:.2f}%")
+        lines.append("")
+        
+        # Найденные слова
+        if result.get('foreign_words'):
+            lines.append("ИНОСТРАННЫЕ СЛОВА:")
+            for word in result['foreign_words']:
+                lines.append(f"  - {word}")
+            lines.append("")
+        
+        if result.get('nenormative_words'):
+            lines.append("НЕНОРМАТИВНЫЕ СЛОВА:")
+            for word in result['nenormative_words']:
+                lines.append(f"  - {word}")
+            lines.append("")
+        
+        if result.get('orfograf_words'):
+            lines.append("ОРФОГРАФИЧЕСКИЕ ОШИБКИ:")
+            for word in result['orfograf_words']:
+                lines.append(f"  - {word}")
+            lines.append("")
+        
+        if result.get('orfoep_words'):
+            lines.append("ОРФОЭПИЧЕСКИЕ ОШИБКИ:")
+            for word in result['orfoep_words']:
+                lines.append(f"  - {word}")
+            lines.append("")
+        
+        lines.append("=" * 60)
+        lines.append("Создано: LawChecker Online - https://lawcheck-production.up.railway.app")
+        lines.append("=" * 60)
+        
+        report = "\n".join(lines)
+        
+        # Создаем файл в памяти
+        output = io.BytesIO()
+        output.write(report.encode('utf-8'))
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='text/plain; charset=utf-8',
+            as_attachment=True,
+            download_name=f'lawcheck_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
+        )
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/export/json', methods=['POST'])
+def export_json():
+    """Экспорт отчета в JSON"""
+    try:
+        data = request.get_json()
+        result = data.get('result', {})
+        
+        # Добавляем метаданные
+        result['exported_at'] = datetime.now().isoformat()
+        result['tool'] = 'LawChecker Online'
+        
+        output = io.BytesIO()
+        output.write(json.dumps(result, ensure_ascii=False, indent=2).encode('utf-8'))
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/json',
+            as_attachment=True,
+            download_name=f'lawcheck_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+        )
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=False)
+
 @app.route('/api/analyze', methods=['POST'])
 def analyze_text():
     """API: Детальный анализ текста"""
