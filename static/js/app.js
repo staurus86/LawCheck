@@ -94,7 +94,7 @@ async function checkText() {
     showLoading();
     
     try {
-        const response = await fetch(\${API_BASE}/api/`check', {
+        const response = await fetch(`${API_BASE}/api/check`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -130,7 +130,7 @@ async function checkUrl() {
     document.getElementById('urlProgress').style.display = 'block';
     
     try {
-        const response = await fetch(\${API_BASE}/api/`check-url', {
+        const response = await fetch(`${API_BASE}/api/check-url`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -179,7 +179,7 @@ async function checkBatch() {
         progressText.textContent = `${completed} / ${urls.length}`;
         
         try {
-            const response = await fetch(\${API_BASE}/api/`check-url', {
+            const response = await fetch(`${API_BASE}/api/check-url`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -358,7 +358,7 @@ async function exportReport(type) {
     }
     
     try {
-        const response = await fetch(\${API_BASE}/api/`export', {
+        const response = await fetch(`${API_BASE}/api/export`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

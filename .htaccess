@@ -1,0 +1,25 @@
+DirectoryIndex index.html
+
+# ???????? ????????? HTML5 History API
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /law-checker/
+    RewriteRule ^index\.html$ - [L]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule . /law-checker/index.html [L]
+</IfModule>
+
+# MIME ????
+AddType text/css .css
+AddType application/javascript .js
+AddType image/svg+xml .svg
+
+# ???????????
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+</IfModule>
