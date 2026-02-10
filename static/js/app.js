@@ -358,7 +358,7 @@ async function exportReport(type) {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/api/export`, {
+        const response = await fetch(`${API_BASE}/api/export/txt`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
