@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>рџ‡·рџ‡є LawChecker Online - РџСЂРѕРІРµСЂРєР° С‚РµРєСЃС‚Р° РЅР° СЃРѕРѕС‚РІРµС‚СЃС‚РІРёРµ Р¤Р— в„–168</title>
-    <meta name="description" content="РћРЅР»Р°Р№РЅ РїСЂРѕРІРµСЂРєР° С‚РµРєСЃС‚Р° Рё СЃР°Р№С‚РѕРІ РЅР° СЃРѕРѕС‚РІРµС‚СЃС‚РІРёРµ Р¤РµРґРµСЂР°Р»СЊРЅРѕРјСѓ Р·Р°РєРѕРЅСѓ в„–168-Р¤Р— Рѕ СЂСѓСЃСЃРєРѕРј СЏР·С‹РєРµ">
+    <title>🇷🇺 LawChecker Online - Проверка текста на соответствие ФЗ №168</title>
+    <meta name="description" content="Онлайн проверка текста и сайтов на соответствие Федеральному закону №168-ФЗ о русском языке">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-	<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>рџ‡·рџ‡є</text></svg>">
+	<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🇷🇺</text></svg>">
 
 </head>
 <body>
@@ -20,13 +20,13 @@
         <div class="container">
             <div class="header-content">
                 <div class="logo">
-                    <span class="logo-icon">рџ‡·рџ‡є</span>
+                    <span class="logo-icon">🇷🇺</span>
                     <span class="logo-text">LawChecker <span class="logo-badge">Online</span></span>
                 </div>
 					<nav class="nav">
-						<a href="/" class="nav-link active">РџСЂРѕРІРµСЂРєР°</a>
-						<a href="/about" class="nav-link">Рћ Р·Р°РєРѕРЅРµ</a>
-						<a href="/api/stats" class="nav-link" target="_blank">РЎС‚Р°С‚РёСЃС‚РёРєР°</a>
+						<a href="/" class="nav-link active">Проверка</a>
+						<a href="/about" class="nav-link">О законе</a>
+						<a href="/api/stats" class="nav-link" target="_blank">Статистика</a>
 					</nav>
             </div>
         </div>
@@ -35,26 +35,26 @@
     <!-- Hero Section -->
     <section class="hero">
         <div class="container">
-            <h1 class="hero-title">РџСЂРѕРІРµСЂРєР° С‚РµРєСЃС‚Р° РЅР° СЃРѕРѕС‚РІРµС‚СЃС‚РІРёРµ Р¤Р— в„–168</h1>
-            <p class="hero-subtitle">РџСЂРѕС„РµСЃСЃРёРѕРЅР°Р»СЊРЅР°СЏ РѕРЅР»Р°Р№РЅ РїСЂРѕРІРµСЂРєР° С‚РµРєСЃС‚РѕРІ Рё РІРµР±-СЃР°Р№С‚РѕРІ РЅР° СЃРѕРѕС‚РІРµС‚СЃС‚РІРёРµ<br>Р¤РµРґРµСЂР°Р»СЊРЅРѕРјСѓ Р·Р°РєРѕРЅСѓ Рѕ СЂСѓСЃСЃРєРѕРј СЏР·С‹РєРµ</p>
+            <h1 class="hero-title">Проверка текста на соответствие ФЗ №168</h1>
+            <p class="hero-subtitle">Профессиональная онлайн проверка текстов и веб-сайтов на соответствие<br>Федеральному закону о русском языке</p>
             
             <!-- Stats Cards -->
             <div class="stats-cards" id="statsCards">
                 <div class="stat-card">
                     <div class="stat-value" id="statNormative">-</div>
-                    <div class="stat-label">РќРѕСЂРјР°С‚РёРІРЅС‹С… СЃР»РѕРІ</div>
+                    <div class="stat-label">Нормативных слов</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="statForeign">-</div>
-                    <div class="stat-label">РРЅРѕСЃС‚СЂР°РЅРЅС‹С… СЃР»РѕРІ</div>
+                    <div class="stat-label">Иностранных слов</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="statNenormative">-</div>
-                    <div class="stat-label">РќРµРЅРѕСЂРјР°С‚РёРІРЅС‹С…</div>
+                    <div class="stat-label">Ненормативных</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value stat-success">вњ“</div>
-                    <div class="stat-label">Р“РѕС‚РѕРІ Рє СЂР°Р±РѕС‚Рµ</div>
+                    <div class="stat-value stat-success">✓</div>
+                    <div class="stat-label">Готов к работе</div>
                 </div>
             </div>
         </div>
@@ -68,15 +68,15 @@
             <div class="tabs">
                 <button class="tab-btn active" data-tab="text">
                     <i class="fas fa-file-alt"></i>
-                    <span>РџСЂРѕРІРµСЂРєР° С‚РµРєСЃС‚Р°</span>
+                    <span>Проверка текста</span>
                 </button>
                 <button class="tab-btn" data-tab="url">
                     <i class="fas fa-globe"></i>
-                    <span>РџСЂРѕРІРµСЂРєР° СЃР°Р№С‚Р°</span>
+                    <span>Проверка сайта</span>
                 </button>
                 <button class="tab-btn" data-tab="batch">
                     <i class="fas fa-list"></i>
-                    <span>РџР°РєРµС‚РЅР°СЏ РїСЂРѕРІРµСЂРєР°</span>
+                    <span>Пакетная проверка</span>
                 </button>
             </div>
 
@@ -84,29 +84,29 @@
             <div class="tab-content active" id="text-tab">
                 <div class="card">
                     <div class="card-header">
-                        <h2>Р’РІРµРґРёС‚Рµ С‚РµРєСЃС‚ РґР»СЏ РїСЂРѕРІРµСЂРєРё</h2>
-                        <p class="text-muted">Р’СЃС‚Р°РІСЊС‚Рµ С‚РµРєСЃС‚ РёР»Рё РІРІРµРґРёС‚Рµ РІСЂСѓС‡РЅСѓСЋ. РџРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ Ctrl+C/V</p>
+                        <h2>Введите текст для проверки</h2>
+                        <p class="text-muted">Вставьте текст или введите вручную. Поддерживается Ctrl+C/V</p>
                     </div>
                     <div class="card-body">
                         <textarea 
                             id="textInput" 
                             class="form-textarea" 
-                            placeholder="Р’СЃС‚Р°РІСЊС‚Рµ РІР°С€ С‚РµРєСЃС‚ СЃСЋРґР°..."
+                            placeholder="Вставьте ваш текст сюда..."
                             rows="12"
                         ></textarea>
                         
                         <div class="btn-group">
                             <button class="btn btn-primary" onclick="checkText()">
                                 <i class="fas fa-search"></i>
-                                РџСЂРѕРІРµСЂРёС‚СЊ С‚РµРєСЃС‚
+                                Проверить текст
                             </button>
                             <button class="btn btn-secondary" onclick="clearText()">
                                 <i class="fas fa-trash"></i>
-                                РћС‡РёСЃС‚РёС‚СЊ
+                                Очистить
                             </button>
                             <button class="btn btn-info" onclick="loadSample()">
                                 <i class="fas fa-file-import"></i>
-                                Р—Р°РіСЂСѓР·РёС‚СЊ РїСЂРёРјРµСЂ
+                                Загрузить пример
                             </button>
                         </div>
                     </div>
@@ -115,10 +115,10 @@
                 <!-- Results -->
                 <div class="card results-card" id="textResults" style="display: none;">
                     <div class="card-header">
-                        <h2>Р РµР·СѓР»СЊС‚Р°С‚С‹ РїСЂРѕРІРµСЂРєРё</h2>
+                        <h2>Результаты проверки</h2>
                         <button class="btn btn-sm btn-success" onclick="exportReport('text')">
                             <i class="fas fa-download"></i>
-                            РЎРєР°С‡Р°С‚СЊ РѕС‚С‡С‘С‚
+                            Скачать отчёт
                         </button>
                     </div>
                     <div class="card-body">
@@ -131,8 +131,8 @@
             <div class="tab-content" id="url-tab">
                 <div class="card">
                     <div class="card-header">
-                        <h2>РџСЂРѕРІРµСЂРєР° РІРµР±-СЃР°Р№С‚Р°</h2>
-                        <p class="text-muted">Р’РІРµРґРёС‚Рµ URL СЃР°Р№С‚Р° РґР»СЏ РїСЂРѕРІРµСЂРєРё РµРіРѕ СЃРѕРґРµСЂР¶РёРјРѕРіРѕ</p>
+                        <h2>Проверка веб-сайта</h2>
+                        <p class="text-muted">Введите URL сайта для проверки его содержимого</p>
                     </div>
                     <div class="card-body">
                         <div class="url-input-group">
@@ -145,7 +145,7 @@
                             >
                             <button class="btn btn-primary" onclick="checkUrl()">
                                 <i class="fas fa-search"></i>
-                                РџСЂРѕРІРµСЂРёС‚СЊ СЃР°Р№С‚
+                                Проверить сайт
                             </button>
                         </div>
                         
@@ -158,10 +158,10 @@
                 <!-- URL Results -->
                 <div class="card results-card" id="urlResults" style="display: none;">
                     <div class="card-header">
-                        <h2>Р РµР·СѓР»СЊС‚Р°С‚С‹ РїСЂРѕРІРµСЂРєРё СЃР°Р№С‚Р°</h2>
+                        <h2>Результаты проверки сайта</h2>
                         <button class="btn btn-sm btn-success" onclick="exportReport('url')">
                             <i class="fas fa-download"></i>
-                            РЎРєР°С‡Р°С‚СЊ РѕС‚С‡С‘С‚
+                            Скачать отчёт
                         </button>
                     </div>
                     <div class="card-body">
@@ -174,18 +174,18 @@
             <div class="tab-content" id="batch-tab">
                 <div class="card">
                     <div class="card-header">
-                        <h2>РџР°РєРµС‚РЅР°СЏ РїСЂРѕРІРµСЂРєР° СЃРїРёСЃРєР° URL</h2>
-                        <p class="text-muted">РџСЂРѕРІРµСЂСЊС‚Рµ РЅРµСЃРєРѕР»СЊРєРѕ СЃР°Р№С‚РѕРІ РѕРґРЅРѕРІСЂРµРјРµРЅРЅРѕ</p>
+                        <h2>Пакетная проверка списка URL</h2>
+                        <p class="text-muted">Проверьте несколько сайтов одновременно</p>
                     </div>
                     <div class="card-body">
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle"></i>
                             <div>
-                                <strong>РљР°Рє РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ:</strong>
+                                <strong>Как использовать:</strong>
                                 <ul>
-                                    <li>Р’РІРµРґРёС‚Рµ СЃРїРёСЃРѕРє URL (РїРѕ РѕРґРЅРѕРјСѓ РЅР° СЃС‚СЂРѕРєРµ)</li>
-                                    <li>РќР°Р¶РјРёС‚Рµ "РџСЂРѕРІРµСЂРёС‚СЊ РІСЃРµ"</li>
-                                    <li>Р”РѕР¶РґРёС‚РµСЃСЊ Р·Р°РІРµСЂС€РµРЅРёСЏ РїСЂРѕРІРµСЂРєРё</li>
+                                    <li>Введите список URL (по одному на строке)</li>
+                                    <li>Нажмите "Проверить все"</li>
+                                    <li>Дождитесь завершения проверки</li>
                                 </ul>
                             </div>
                         </div>
@@ -199,7 +199,7 @@
                         
                         <button class="btn btn-primary" onclick="checkBatch()">
                             <i class="fas fa-list-check"></i>
-                            РџСЂРѕРІРµСЂРёС‚СЊ РІСЃРµ
+                            Проверить все
                         </button>
                         
                         <div class="progress" id="batchProgress" style="display: none;">
@@ -212,10 +212,10 @@
                 <!-- Batch Results -->
                 <div class="card results-card" id="batchResults" style="display: none;">
                     <div class="card-header">
-                        <h2>Р РµР·СѓР»СЊС‚Р°С‚С‹ РїР°РєРµС‚РЅРѕР№ РїСЂРѕРІРµСЂРєРё</h2>
+                        <h2>Результаты пакетной проверки</h2>
                         <button class="btn btn-sm btn-success" onclick="exportReport('batch')">
                             <i class="fas fa-download"></i>
-                            РЎРєР°С‡Р°С‚СЊ РѕС‚С‡С‘С‚
+                            Скачать отчёт
                         </button>
                     </div>
                     <div class="card-body">
@@ -233,20 +233,20 @@
             <div class="footer-content">
                 <div class="footer-section">
                     <h3>LawChecker Online</h3>
-                    <p>РџСЂРѕС„РµСЃСЃРёРѕРЅР°Р»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР° С‚РµРєСЃС‚РѕРІ РЅР° СЃРѕРѕС‚РІРµС‚СЃС‚РІРёРµ Р¤Р— в„–168 Рѕ СЂСѓСЃСЃРєРѕРј СЏР·С‹РєРµ</p>
+                    <p>Профессиональная проверка текстов на соответствие ФЗ №168 о русском языке</p>
                 </div>
                 <div class="footer-section">
-                    <h3>РЎСЃС‹Р»РєРё</h3>
+                    <h3>Ссылки</h3>
                     <ul>
-                        <li><a href="#check">РџСЂРѕРІРµСЂРєР°</a></li>
+                        <li><a href="#check">Проверка</a></li>
                         <li><a href="#api">API</a></li>
-                        <li><a href="#about">Рћ СЃРµСЂРІРёСЃРµ</a></li>
+                        <li><a href="#about">О сервисе</a></li>
                     </ul>
                 </div>
                 <div class="footer-section">
-                    <h3>РљРѕРЅС‚Р°РєС‚С‹</h3>
-                    <p>В© 2026 LawChecker</p>
-                    <p>Р’СЃРµ РїСЂР°РІР° Р·Р°С‰РёС‰РµРЅС‹</p>
+                    <h3>Контакты</h3>
+                    <p>© 2026 LawChecker</p>
+                    <p>Все права защищены</p>
                 </div>
             </div>
         </div>
@@ -255,7 +255,7 @@
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay" style="display: none;">
         <div class="spinner"></div>
-        <p>РџСЂРѕРІРµСЂСЏСЋ...</p>
+        <p>Проверяю...</p>
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
