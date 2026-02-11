@@ -240,6 +240,7 @@ def get_stats():
             'normative': len(c.normative_words),
             'foreign': len(c.foreign_allowed),
             'nenormative': len(c.nenormative_words),
+            'abbreviations': len(c.abbreviations),
             'morph_available': c.morph is not None
         }
         
@@ -250,6 +251,7 @@ def get_stats():
             'normative': 0,
             'foreign': 0,
             'nenormative': 0,
+            'abbreviations': 0,
             'morph_available': False,
             'error': str(e)
         }), 500

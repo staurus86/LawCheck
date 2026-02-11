@@ -39,8 +39,6 @@ function initTabs() {
 // Загрузка статистики словарей
 async function loadStats() {
     try {
-        console.log('🔄 Загружаю статистику...');
-        
         const response = await fetch(`${API_BASE}/api/stats`);
         
         if (!response.ok) {
@@ -48,12 +46,12 @@ async function loadStats() {
         }
         
         const data = await response.json();
-        console.log('📊 Получена статистика:', data);
         
         // Безопасное обновление с проверками
         const normativeEl = document.getElementById('statNormative');
         const foreignEl = document.getElementById('statForeign');
         const nenormativeEl = document.getElementById('statNenormative');
+        const abbrEl = document.getElementById('statAbbreviations');
         
         if (normativeEl && data.normative !== undefined) {
             normativeEl.textContent = data.normative.toLocaleString('ru-RU');
@@ -67,19 +65,21 @@ async function loadStats() {
             nenormativeEl.textContent = data.nenormative.toLocaleString('ru-RU');
         }
         
-        console.log('✅ Статистика загружена успешно');
+        if (abbrEl && data.abbreviations !== undefined) {
+            abbrEl.textContent = data.abbreviations.toLocaleString('ru-RU');
+        }
         
     } catch (error) {
-        console.error('❌ Ошибка загрузки статистики:', error);
-        
         // Показываем "0" вместо ошибки
         const normativeEl = document.getElementById('statNormative');
         const foreignEl = document.getElementById('statForeign');
         const nenormativeEl = document.getElementById('statNenormative');
+        const abbrEl = document.getElementById('statAbbreviations');
         
         if (normativeEl) normativeEl.textContent = '0';
         if (foreignEl) foreignEl.textContent = '0';
         if (nenormativeEl) nenormativeEl.textContent = '0';
+        if (abbrEl) abbrEl.textContent = '0';
     }
 }
 
