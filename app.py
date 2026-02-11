@@ -1,8 +1,8 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Flask API РґР»СЏ РїСЂРѕРІРµСЂРєРё С‚РµРєСЃС‚Р° РЅР° СЃРѕРѕС‚РІРµС‚СЃС‚РІРёРµ Р·Р°РєРѕРЅСѓ в„–168-Р¤Р—
-РЈР›РЈР§РЁР•РќРќРђРЇ Р’Р•Р РЎРРЇ СЃ РјР°РєСЃРёРјР°Р»СЊРЅС‹Рј С„СѓРЅРєС†РёРѕРЅР°Р»РѕРј
+Flask API для проверки текста на соответствие закону №168-ФЗ
+УЛУЧШЕННАЯ ВЕРСИЯ с максимальным функционалом
 """
 
 from flask import Flask, render_template, request, jsonify, send_file, session
@@ -18,7 +18,7 @@ import uuid
 from collections import defaultdict
 
 app = Flask(__name__)
-# CORS - СЂР°Р·СЂРµС€Р°РµРј РІСЃРµ РґРѕРјРµРЅС‹
+# CORS - разрешаем все домены
 CORS(app, resources={
     r"/api/*": {
         "origins": "*",
@@ -27,10 +27,10 @@ CORS(app, resources={
     }
 })
 
-# РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ С‡РµРєРµСЂР°
+# Инициализация чекера
 checker = RussianLanguageChecker()
 
-# РҐСЂР°РЅРёР»РёС‰Рµ РёСЃС‚РѕСЂРёРё РїСЂРѕРІРµСЂРѕРє (РІ РїСЂРѕРґР°РєС€РµРЅРµ РёСЃРїРѕР»СЊР·СѓР№С‚Рµ Redis/Database)
+# Хранилище истории проверок (в продакшене используйте Redis/Database)
 check_history = []
 statistics = {
     'total_checks': 0,
@@ -40,22 +40,22 @@ statistics = {
 
 @app.route('/')
 def index():
-    """Р“Р»Р°РІРЅР°СЏ СЃС‚СЂР°РЅРёС†Р°"""
+    """Главная страница"""
     return render_template('index.html')
 
 @app.route('/about')
 def about():
-    """РЎС‚СЂР°РЅРёС†Р° Рѕ Р·Р°РєРѕРЅРµ"""
+    """Страница о законе"""
     return render_template('about.html')
 
 @app.route('/api-docs')
 def api_docs():
-    """API РґРѕРєСѓРјРµРЅС‚Р°С†РёСЏ"""
+    """API документация"""
     return render_template('api_docs.html')
 
 @app.route('/examples')
 def examples():
-    """РџСЂРёРјРµСЂС‹ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ"""
+    """Примеры использования"""
     return render_template('examples.html')
     
 @app.route('/robots.txt')
@@ -66,31 +66,31 @@ def robots():
 @app.route('/favicon.ico')
 def favicon():
     """Favicon"""
-    return '', 204  # No content - РёСЃРїРѕР»СЊР·СѓРµРј data URI РІ HTML
+    return '', 204  # No content - используем data URI в HTML
 
 # ==================== API ENDPOINTS ====================
 
 @app.route('/api/check', methods=['POST'])
 def check_text():
-    """API: РџСЂРѕРІРµСЂРєР° С‚РµРєСЃС‚Р°"""
+    """API: Проверка текста"""
     try:
         data = request.json
         text = data.get('text', '')
         save_history = data.get('save_history', True)
         
         if not text or not text.strip():
-            return jsonify({'error': 'РўРµРєСЃС‚ РЅРµ РїСЂРµРґРѕСЃС‚Р°РІР»РµРЅ'}), 400
+            return jsonify({'error': 'Текст не предоставлен'}), 400
         
         result = checker.check_text(text)
         
-        # Р”РѕР±Р°РІР»СЏРµРј СЂРµРєРѕРјРµРЅРґР°С†РёРё
+        # Добавляем рекомендации
         result['recommendations'] = generate_recommendations(result)
         
-        # РЎРѕС…СЂР°РЅСЏРµРј РІ РёСЃС‚РѕСЂРёСЋ
+        # Сохраняем в историю
         if save_history:
             save_to_history('text', result, text[:100])
         
-        # РћР±РЅРѕРІР»СЏРµРј СЃС‚Р°С‚РёСЃС‚РёРєСѓ
+        # Обновляем статистику
         update_statistics(result)
         
         return jsonify({
@@ -105,35 +105,35 @@ def check_text():
 
 @app.route('/api/check-url', methods=['POST'])
 def check_url():
-    """API: РџСЂРѕРІРµСЂРєР° URL"""
+    """API: Проверка URL"""
     try:
         data = request.json
         url = data.get('url', '')
         
         if not url or not url.startswith('http'):
-            return jsonify({'error': 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ URL'}), 400
+            return jsonify({'error': 'Некорректный URL'}), 400
         
-        # Р—Р°РіСЂСѓР·РєР° СЃС‚СЂР°РЅРёС†С‹
+        # Загрузка страницы
         response = requests.get(url, timeout=15, headers={
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # РЈРґР°Р»СЏРµРј РЅРµРЅСѓР¶РЅРѕРµ
+        # Удаляем ненужное
         for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
             tag.decompose()
         
-        # РР·РІР»РµРєР°РµРј С‚РµРєСЃС‚ Рё РјРµС‚Р°-РёРЅС„РѕСЂРјР°С†РёСЋ
+        # Извлекаем текст и мета-информацию
         text = soup.get_text(separator=' ', strip=True)
         title = soup.find('title')
-        title_text = title.get_text() if title else 'Р‘РµР· РЅР°Р·РІР°РЅРёСЏ'
+        title_text = title.get_text() if title else 'Без названия'
         
         result = checker.check_text(text)
         result['page_title'] = title_text
         result['recommendations'] = generate_recommendations(result)
         
-        # РЎРѕС…СЂР°РЅСЏРµРј РІ РёСЃС‚РѕСЂРёСЋ
+        # Сохраняем в историю
         save_to_history('url', result, url)
         update_statistics(result)
         
@@ -145,20 +145,20 @@ def check_url():
         })
     
     except Exception as e:
-        return jsonify({'error': f'РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё: {str(e)}'}), 500
+        return jsonify({'error': f'Ошибка загрузки: {str(e)}'}), 500
 
 @app.route('/api/batch-check', methods=['POST'])
 def batch_check():
-    """API: РџР°РєРµС‚РЅР°СЏ РїСЂРѕРІРµСЂРєР°"""
+    """API: Пакетная проверка"""
     try:
         data = request.json
         urls = data.get('urls', [])
         
         if not urls:
-            return jsonify({'error': 'РЎРїРёСЃРѕРє URL РїСѓСЃС‚'}), 400
+            return jsonify({'error': 'Список URL пуст'}), 400
         
         results = []
-        for url in urls[:50]:  # Р›РёРјРёС‚ 50 URL Р·Р° СЂР°Р·
+        for url in urls[:50]:  # Лимит 50 URL за раз
             try:
                 response = requests.get(url, timeout=10, headers={
                     'User-Agent': 'Mozilla/5.0'
@@ -194,7 +194,7 @@ def batch_check():
 
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
-    """API: РЎС‚Р°С‚РёСЃС‚РёРєР° СЃР»РѕРІР°СЂРµР№"""
+    """API: Статистика словарей"""
     try:
         stats_data = {
             'normative': len(checker.normative_words),
@@ -203,12 +203,12 @@ def get_stats():
             'morph_available': checker.morph is not None
         }
         
-        print(f"рџ“Љ РћС‚РїСЂР°РІРєР° СЃС‚Р°С‚РёСЃС‚РёРєРё: {stats_data}")  # Р”Р»СЏ РѕС‚Р»Р°РґРєРё
+        print(f"📊 Отправка статистики: {stats_data}")  # Для отладки
         
         return jsonify(stats_data)
     
     except Exception as e:
-        print(f"вќЊ РћС€РёР±РєР° РІ /api/stats: {e}")
+        print(f"❌ Ошибка в /api/stats: {e}")
         return jsonify({
             'normative': 0,
             'foreign': 0,
@@ -219,7 +219,7 @@ def get_stats():
 
 @app.route('/api/history', methods=['GET'])
 def get_history():
-    """API: РСЃС‚РѕСЂРёСЏ РїСЂРѕРІРµСЂРѕРє"""
+    """API: История проверок"""
     limit = int(request.args.get('limit', 10))
     return jsonify({
         'history': check_history[-limit:][::-1],
@@ -228,67 +228,151 @@ def get_history():
 
 @app.route('/api/export/txt', methods=['POST'])
 def export_txt():
-    """Р­РєСЃРїРѕСЂС‚ РѕС‚С‡РµС‚Р° РІ TXT"""
+    """Экспорт отчета в TXT с полной информацией и правильной кодировкой"""
     try:
         data = request.get_json()
         result = data.get('result', {})
         
-        # Р¤РѕСЂРјРёСЂСѓРµРј РѕС‚С‡РµС‚
+        # Формируем улучшенный отчет
         lines = []
-        lines.append("=" * 60)
-        lines.append("РћРўР§Р•Рў РџР РћР’Р•Р РљР РўР•РљРЎРўРђ РќРђ РЎРћРћРўР’Р•РўРЎРўР’РР• Р¤Р—-168")
-        lines.append("=" * 60)
-        lines.append(f"Р”Р°С‚Р° РїСЂРѕРІРµСЂРєРё: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+        lines.append("=" * 70)
+        lines.append("ОТЧЕТ ПРОВЕРКИ ТЕКСТА НА СООТВЕТСТВИЕ ФЗ-168")
+        lines.append("=" * 70)
+        lines.append(f"Дата проверки: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+        lines.append(f"ID проверки: {str(uuid.uuid4())[:8]}")
         lines.append("")
         
-        # РЎС‚Р°С‚РёСЃС‚РёРєР°
-        lines.append("РЎРўРђРўРРЎРўРРљРђ:")
-        lines.append(f"  Р’СЃРµРіРѕ СЃР»РѕРІ: {result.get('total_words', 0)}")
-        lines.append(f"  РќРѕСЂРјР°С‚РёРІРЅС‹С…: {result.get('normative_count', 0)}")
-        lines.append(f"  РРЅРѕСЃС‚СЂР°РЅРЅС‹С…: {result.get('foreign_count', 0)}")
-        lines.append(f"  РќРµРЅРѕСЂРјР°С‚РёРІРЅС‹С…: {result.get('nenormative_count', 0)}")
-        lines.append(f"  РћСЂС„РѕРіСЂР°С„РёС‡РµСЃРєРёС…: {result.get('orfograf_count', 0)}")
-        lines.append(f"  РћСЂС„РѕСЌРїРёС‡РµСЃРєРёС…: {result.get('orfoep_count', 0)}")
+        # Общая статистика
+        lines.append("-" * 70)
+        lines.append("ОБЩАЯ СТАТИСТИКА:")
+        lines.append("-" * 70)
+        lines.append(f"  Всего слов в тексте:     {result.get('total_words', 0)}")
+        lines.append(f"  Уникальных слов:         {result.get('unique_words', 0)}")
+        lines.append(f"  Нарушений найдено:       {result.get('violations_count', 0)}")
         lines.append("")
         
-        # РџСЂРѕС†РµРЅС‚ СЃРѕРѕС‚РІРµС‚СЃС‚РІРёСЏ
+        # Детальная статистика по категориям
+        lines.append("-" * 70)
+        lines.append("ДЕТАЛЬНАЯ СТАТИСТИКА:")
+        lines.append("-" * 70)
+        lines.append(f"  ✅ Нормативные слова:   {result.get('normative_count', result.get('total_words', 0) - result.get('violations_count', 0))}")
+        lines.append(f"  🌍 Иностранные слова:   {result.get('foreign_count', result.get('latin_count', 0))}")
+        lines.append(f"  🚫 Ненормативная лексика: {result.get('nenormative_count', 0)}")
+        lines.append(f"  ✏️ Орфографические:      {result.get('orfograf_count', 0)}")
+        lines.append(f"  🔊 Орфоэпические:        {result.get('orfoep_count', 0)}")
+        lines.append(f"  ❓ Неизвестные слова:    {result.get('unknown_count', 0)}")
+        lines.append("")
+        
+        # Процент соответствия
         compliance = result.get('compliance_percentage', 0)
-        lines.append(f"РџР РћР¦Р•РќРў РЎРћРћРўР’Р•РўРЎРўР’РРЇ: {compliance:.2f}%")
+        if result.get('law_compliant', result.get('violations_count', 0) == 0):
+            compliance = 100.0
+            status = "✅ СООТВЕТСТВУЕТ"
+        else:
+            total = result.get('total_words', 1)
+            violations = result.get('violations_count', 0)
+            compliance = ((total - violations) / total) * 100 if total > 0 else 0
+            status = "❌ НЕ СООТВЕТСТВУЕТ"
+        
+        lines.append("-" * 70)
+        lines.append(f"СТАТУС: {status}")
+        lines.append(f"ПРОЦЕНТ СООТВЕТСТВИЯ: {compliance:.2f}%")
+        lines.append("-" * 70)
         lines.append("")
         
-        # РќР°Р№РґРµРЅРЅС‹Рµ СЃР»РѕРІР°
-        if result.get('foreign_words'):
-            lines.append("РРќРћРЎРўР РђРќРќР«Р• РЎР›РћР’Рђ:")
-            for word in result['foreign_words']:
-                lines.append(f"  - {word}")
+        # Найденные нарушения с детализацией
+        has_violations = False
+        
+        # Ненормативная лексика
+        nenormative_words = result.get('nenormative_words', [])
+        if nenormative_words:
+            has_violations = True
+            lines.append("=" * 70)
+            lines.append(f"🚫 НЕНОРМАТИВНАЯ ЛЕКСИКА ({len(nenormative_words)} слов):")
+            lines.append("=" * 70)
+            for i, word in enumerate(nenormative_words, 1):
+                lines.append(f"  {i:3d}. {word}")
             lines.append("")
         
-        if result.get('nenormative_words'):
-            lines.append("РќР•РќРћР РњРђРўРР’РќР«Р• РЎР›РћР’Рђ:")
-            for word in result['nenormative_words']:
-                lines.append(f"  - {word}")
+        # Слова на латинице
+        latin_words = result.get('latin_words', [])
+        if latin_words:
+            has_violations = True
+            lines.append("=" * 70)
+            lines.append(f"🌍 ИНОСТРАННЫЕ СЛОВА НА ЛАТИНИЦЕ ({len(latin_words)} слов):")
+            lines.append("=" * 70)
+            for i, word in enumerate(latin_words, 1):
+                lines.append(f"  {i:3d}. {word}")
             lines.append("")
         
-        if result.get('orfograf_words'):
-            lines.append("РћР Р¤РћР“Р РђР¤РР§Р•РЎРљРР• РћРЁРР‘РљР:")
-            for word in result['orfograf_words']:
-                lines.append(f"  - {word}")
+        # Неизвестные/англицизмы
+        unknown_cyrillic = result.get('unknown_cyrillic', [])
+        if unknown_cyrillic:
+            has_violations = True
+            lines.append("=" * 70)
+            lines.append(f"❓ АНГЛИЦИЗМЫ / НЕИЗВЕСТНЫЕ СЛОВА ({len(unknown_cyrillic)} слов):")
+            lines.append("=" * 70)
+            for i, word in enumerate(unknown_cyrillic, 1):
+                lines.append(f"  {i:3d}. {word}")
             lines.append("")
         
-        if result.get('orfoep_words'):
-            lines.append("РћР Р¤РћР­РџРР§Р•РЎРљРР• РћРЁРР‘РљР:")
-            for word in result['orfoep_words']:
-                lines.append(f"  - {word}")
+        # Орфографические ошибки
+        orfograf_words = result.get('orfograf_words', [])
+        if orfograf_words:
+            has_violations = True
+            lines.append("=" * 70)
+            lines.append(f"✏️ ОРФОГРАФИЧЕСКИЕ ОШИБКИ ({len(orfograf_words)} слов):")
+            lines.append("=" * 70)
+            for i, word in enumerate(orfograf_words, 1):
+                lines.append(f"  {i:3d}. {word}")
             lines.append("")
         
-        lines.append("=" * 60)
-        lines.append("РЎРѕР·РґР°РЅРѕ: LawChecker Online - https://lawcheck-production.up.railway.app")
-        lines.append("=" * 60)
+        # Орфоэпические ошибки
+        orfoep_words = result.get('orfoep_words', [])
+        if orfoep_words:
+            has_violations = True
+            lines.append("=" * 70)
+            lines.append(f"🔊 ОРФОЭПИЧЕСКИЕ ОШИБКИ ({len(orfoep_words)} слов):")
+            lines.append("=" * 70)
+            for i, word in enumerate(orfoep_words, 1):
+                lines.append(f"  {i:3d}. {word}")
+            lines.append("")
+        
+        if not has_violations:
+            lines.append("=" * 70)
+            lines.append("✅ НАРУШЕНИЙ НЕ ОБНАРУЖЕНО")
+            lines.append("=" * 70)
+            lines.append("")
+            lines.append("Текст полностью соответствует требованиям закона о русском языке.")
+            lines.append("")
+        
+        # Рекомендации
+        recommendations = result.get('recommendations', [])
+        if recommendations:
+            lines.append("=" * 70)
+            lines.append("РЕКОМЕНДАЦИИ:")
+            lines.append("=" * 70)
+            for rec in recommendations:
+                level = rec.get('level', 'info')
+                icon = '🔴' if level == 'critical' else '🟡' if level == 'warning' else '🟢' if level == 'success' else 'ℹ️'
+                lines.append(f"{icon} {rec.get('title', '')}")
+                lines.append(f"   {rec.get('message', '')}")
+                if rec.get('action'):
+                    lines.append(f"   → Действие: {rec['action']}")
+                lines.append("")
+        
+        # Подвал
+        lines.append("=" * 70)
+        lines.append("Создано: LawChecker Online")
+        lines.append("Сайт: https://lawcheck-production.up.railway.app")
+        lines.append("Закон: Федеральный закон №168-ФЗ «О русском языке»")
+        lines.append("=" * 70)
         
         report = "\n".join(lines)
         
-        # РЎРѕР·РґР°РµРј С„Р°Р№Р» РІ РїР°РјСЏС‚Рё
+        # Создаем файл с BOM для Windows-совместимости
         output = io.BytesIO()
+        output.write('\ufeff'.encode('utf-8'))  # UTF-8 BOM
         output.write(report.encode('utf-8'))
         output.seek(0)
         
@@ -304,12 +388,12 @@ def export_txt():
 
 @app.route('/api/export/json', methods=['POST'])
 def export_json():
-    """Р­РєСЃРїРѕСЂС‚ РѕС‚С‡РµС‚Р° РІ JSON"""
+    """Экспорт отчета в JSON"""
     try:
         data = request.get_json()
         result = data.get('result', {})
         
-        # Р”РѕР±Р°РІР»СЏРµРј РјРµС‚Р°РґР°РЅРЅС‹Рµ
+        # Добавляем метаданные
         result['exported_at'] = datetime.now().isoformat()
         result['tool'] = 'LawChecker Online'
         
@@ -327,135 +411,10 @@ def export_json():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
-
-@app.route('/api/analyze', methods=['POST'])
-def analyze_text():
-    """API: Р”РµС‚Р°Р»СЊРЅС‹Р№ Р°РЅР°Р»РёР· С‚РµРєСЃС‚Р°"""
-    try:
-        data = request.json
-        text = data.get('text', '')
-        
-        if not text:
-            return jsonify({'error': 'РўРµРєСЃС‚ РЅРµ РїСЂРµРґРѕСЃС‚Р°РІР»РµРЅ'}), 400
-        
-        result = checker.check_text(text)
-        
-        # Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅР°СЏ Р°РЅР°Р»РёС‚РёРєР°
-        analysis = {
-            'readability': calculate_readability(text),
-            'word_frequency': get_word_frequency(text),
-            'sentence_count': len([s for s in text.split('.') if s.strip()]),
-            'avg_word_length': sum(len(w) for w in text.split()) / max(len(text.split()), 1),
-            'complexity_score': calculate_complexity(text),
-        }
-        
-        return jsonify({
-            'success': True,
-            'result': result,
-            'analysis': analysis,
-            'recommendations': generate_recommendations(result)
-        })
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/suggest-fixes', methods=['POST'])
-def suggest_fixes():
-    """API: РџСЂРµРґР»РѕР¶РµРЅРёСЏ РїРѕ РёСЃРїСЂР°РІР»РµРЅРёСЋ"""
-    try:
-        data = request.json
-        words = data.get('words', [])
-        
-        suggestions = {}
-        for word in words[:50]:
-            suggestions[word] = get_word_suggestions(word)
-        
-        return jsonify({
-            'success': True,
-            'suggestions': suggestions
-        })
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/export/<format>', methods=['POST'])
-def export_report(format):
-    """API: Р­РєСЃРїРѕСЂС‚ РѕС‚С‡С‘С‚Р° РІ СЂР°Р·РЅС‹С… С„РѕСЂРјР°С‚Р°С…"""
-    try:
-        data = request.json
-        result = data.get('result')
-        
-        if not result:
-            return jsonify({'error': 'РќРµС‚ РґР°РЅРЅС‹С…'}), 400
-        
-        if format == 'txt':
-            report = generate_text_report(result)
-            buffer = io.BytesIO(report.encode('utf-8'))
-            mimetype = 'text/plain'
-            filename = f'law_check_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
-        
-        elif format == 'json':
-            report = json.dumps(result, ensure_ascii=False, indent=2)
-            buffer = io.BytesIO(report.encode('utf-8'))
-            mimetype = 'application/json'
-            filename = f'law_check_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
-        
-        elif format == 'csv':
-            report = generate_csv_report(result)
-            buffer = io.BytesIO(report.encode('utf-8'))
-            mimetype = 'text/csv'
-            filename = f'law_check_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-        
-        elif format == 'html':
-            report = generate_html_report(result)
-            buffer = io.BytesIO(report.encode('utf-8'))
-            mimetype = 'text/html'
-            filename = f'law_check_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html'
-        
-        else:
-            return jsonify({'error': 'РќРµРїРѕРґРґРµСЂР¶РёРІР°РµРјС‹Р№ С„РѕСЂРјР°С‚'}), 400
-        
-        buffer.seek(0)
-        return send_file(buffer, mimetype=mimetype, as_attachment=True, download_name=filename)
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/compare', methods=['POST'])
-def compare_texts():
-    """API: РЎСЂР°РІРЅРµРЅРёРµ РґРІСѓС… С‚РµРєСЃС‚РѕРІ"""
-    try:
-        data = request.json
-        text1 = data.get('text1', '')
-        text2 = data.get('text2', '')
-        
-        result1 = checker.check_text(text1)
-        result2 = checker.check_text(text2)
-        
-        comparison = {
-            'text1': result1,
-            'text2': result2,
-            'difference': {
-                'violations_delta': result2['violations_count'] - result1['violations_count'],
-                'improved': result2['violations_count'] < result1['violations_count'],
-                'improvement_percent': calculate_improvement(result1, result2)
-            }
-        }
-        
-        return jsonify({
-            'success': True,
-            'comparison': comparison
-        })
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-# ==================== Р’РЎРџРћРњРћР“РђРўР•Р›Р¬РќР«Р• Р¤РЈРќРљР¦РР ====================
+# ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 
 def save_to_history(check_type, result, context):
-    """РЎРѕС…СЂР°РЅРµРЅРёРµ РІ РёСЃС‚РѕСЂРёСЋ"""
+    """Сохранение в историю"""
     check_history.append({
         'id': str(uuid.uuid4()),
         'type': check_type,
@@ -465,86 +424,86 @@ def save_to_history(check_type, result, context):
         'context': context
     })
     
-    # РћРіСЂР°РЅРёС‡РёРІР°РµРј СЂР°Р·РјРµСЂ РёСЃС‚РѕСЂРёРё
+    # Ограничиваем размер истории
     if len(check_history) > 1000:
         check_history.pop(0)
 
 def update_statistics(result):
-    """РћР±РЅРѕРІР»РµРЅРёРµ СЃС‚Р°С‚РёСЃС‚РёРєРё"""
+    """Обновление статистики"""
     statistics['total_checks'] += 1
     statistics['total_violations'] += result['violations_count']
     
-    # РџРѕРґСЃС‡С‘С‚ С‡Р°СЃС‚С‹С… РЅР°СЂСѓС€РµРЅРёР№
+    # Подсчет частых нарушений
     for word in result.get('latin_words', [])[:10]:
         statistics['most_common_violations'][word] += 1
     for word in result.get('unknown_cyrillic', [])[:10]:
         statistics['most_common_violations'][word] += 1
 
 def generate_recommendations(result):
-    """Р“РµРЅРµСЂР°С†РёСЏ СЂРµРєРѕРјРµРЅРґР°С†РёР№ РїРѕ РёСЃРїСЂР°РІР»РµРЅРёСЋ"""
+    """Генерация рекомендаций по исправлению"""
     recommendations = []
     
     if result.get('nenormative_count', 0) > 0:
         recommendations.append({
             'level': 'critical',
-            'icon': 'рџљ«',
-            'title': 'РќРµРЅРѕСЂРјР°С‚РёРІРЅР°СЏ Р»РµРєСЃРёРєР°',
-            'message': f'РћР±РЅР°СЂСѓР¶РµРЅРѕ {result["nenormative_count"]} СЃР»РѕРІ РЅРµРЅРѕСЂРјР°С‚РёРІРЅРѕР№ Р»РµРєСЃРёРєРё. Р­С‚Рѕ РљР РРўРР§Р•РЎРљРћР• РЅР°СЂСѓС€РµРЅРёРµ Р·Р°РєРѕРЅР°.',
-            'action': 'Р—Р°РјРµРЅРёС‚Рµ РёР»Рё СѓРґР°Р»РёС‚Рµ РІСЃРµ РЅРµРЅРѕСЂРјР°С‚РёРІРЅС‹Рµ РІС‹СЂР°Р¶РµРЅРёСЏ.'
+            'icon': '🚫',
+            'title': 'Ненормативная лексика',
+            'message': f"Обнаружено {result['nenormative_count']} слов ненормативной лексики. Это КРИТИЧЕСКОЕ нарушение закона.",
+            'action': 'Замените или удалите все ненормативные выражения.'
         })
     
     if result.get('latin_count', 0) > 0:
         recommendations.append({
             'level': 'warning',
-            'icon': 'вљ пёЏ',
-            'title': 'Р›Р°С‚РёРЅРёС†Р° РІ С‚РµРєСЃС‚Рµ',
-            'message': f'РќР°Р№РґРµРЅРѕ {result["latin_count"]} СЃР»РѕРІ РЅР° Р»Р°С‚РёРЅРёС†Рµ.',
-            'action': 'Р—Р°РјРµРЅРёС‚Рµ Р°РЅРіР»РёР№СЃРєРёРµ СЃР»РѕРІР° РЅР° СЂСѓСЃСЃРєРёРµ Р°РЅР°Р»РѕРіРё РёР»Рё РґРѕР±Р°РІСЊС‚Рµ РїРѕСЏСЃРЅРµРЅРёСЏ РІ СЃРєРѕР±РєР°С….'
+            'icon': '⚠️',
+            'title': 'Латиница в тексте',
+            'message': f"Найдено {result['latin_count']} слов на латинице.",
+            'action': 'Замените английские слова на русские аналоги или добавьте пояснения в скобках.'
         })
     
     if result.get('unknown_count', 0) > 0:
         recommendations.append({
             'level': 'info',
-            'icon': 'в„№пёЏ',
-            'title': 'РќРµРёР·РІРµСЃС‚РЅС‹Рµ СЃР»РѕРІР°',
-            'message': f'РћР±РЅР°СЂСѓР¶РµРЅРѕ {result["unknown_count"]} РїРѕС‚РµРЅС†РёР°Р»СЊРЅС‹С… Р°РЅРіР»РёС†РёР·РјРѕРІ РёР»Рё РЅРµРёР·РІРµСЃС‚РЅС‹С… СЃР»РѕРІ.',
-            'action': 'РџСЂРѕРІРµСЂСЊС‚Рµ РєРѕСЂСЂРµРєС‚РЅРѕСЃС‚СЊ РЅР°РїРёСЃР°РЅРёСЏ РёР»Рё РёСЃРїРѕР»СЊР·СѓР№С‚Рµ РѕР±С‰РµРїСЂРёРЅСЏС‚С‹Рµ С‚РµСЂРјРёРЅС‹.'
+            'icon': 'ℹ️',
+            'title': 'Неизвестные слова',
+            'message': f"Обнаружено {result['unknown_count']} потенциальных англицизмов или неизвестных слов.",
+            'action': 'Проверьте корректность написания или используйте общепринятые термины.'
         })
     
     if result['law_compliant']:
         recommendations.append({
             'level': 'success',
-            'icon': 'вњ…',
-            'title': 'РўРµРєСЃС‚ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚ Р·Р°РєРѕРЅСѓ',
-            'message': 'РќР°СЂСѓС€РµРЅРёР№ РЅРµ РѕР±РЅР°СЂСѓР¶РµРЅРѕ. РўРµРєСЃС‚ РїРѕР»РЅРѕСЃС‚СЊСЋ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚ С‚СЂРµР±РѕРІР°РЅРёСЏРј Р¤Р— в„–168.',
-            'action': 'РњРѕР¶РЅРѕ РїСѓР±Р»РёРєРѕРІР°С‚СЊ Р±РµР· РёР·РјРµРЅРµРЅРёР№.'
+            'icon': '✅',
+            'title': 'Текст соответствует закону',
+            'message': 'Нарушений не обнаружено. Текст полностью соответствует требованиям ФЗ №168.',
+            'action': 'Можно публиковать без изменений.'
         })
     
     return recommendations
 
 def get_word_suggestions(word):
-    """РџРѕР»СѓС‡РµРЅРёРµ РїСЂРµРґР»РѕР¶РµРЅРёР№ РїРѕ Р·Р°РјРµРЅРµ СЃР»РѕРІР°"""
-    # Р—РґРµСЃСЊ РјРѕР¶РЅРѕ РґРѕР±Р°РІРёС‚СЊ Р»РѕРіРёРєСѓ РїРѕРґР±РѕСЂР° СЃРёРЅРѕРЅРёРјРѕРІ
+    """Получение предложений по замене слова"""
+    # Здесь можно добавить логику подбора синонимов
     suggestions = []
     
-    # РџСЂРѕСЃС‚С‹Рµ РїСЂРёРјРµСЂС‹ Р·Р°РјРµРЅ (СЂР°СЃС€РёСЂСЊС‚Рµ РїРѕРґ СЃРІРѕРё РЅСѓР¶РґС‹)
+    # Простые примеры замен (расширьте под свои нужды)
     replacements = {
-        'hello': 'РїСЂРёРІРµС‚',
-        'world': 'РјРёСЂ',
-        'computer': 'РєРѕРјРїСЊСЋС‚РµСЂ',
-        'email': 'СЌР»РµРєС‚СЂРѕРЅРЅР°СЏ РїРѕС‡С‚Р°',
-        'internet': 'РёРЅС‚РµСЂРЅРµС‚',
-        'software': 'РїСЂРѕРіСЂР°РјРјРЅРѕРµ РѕР±РµСЃРїРµС‡РµРЅРёРµ',
+        'hello': 'привет',
+        'world': 'мир',
+        'computer': 'компьютер',
+        'email': 'электронная почта',
+        'internet': 'интернет',
+        'software': 'программное обеспечение',
     }
     
     word_lower = word.lower()
     if word_lower in replacements:
         suggestions.append(replacements[word_lower])
     
-    return suggestions if suggestions else ['РќРµС‚ РїСЂРµРґР»РѕР¶РµРЅРёР№']
+    return suggestions if suggestions else ['Нет предложений']
 
 def calculate_readability(text):
-    """Р Р°СЃС‡С‘С‚ РёРЅРґРµРєСЃР° С‡РёС‚Р°РµРјРѕСЃС‚Рё"""
+    """Расчет индекса читаемости"""
     words = text.split()
     sentences = [s for s in text.split('.') if s.strip()]
     
@@ -554,13 +513,13 @@ def calculate_readability(text):
     avg_sentence_length = len(words) / len(sentences)
     avg_word_length = sum(len(w) for w in words) / len(words)
     
-    # РџСЂРѕСЃС‚РѕР№ РёРЅРґРµРєСЃ (С‡РµРј РјРµРЅСЊС€Рµ, С‚РµРј Р»СѓС‡С€Рµ)
+    # Простой индекс (чем меньше, тем лучше)
     readability = (avg_sentence_length * 0.5) + (avg_word_length * 2)
     
     return round(readability, 2)
 
 def get_word_frequency(text):
-    """Р§Р°СЃС‚РѕС‚РЅРѕСЃС‚СЊ СЃР»РѕРІ"""
+    """Частотность слов"""
     words = text.lower().split()
     frequency = defaultdict(int)
     
@@ -571,7 +530,7 @@ def get_word_frequency(text):
     return dict(sorted(frequency.items(), key=lambda x: x[1], reverse=True)[:10])
 
 def calculate_complexity(text):
-    """РћС†РµРЅРєР° СЃР»РѕР¶РЅРѕСЃС‚Рё С‚РµРєСЃС‚Р° (0-100)"""
+    """Оценка сложности текста (0-100)"""
     words = text.split()
     
     if not words:
@@ -586,7 +545,7 @@ def calculate_complexity(text):
     return min(100, round(complexity, 2))
 
 def calculate_improvement(result1, result2):
-    """Р Р°СЃС‡С‘С‚ РїСЂРѕС†РµРЅС‚Р° СѓР»СѓС‡С€РµРЅРёСЏ"""
+    """Расчет процента улучшения"""
     if result1['violations_count'] == 0:
         return 0
     
@@ -594,53 +553,53 @@ def calculate_improvement(result1, result2):
     return round(improvement, 2)
 
 def generate_text_report(result):
-    """Р“РµРЅРµСЂР°С†РёСЏ С‚РµРєСЃС‚РѕРІРѕРіРѕ РѕС‚С‡С‘С‚Р°"""
+    """Генерация текстового отчета"""
     output = "="*100 + "\n"
-    output += "РћРўР§РЃРў РџРћ РџР РћР’Р•Р РљР• Р—РђРљРћРќРђ Рћ Р РЈРЎРЎРљРћРњ РЇР—Р«РљР• в„–168-Р¤Р—\n"
-    output += f"РЎРѕР·РґР°РЅ: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    output += "ОТЧЁТ ПО ПРОВЕРКЕ ЗАКОНА О РУССКОМ ЯЗЫКЕ №168-ФЗ\n"
+    output += f"Создан: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
     output += "="*100 + "\n\n"
     
-    output += f"Р’СЃРµРіРѕ СЃР»РѕРІ: {result.get('total_words', 0)}\n"
-    output += f"РЈРЅРёРєР°Р»СЊРЅС‹С… СЃР»РѕРІ: {result.get('unique_words', 0)}\n"
-    output += f"РќР°СЂСѓС€РµРЅРёР№: {result.get('violations_count', 0)}\n\n"
+    output += f"Всего слов: {result.get('total_words', 0)}\n"
+    output += f"Уникальных слов: {result.get('unique_words', 0)}\n"
+    output += f"Нарушений: {result.get('violations_count', 0)}\n\n"
     
     if result.get('law_compliant'):
-        output += "вњ… РўР•РљРЎРў РЎРћРћРўР’Р•РўРЎРўР’РЈР•Рў РўР Р•Р‘РћР’РђРќРРЇРњ Р—РђРљРћРќРђ\n\n"
+        output += "✅ ТЕКСТ СООТВЕТСТВУЕТ ТРЕБОВАНИЯМ ЗАКОНА\n\n"
     else:
-        output += f"вљ пёЏ РћР‘РќРђР РЈР–Р•РќРћ РќРђР РЈРЁР•РќРР™: {result.get('violations_count', 0)}\n\n"
+        output += f"⚠️ ОБНАРУЖЕНО НАРУШЕНИЙ: {result.get('violations_count', 0)}\n\n"
         
         if result.get('nenormative_count', 0) > 0:
-            output += f"рџљ« РќРµРЅРѕСЂРјР°С‚РёРІРЅР°СЏ Р»РµРєСЃРёРєР°: {result['nenormative_count']}\n"
+            output += f"🚫 Ненормативная лексика: {result['nenormative_count']}\n"
         if result.get('latin_count', 0) > 0:
-            output += f"вљ пёЏ Р›Р°С‚РёРЅРёС†Р°: {result['latin_count']}\n"
+            output += f"⚠️ Латиница: {result['latin_count']}\n"
             for i, word in enumerate(result.get('latin_words', [])[:50], 1):
                 output += f"  {i}. {word}\n"
             output += "\n"
         if result.get('unknown_count', 0) > 0:
-            output += f"вљ пёЏ РђРЅРіР»РёС†РёР·РјС‹: {result['unknown_count']}\n"
+            output += f"⚠️ Англицизмы: {result['unknown_count']}\n"
             for i, word in enumerate(result.get('unknown_cyrillic', [])[:50], 1):
                 output += f"  {i}. {word}\n"
     
     return output
 
 def generate_csv_report(result):
-    """Р“РµРЅРµСЂР°С†РёСЏ CSV РѕС‚С‡С‘С‚Р°"""
-    output = "РўРёРї,РљРѕР»РёС‡РµСЃС‚РІРѕ,РЎР»РѕРІР°\n"
+    """Генерация CSV отчета"""
+    output = "Тип,Количество,Слова\n"
     
-    output += f"Р›Р°С‚РёРЅРёС†Р°,{result.get('latin_count', 0)},\"{', '.join(result.get('latin_words', [])[:20])}\"\n"
-    output += f"РђРЅРіР»РёС†РёР·РјС‹,{result.get('unknown_count', 0)},\"{', '.join(result.get('unknown_cyrillic', [])[:20])}\"\n"
-    output += f"РќРµРЅРѕСЂРјР°С‚РёРІРЅР°СЏ,{result.get('nenormative_count', 0)},\"[СЃРєСЂС‹С‚Рѕ]\"\n"
+    output += f"Латиница,{result.get('latin_count', 0)},\"{', '.join(result.get('latin_words', [])[:20])}\"\n"
+    output += f"Англицизмы,{result.get('unknown_count', 0)},\"{', '.join(result.get('unknown_cyrillic', [])[:20])}\"\n"
+    output += f"Ненормативная,{result.get('nenormative_count', 0)},\"[скрыто]\"\n"
     
     return output
 
 def generate_html_report(result):
-    """Р“РµРЅРµСЂР°С†РёСЏ HTML РѕС‚С‡С‘С‚Р°"""
+    """Генерация HTML отчета"""
     html = f"""
     <!DOCTYPE html>
     <html lang="ru">
     <head>
         <meta charset="UTF-8">
-        <title>РћС‚С‡С‘С‚ РїСЂРѕРІРµСЂРєРё Р¤Р— в„–168</title>
+        <title>Отчет проверки ФЗ №168</title>
         <style>
             body {{ font-family: Arial, sans-serif; max-width: 1000px; margin: 50px auto; padding: 20px; }}
             .header {{ background: #1976D2; color: white; padding: 20px; border-radius: 8px; }}
@@ -654,22 +613,22 @@ def generate_html_report(result):
     </head>
     <body>
         <div class="header">
-            <h1>рџ‡·рџ‡є РћС‚С‡С‘С‚ РїРѕ РїСЂРѕРІРµСЂРєРµ Р¤Р— в„–168</h1>
-            <p>РЎРѕР·РґР°РЅ: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <h1>🇷🇺 Отчет по проверке ФЗ №168</h1>
+            <p>Создан: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
         </div>
         
         <div class="status {'success' if result.get('law_compliant') else 'error'}">
-            {'вњ… РўР•РљРЎРў РЎРћРћРўР’Р•РўРЎРўР’РЈР•Рў РўР Р•Р‘РћР’РђРќРРЇРњ' if result.get('law_compliant') else f"вљ пёЏ РќРђР РЈРЁР•РќРР™: {result.get('violations_count', 0)}"}
+            {'✅ ТЕКСТ СООТВЕТСТВУЕТ ТРЕБОВАНИЯМ' if result.get('law_compliant') else f"⚠️ НАРУШЕНИЙ: {result.get('violations_count', 0)}"}
         </div>
         
         <div class="violations">
-            <h2>РЎС‚Р°С‚РёСЃС‚РёРєР°:</h2>
-            <p>Р’СЃРµРіРѕ СЃР»РѕРІ: {result.get('total_words', 0)}</p>
-            <p>РЈРЅРёРєР°Р»СЊРЅС‹С…: {result.get('unique_words', 0)}</p>
-            <p>Р›Р°С‚РёРЅРёС†Р°: {result.get('latin_count', 0)}</p>
-            <p>РђРЅРіР»РёС†РёР·РјС‹: {result.get('unknown_count', 0)}</p>
+            <h2>Статистика:</h2>
+            <p>Всего слов: {result.get('total_words', 0)}</p>
+            <p>Уникальных: {result.get('unique_words', 0)}</p>
+            <p>Латиница: {result.get('latin_count', 0)}</p>
+            <p>Англицизмы: {result.get('unknown_count', 0)}</p>
             
-            {f"<h3>РЎР»РѕРІР° РЅР° Р»Р°С‚РёРЅРёС†Рµ:</h3>" if result.get('latin_words') else ''}
+            {f"<h3>Слова на латинице:</h3>" if result.get('latin_words') else ''}
             {''.join([f'<span class="word-tag">{w}</span>' for w in result.get('latin_words', [])[:50]])}
         </div>
     </body>

@@ -1,6 +1,7 @@
-﻿// API Configuration
+// API Configuration
 const API_BASE = window.API_BASE_URL || 'http://localhost:5000';
 console.log('🔗 Using API:', API_BASE);
+
 // Global variables
 let currentResults = {
     text: null,
@@ -8,10 +9,11 @@ let currentResults = {
     batch: null
 };
 
-// Инициализация
+// Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     loadStats();
+    console.log('✅ LawChecker Online загружен');
 });
 
 // Переключение вкладок
@@ -34,7 +36,7 @@ function initTabs() {
     });
 }
 
-// Загрузка статистики (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// Загрузка статистики словарей
 async function loadStats() {
     try {
         console.log('🔄 Загружаю статистику...');
@@ -81,7 +83,6 @@ async function loadStats() {
     }
 }
 
-
 // Проверка текста
 async function checkText() {
     const text = document.getElementById('textInput').value.trim();
@@ -107,6 +108,7 @@ async function checkText() {
         if (data.success) {
             currentResults.text = data.result;
             displayResults('text', data.result);
+            console.log('✅ Текст проверен:', data.result);
         } else {
             alert('Ошибка: ' + data.error);
         }
@@ -143,6 +145,7 @@ async function checkUrl() {
         if (data.success) {
             currentResults.url = data.result;
             displayResults('url', data.result, url);
+            console.log('✅ URL проверен:', data.result);
         } else {
             alert('Ошибка: ' + data.error);
         }
@@ -209,70 +212,92 @@ async function checkBatch() {
     progressText.textContent = `${completed} / ${urls.length}`;
     currentResults.batch = results;
     displayBatchResults(results);
+    console.log('✅ Пакетная проверка завершена:', results);
 }
 
-// Отображение результатов
+// Отображение результатов проверки
 function displayResults(type, result, url = '') {
     const resultsCard = document.getElementById(`${type}Results`);
     const resultsContent = document.getElementById(`${type}ResultsContent`);
     
     let html = '';
     
-    // Статус
+    // Статус проверки
     if (result.law_compliant) {
         html += `
             <div class="result-status success">
-                ✅ ✅ ✅ ТЕКСТ СООТВЕТСТВУЕТ ТРЕБОВАНИЯМ ЗАКОНА
+                <div class="status-icon">✅</div>
+                <div class="status-text">
+                    <h3>ТЕКСТ СООТВЕТСТВУЕТ ТРЕБОВАНИЯМ ЗАКОНА</h3>
+                    <p>Нарушений не обнаружено. Текст можно публиковать.</p>
+                </div>
             </div>
         `;
     } else {
         html += `
             <div class="result-status error">
-                ⚠️ ОБНАРУЖЕНО НАРУШЕНИЙ: ${result.violations_count}
+                <div class="status-icon">⚠️</div>
+                <div class="status-text">
+                    <h3>ОБНАРУЖЕНО НАРУШЕНИЙ: ${result.violations_count}</h3>
+                    <p>Требуется исправление перед публикацией</p>
+                </div>
             </div>
         `;
         
-        // Нарушения
+        // Блок нарушений
         html += '<div class="violations-list">';
         
+        // Ненормативная лексика
         if (result.nenormative_count > 0) {
             html += `
-                <div class="violation-section">
-                    <h3>🚫 Ненормативная лексика: ${result.nenormative_count}</h3>
+                <div class="violation-section critical">
+                    <div class="violation-header">
+                        <span class="violation-icon">🚫</span>
+                        <h3>Ненормативная лексика: ${result.nenormative_count}</h3>
+                    </div>
                     <div class="word-list">
                         ${result.nenormative_words.slice(0, 20).map(w => {
                             const censored = w[0] + '*'.repeat(w.length - 2) + w[w.length - 1];
-                            return `<span class="word-tag">${censored}</span>`;
+                            return `<span class="word-tag critical">${censored}</span>`;
                         }).join('')}
                     </div>
+                    ${result.nenormative_words.length > 20 ? `<p class="more-words">... и ещё ${result.nenormative_words.length - 20} слов</p>` : ''}
                 </div>
             `;
         }
         
+        // Слова на латинице
         if (result.latin_count > 0) {
             html += `
                 <div class="violation-section">
-                    <h3>⚠️ Слова на латинице: ${result.latin_count}</h3>
+                    <div class="violation-header">
+                        <span class="violation-icon">🌍</span>
+                        <h3>Слова на латинице: ${result.latin_count}</h3>
+                    </div>
                     <div class="word-list">
                         ${result.latin_words.slice(0, 30).map(w => 
                             `<span class="word-tag">${w}</span>`
                         ).join('')}
                     </div>
-                    ${result.latin_words.length > 30 ? `<p>... и ещё ${result.latin_words.length - 30} слов</p>` : ''}
+                    ${result.latin_words.length > 30 ? `<p class="more-words">... и ещё ${result.latin_words.length - 30} слов</p>` : ''}
                 </div>
             `;
         }
         
+        // Неизвестные слова/англицизмы
         if (result.unknown_count > 0) {
             html += `
                 <div class="violation-section">
-                    <h3>⚠️ Англицизмы / Неизвестные слова: ${result.unknown_count}</h3>
+                    <div class="violation-header">
+                        <span class="violation-icon">❓</span>
+                        <h3>Англицизмы / Неизвестные слова: ${result.unknown_count}</h3>
+                    </div>
                     <div class="word-list">
                         ${result.unknown_cyrillic.slice(0, 30).map(w => 
                             `<span class="word-tag">${w}</span>`
                         ).join('')}
                     </div>
-                    ${result.unknown_cyrillic.length > 30 ? `<p>... и ещё ${result.unknown_cyrillic.length - 30} слов</p>` : ''}
+                    ${result.unknown_cyrillic.length > 30 ? `<p class="more-words">... и ещё ${result.unknown_cyrillic.length - 30} слов</p>` : ''}
                 </div>
             `;
         }
@@ -282,12 +307,50 @@ function displayResults(type, result, url = '') {
     
     // Статистика
     html += `
-        <div style="margin-top: 2rem; padding: 1rem; background: #F5F5F5; border-radius: 8px;">
-            <p><strong>Всего слов:</strong> ${result.total_words.toLocaleString('ru-RU')}</p>
-            <p><strong>Уникальных:</strong> ${result.unique_words.toLocaleString('ru-RU')}</p>
-            ${url ? `<p><strong>URL:</strong> ${url}</p>` : ''}
+        <div class="stats-summary">
+            <h4>📊 Статистика проверки</h4>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-number">${result.total_words.toLocaleString('ru-RU')}</span>
+                    <span class="stat-label">Всего слов</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">${result.unique_words.toLocaleString('ru-RU')}</span>
+                    <span class="stat-label">Уникальных</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">${result.violations_count}</span>
+                    <span class="stat-label">Нарушений</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">${result.law_compliant ? '100%' : Math.round(((result.total_words - result.violations_count) / result.total_words) * 100) + '%'}</span>
+                    <span class="stat-label">Соответствие</span>
+                </div>
+            </div>
+            ${url ? `<p class="url-info"><strong>URL:</strong> <a href="${url}" target="_blank">${url}</a></p>` : ''}
         </div>
     `;
+    
+    // Рекомендации
+    if (result.recommendations && result.recommendations.length > 0) {
+        html += `
+            <div class="recommendations">
+                <h4>💡 Рекомендации</h4>
+                <div class="recommendations-list">
+                    ${result.recommendations.map(rec => `
+                        <div class="recommendation ${rec.level}">
+                            <div class="rec-icon">${rec.icon}</div>
+                            <div class="rec-content">
+                                <h5>${rec.title}</h5>
+                                <p>${rec.message}</p>
+                                ${rec.action ? `<p class="rec-action">→ ${rec.action}</p>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
     
     resultsContent.innerHTML = html;
     resultsCard.style.display = 'block';
@@ -301,63 +364,92 @@ function displayBatchResults(results) {
     
     let totalViolations = 0;
     let critical = 0;
+    let successful = 0;
+    
+    results.forEach(item => {
+        if (item.success) {
+            successful++;
+            const hasViolations = !item.result.law_compliant;
+            if (hasViolations) {
+                totalViolations++;
+                if (item.result.nenormative_count > 0) critical++;
+            }
+        }
+    });
     
     let html = `
-        <div class="result-status">
-            📊 Проверено сайтов: ${results.length}
+        <div class="batch-summary">
+            <div class="summary-header">
+                <h3>📊 Результаты пакетной проверки</h3>
+                <p>Проверено сайтов: ${results.length}</p>
+            </div>
+            <div class="summary-stats">
+                <div class="summary-item success">
+                    <span class="summary-number">${successful - totalViolations}</span>
+                    <span class="summary-label">Без нарушений</span>
+                </div>
+                <div class="summary-item warning">
+                    <span class="summary-number">${totalViolations}</span>
+                    <span class="summary-label">С нарушениями</span>
+                </div>
+                ${critical > 0 ? `
+                    <div class="summary-item critical">
+                        <span class="summary-number">${critical}</span>
+                        <span class="summary-label">Критических</span>
+                    </div>
+                ` : ''}
+            </div>
         </div>
-        <div style="margin-top: 1rem;">
+        <div class="batch-results-list">
     `;
     
     results.forEach((item, index) => {
-        const hasViolations = item.success && !item.result.law_compliant;
-        if (hasViolations) {
-            totalViolations++;
-            if (item.result.nenormative_count > 0) critical++;
-        }
-        
         const statusIcon = !item.success ? '❌' : 
                           item.result.law_compliant ? '✅' : 
                           item.result.nenormative_count > 0 ? '🚫' : '⚠️';
         
+        const statusClass = !item.success ? 'error' : 
+                           item.result.law_compliant ? 'success' : 
+                           item.result.nenormative_count > 0 ? 'critical' : 'warning';
+        
         html += `
-            <div style="padding: 1rem; margin-bottom: 1rem; background: #F9F9F9; border-radius: 8px; border-left: 4px solid ${!item.success ? '#F44336' : item.result.law_compliant ? '#4CAF50' : '#FF9800'}">
-                <h4>${statusIcon} [${index + 1}] ${item.url}</h4>
+            <div class="batch-item ${statusClass}">
+                <div class="batch-item-header">
+                    <span class="batch-icon">${statusIcon}</span>
+                    <span class="batch-number">[${index + 1}]</span>
+                    <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
+                </div>
                 ${item.success ? `
-                    <p>Нарушений: ${item.result.violations_count} 
-                    (латиница: ${item.result.latin_count}, 
-                    англицизмы: ${item.result.unknown_count}
-                    ${item.result.nenormative_count > 0 ? `, 🚫 ненормативная: ${item.result.nenormative_count}` : ''})
-                    </p>
-                ` : `<p style="color: #F44336;">Ошибка: ${item.error}</p>`}
+                    <div class="batch-item-stats">
+                        <span>Нарушений: ${item.result.violations_count}</span>
+                        <span>Латиница: ${item.result.latin_count}</span>
+                        <span>Англицизмы: ${item.result.unknown_count}</span>
+                        ${item.result.nenormative_count > 0 ? `<span class="critical-badge">Ненорматив: ${item.result.nenormative_count}</span>` : ''}
+                    </div>
+                ` : `<div class="batch-item-error">Ошибка: ${item.error}</div>`}
             </div>
         `;
     });
     
     html += '</div>';
     
-    html += `
-        <div class="result-status">
-            <p><strong>С нарушениями:</strong> ${totalViolations} / ${results.length}</p>
-            <p><strong>Чистых:</strong> ${results.length - totalViolations}</p>
-            ${critical > 0 ? `<p style="color: #F44336;"><strong>🚫 Критических:</strong> ${critical}</p>` : ''}
-        </div>
-    `;
-    
     resultsContent.innerHTML = html;
     resultsCard.style.display = 'block';
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// Экспорт отчёта
+// Экспорт отчета
 async function exportReport(type) {
     const result = currentResults[type];
     if (!result) {
-        alert('Нет данных для экспорта!');
+        alert('Нет данных для экспорта! Сначала выполните проверку.');
         return;
     }
     
     try {
+        showLoading();
+        console.log('📥 Экспорт отчета:', type, result);
+        
         const response = await fetch(`${API_BASE}/api/export/txt`, {
             method: 'POST',
             headers: {
@@ -366,17 +458,27 @@ async function exportReport(type) {
             body: JSON.stringify({ result })
         });
         
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `law_check_${Date.now()}.txt`;
+        a.download = `law_check_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
+        
+        console.log('✅ Отчет скачан');
+        
     } catch (error) {
+        console.error('❌ Ошибка экспорта:', error);
         alert('Ошибка экспорта: ' + error.message);
+    } finally {
+        hideLoading();
     }
 }
 
@@ -384,6 +486,7 @@ async function exportReport(type) {
 function clearText() {
     document.getElementById('textInput').value = '';
     document.getElementById('textResults').style.display = 'none';
+    currentResults.text = null;
 }
 
 function loadSample() {
@@ -396,9 +499,26 @@ function loadSample() {
 }
 
 function showLoading() {
-    document.getElementById('loadingOverlay').style.display = 'flex';
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.style.display = 'flex';
+    }
 }
 
 function hideLoading() {
-    document.getElementById('loadingOverlay').style.display = 'none';
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
 }
+
+// Горячие клавиши
+document.addEventListener('keydown', (e) => {
+    // Ctrl+Enter для проверки текста
+    if (e.ctrlKey && e.key === 'Enter') {
+        const textTab = document.getElementById('text-tab');
+        if (textTab && textTab.classList.contains('active')) {
+            checkText();
+        }
+    }
+});
