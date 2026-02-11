@@ -737,13 +737,6 @@ class RussianLanguageChecker:
             'Nenormativnye_slova.txt': 'nenormative_words'
         }
 
-        MAX_WORDS_PER_FILE = {
-            'orfograf_words.txt': 100000,
-            'orfoep_words.txt': 20000,
-            'foreign_words.txt': 10000,
-            'Nenormativnye_slova.txt': 10000
-        }
-
         loaded = 0
         for filename, target_attr in files_to_load.items():
             filepath = dict_path / filename
@@ -753,15 +746,12 @@ class RussianLanguageChecker:
                 continue
 
             try:
-                max_words = MAX_WORDS_PER_FILE.get(filename, 100000)
                 with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
                     words = set()
                     for line in f:
                         word = line.strip().lower()
                         if word and not word.startswith('#') and len(word) > 1:
                             words.add(word)
-                        if len(words) >= max_words:
-                            break
 
                     if words:
                         getattr(self, target_attr).update(words)
