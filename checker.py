@@ -537,46 +537,58 @@ class RussianLanguageChecker:
         print(f"\nЗагружено файлов: {loaded}/{len(files_to_load)}")
     
     def is_known_word(self, word):
-        """Проверка известности слова с улучшенной логикой"""
+        """Проверка известности слова с максимально мягкой логикой"""
         word_lower = word.lower()
         
         # Проверяем в словарях
         if word_lower in self.normative_words or word_lower in self.foreign_allowed:
             return True
         
-        # Проверяем через pymorphy3 - более мягкие условия
+        # Проверяем через pymorphy3 - максимально мягкие условия
         if self.morph:
             try:
                 parsed = self.morph.parse(word_lower)
                 if parsed:
                     # Берём лучший разбор
                     best_parse = parsed[0]
-                    # Если score > 0 или это имя собственное/нарицательное
-                    if best_parse.score > 0 or best_parse.tag.POS:
-                        # Проверяем нормальную форму в словаре
+                    # Если есть хоть какой-то разбор с ненулевой вероятностью
+                    # или любой tag (часть речи или имя собственное)
+                    if best_parse.score >= 0 or best_parse.tag:
+                        # Если распознано как имя собственное - тоже нормально
+                        if 'Name' in best_parse.tag or 'Surn' in best_parse.tag or 'Patr' in best_parse.tag:
+                            return True
+                        # Если распознано как географическое название
+                        if 'Geox' in best_parse.tag:
+                            return True
+                        # Если распознано как организация
+                        if 'Orgn' in best_parse.tag:
+                            return True
+                        # Если есть любая часть речи
+                        if best_parse.tag.POS:
+                            return True
+                        # Если нормальная форма есть в словаре
                         normal_form = best_parse.normal_form
                         if normal_form in self.normative_words:
                             return True
-                        # Если pymorphy3 уверен в разборе (любой части речи)
-                        if best_parse.tag.POS in {'NOUN', 'ADJF', 'ADJS', 'VERB', 'INFN', 
-                                                   'PRTF', 'PRTS', 'GRND', 'NUMR', 'ADVB',
-                                                   'NPRO', 'PRED', 'PREP', 'CONJ', 'PRCL', 'INTJ'}:
-                            return True
-            except Exception as e:
+            except:
                 pass
         
-        # Аббревиатуры (все заглавные, до 6 символов)
-        if word.isupper() and len(word) <= 6:
+        # Аббревиатуры (все заглавные, до 10 символов)
+        if word.isupper() and len(word) <= 10:
             return True
             
-        # Имена собственные (с заглавной буквы, не в начале предложения)
-        # Проверяем по шаблону: слово с заглавной без дефиса
+        # Слова с заглавной буквы (вероятно, имена собственные)
         if word[0].isupper() and len(word) > 1:
-            # Если похоже на имя (оканчивается типично для русских имён)
-            name_endings = ('а', 'я', 'ий', 'ий', 'ей', 'ов', 'ев', 'ин', 'ын', 
-                          'ая', 'яя', 'ой', 'ый', 'ий', 'ое', 'ее', 'ие', 'ые')
-            if word_lower.endswith(name_endings):
-                return True
+            # Если похоже на имя или название
+            return True
+        
+        # Слова с дефисом (составные)
+        if '-' in word:
+            parts = word_lower.split('-')
+            # Если хотя бы одна часть известна
+            for part in parts:
+                if len(part) > 1 and (part in self.normative_words or part in self.foreign_allowed):
+                    return True
         
         return False
     
