@@ -473,7 +473,23 @@ class RussianLanguageChecker:
             'давать', 'дать', 'брать', 'взять', 'одалживать', 'одолжить',
         }
         self.normative_words.update(common)
-        print(f"✓ Базовый словарь: {len(common)} слов")
+        
+        # Добавляем словоформы через pymorphy3
+        if self.morph:
+            forms_added = 0
+            for word in list(common):
+                try:
+                    parsed = self.morph.parse(word)
+                    if parsed:
+                        for p in parsed:
+                            # Добавляем все формы слова
+                            self.normative_words.add(p.word.lower())
+                            forms_added += 1
+                except:
+                    pass
+            print(f"✓ Базовый словарь: {len(common)} слов + {forms_added} словоформ")
+        else:
+            print(f"✓ Базовый словарь: {len(common)} слов")
     
     def load_dictionaries(self):
         """Загрузка словарей"""
