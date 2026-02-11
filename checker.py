@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Класс проверки текста - УЛУЧШЕННАЯ ВЕРСИЯ С PYASPELLER"""
+"""Класс проверки текста - ОПТИМИЗИРОВАННАЯ ВЕРСИЯ"""
 
 import re
 from pathlib import Path
 import sys
-from functools import lru_cache
 
 try:
     import pymorphy3
@@ -19,26 +18,28 @@ try:
 except:
     PYASPELLER_AVAILABLE = False
 
+_RE_URL = re.compile(r'https?://[^\s]+')
+_RE_PHONE = re.compile(r'\+?\d[\d\s\-\(\)]{7,}')
+_RE_LATIN = re.compile(r'[a-zA-Z]')
+_RE_WORD = re.compile(r'\b[а-яёА-ЯЁa-zA-Z][а-яёА-ЯЁa-zA-Z\-]*\b')
+
 class RussianLanguageChecker:
+    __slots__ = ('normative_words', 'foreign_allowed', 'nenormative_words',
+                 'speller_cache', 'forms_cache', 'all_forms', 'morph', 'speller',
+                 '_word_prefixes', '_skip_words')
+
     def __init__(self):
         self.normative_words = set()
         self.foreign_allowed = set()
         self.nenormative_words = set()
-        
-        # Кэш для pyaspeller
         self.speller_cache = {}
-        
-        # Кэш для склонений (word -> set of all forms)
         self.forms_cache = {}
-        
-        # Словарь всех известных форм (для быстрой проверки)
         self.all_forms = set()
-        
+
         print("\n" + "="*60)
-        print("INIT RussianLanguageChecker")
+        print("INIT RussianLanguageChecker (OPTIMIZED)")
         print("="*60)
-        
-        # Морфология
+
         if MORPH_AVAILABLE:
             try:
                 self.morph = pymorphy3.MorphAnalyzer()
@@ -49,8 +50,7 @@ class RussianLanguageChecker:
         else:
             self.morph = None
             print("[WARN] pymorphy3 not available")
-        
-        # Pyaspeller - Yandex Speller
+
         if PYASPELLER_AVAILABLE:
             try:
                 self.speller = YandexSpeller()
@@ -61,10 +61,13 @@ class RussianLanguageChecker:
         else:
             self.speller = None
             print("[WARN] pyaspeller not available")
-        
+
+        self._word_prefixes = None
+        self._skip_words = None
+
         self.add_common_words()
         self.load_dictionaries()
-        
+
         print("\n" + "="*60)
         print("TOTAL LOADED:")
         print("="*60)
@@ -501,120 +504,87 @@ class RussianLanguageChecker:
             'давать', 'дать', 'брать', 'взять', 'одалживать', 'одолжить',
         }
         self.normative_words.update(common)
-        
-        # Note: Word form generation is now done on-demand (lazy loading)
-        # to avoid memory issues on Railway
-        if self.morph:
-            print(f"[OK] Base dictionary: {len(common)} words (forms generated on-demand)")
-        else:
-            print(f"[OK] Base dictionary: {len(common)} words")
-    
-    def _generate_all_forms_for_dictionary(self):
-        """Генерация всех форм для всех слов в словаре (ленивая загрузка)"""
+        print(f"[OK] Base dictionary: {len(common)} words")
+
+    def _is_known_fast(self, word_lower):
+        """Быстрая проверка без генерации форм"""
+        if word_lower in self.all_forms:
+            return True
+        if word_lower in self.normative_words or word_lower in self.foreign_allowed:
+            self.all_forms.add(word_lower)
+            return True
+        return False
+
+    def _check_morph_fast(self, word_lower):
+        """Быстрая проверка через морфологию"""
         if not self.morph:
-            return
-        
-        print("[INF] Generating all word forms...")
-        total_forms = 0
-        
-        for word in list(self.normative_words):
-            forms = self._get_all_forms_cached(word)
-            self.all_forms.update(forms)
-            total_forms += len(forms)
-        
-        print(f"[OK] Generated {total_forms:,} forms")
-    
-    def _get_all_forms_cached(self, word):
-        """Получить все формы слова с кэшированием"""
-        word_lower = word.lower()
-        
-        if word_lower in self.forms_cache:
-            return self.forms_cache[word_lower]
-        
-        if not self.morph:
-            forms = {word_lower}
-            self.forms_cache[word_lower] = forms
-            return forms
-        
-        forms = set()
-        forms.add(word_lower)
-        
+            return False
+
         try:
             parsed = self.morph.parse(word_lower)
-            for p in parsed:
-                # Получаем лексему (все формы)
-                try:
-                    lexeme = p.lexeme
-                    for lex in lexeme:
-                        forms.add(lex.word.lower())
-                except:
-                    forms.add(p.word.lower())
-                
-                # Также добавляем нормальную форму
-                if p.normal_form:
-                    forms.add(p.normal_form.lower())
-                    # И формы от нормальной формы
-                    try:
-                        normal_parsed = self.morph.parse(p.normal_form)
-                        for np in normal_parsed[:1]:
-                            if hasattr(np, 'lexeme'):
-                                for lex in np.lexeme:
-                                    forms.add(lex.word.lower())
-                    except:
-                        pass
-        except Exception as e:
+            if not parsed:
+                return False
+
+            p = parsed[0]
+            normal = p.normal_form
+
+            if normal in self.normative_words or normal in self.all_forms:
+                self.all_forms.add(word_lower)
+                return True
+
+            if 'Name' in p.tag or 'Surn' in p.tag or 'Patr' in p.tag:
+                return True
+            if 'Geox' in p.tag or 'Orgn' in p.tag:
+                return True
+
+        except:
             pass
-        
-        self.forms_cache[word_lower] = forms
-        return forms
-    
+        return False
+
     def load_dictionaries(self):
-        """Load dictionaries from files - с ограничением размера для Railway"""
-        # All possible paths
+        """Load dictionaries from files"""
         possible_paths = [
             Path('dictionaries'),
             Path('.') / 'dictionaries',
             Path(__file__).parent / 'dictionaries',
             Path.cwd() / 'dictionaries',
         ]
-        
+
         dict_path = None
         for path in possible_paths:
             if path.exists() and path.is_dir():
                 dict_path = path
                 print(f"[OK] Dictionaries folder found: {path.absolute()}")
                 break
-        
+
         if not dict_path:
-            print("[OK][OK] DICTIONARIES FOLDER NOT FOUND!")
+            print("[WARN] Dictionaries folder not found")
             print("   Check that dictionaries/ folder exists")
             print("   Current directory:", Path.cwd())
             return
-        
-        # Files to load - ограничиваем размер для Railway
+
         files_to_load = {
             'orfograf_words.txt': 'normative_words',
             'orfoep_words.txt': 'normative_words',
             'foreign_words.txt': 'foreign_allowed',
             'Nenormativnye_slova.txt': 'nenormative_words'
         }
-        
-        # Максимальное количество слов из каждого файла (для экономии памяти)
+
         MAX_WORDS_PER_FILE = {
-            'orfograf_words.txt': 50000,      # Только частые слова
-            'orfoep_words.txt': 10000,        # Орфоэпические
-            'foreign_words.txt': 5000,        # Иностранные
-            'Nenormativnye_slova.txt': 10000  # Ненормативные
+            'orfograf_words.txt': 50000,
+            'orfoep_words.txt': 10000,
+            'foreign_words.txt': 5000,
+            'Nenormativnye_slova.txt': 10000
         }
-        
+
         loaded = 0
         for filename, target_attr in files_to_load.items():
             filepath = dict_path / filename
-            
+
             if not filepath.exists():
-                print(f"[OK][OK] File not found: {filename}")
+                print(f"[WARN] File not found: {filename}")
                 continue
-            
+
             try:
                 max_words = MAX_WORDS_PER_FILE.get(filename, 50000)
                 with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
@@ -625,184 +595,81 @@ class RussianLanguageChecker:
                         word = line.strip().lower()
                         if word and not word.startswith('#') and len(word) > 1:
                             words.add(word)
-                        # Ограничиваем количество слов
                         if len(words) >= max_words:
                             print(f"[INF] {filename}: limit reached ({max_words})")
                             break
-                    
+
                     if words:
                         getattr(self, target_attr).update(words)
-                        print(f"[OK] {filename}: {len(words):,} words (lines: {line_count})")
+                        print(f"[OK] {filename}: {len(words):,} words")
                         loaded += 1
                     else:
-                        print(f"[OK][OK] {filename}: empty file")
-            
+                        print(f"[WARN] {filename}: empty file")
             except Exception as e:
-                print(f"[OK] Error loading {filename}: {e}")
-        
+                print(f"[ERROR] {filename}: {e}")
+
         print(f"\nFiles loaded: {loaded}/{len(files_to_load)}")
-        
-        # Инициализируем all_forms копией normative_words для быстрого старта
+
         self.all_forms = self.normative_words.copy()
         print(f"[OK] Ready with {len(self.all_forms):,} base forms")
-        print(f"[INF] Word forms generated on-demand to save memory")
     
     def is_known_word(self, word):
-        """Improved word check with pyaspeller and pymorphy3 - с улучшенной проверкой склонений"""
+        """Оптимизированная проверка слова"""
         word_lower = word.lower()
-        
-        # 1. Быстрая проверка в кэше всех форм
-        if word_lower in self.all_forms:
+        wlen = len(word_lower)
+
+        if wlen <= 1:
             return True
-        
-        # 2. Проверка в исходных словарях
-        if word_lower in self.normative_words or word_lower in self.foreign_allowed:
+
+        if self._is_known_fast(word_lower):
             return True
-        
-        # 3. Проверка склонений через кэш
-        if word_lower in self.forms_cache:
+
+        if self._check_morph_fast(word_lower):
             return True
-        
-        # 4. Проверка через pymorphy3 - генерируем все формы на лету
-        if self.morph:
-            try:
-                forms = self._get_all_forms_cached(word_lower)
-                # Проверяем, есть ли пересечение с нашим словарём
-                if forms & self.normative_words:
-                    self.all_forms.update(forms)  # Добавляем в общий кэш
-                    return True
-                # Проверяем нормальную форму
-                parsed = self.morph.parse(word_lower)
-                if parsed:
-                    for p in parsed[:3]:
-                        if p.normal_form in self.normative_words:
-                            # Добавляем все формы этого слова в кэш
-                            word_forms = self._get_all_forms_cached(p.normal_form)
-                            self.all_forms.update(word_forms)
-                            return True
-                        # Проверяем лексему
-                        try:
-                            if hasattr(p, 'lexeme'):
-                                for lex in p.lexeme:
-                                    if lex.word.lower() in self.normative_words:
-                                        self.all_forms.add(word_lower)
-                                        return True
-                        except:
-                            pass
-            except:
-                pass
-        
-        # 5. Check via pyaspeller (Yandex Speller) - recognizes word forms!
+
         if self.speller and PYASPELLER_AVAILABLE:
             try:
-                speller_result = self.check_with_speller(word)
-                if speller_result:
-                    # If speller says it's correct - it's a valid Russian word
-                    if speller_result.get('correct', False):
+                if word_lower in self.speller_cache:
+                    cached = self.speller_cache[word_lower]
+                    if cached.get('correct'):
                         return True
-                    # If speller suggests variants - word might have typo
-                    variants = speller_result.get('variants', [])
-                    if variants:
-                        for variant in variants[:2]:
-                            variant_lower = variant.lower()
-                            if variant_lower in self.normative_words or variant_lower in self.all_forms:
-                                return True
-                            # Проверяем склонения вариантов
-                            if self.morph:
-                                variant_forms = self._get_all_forms_cached(variant_lower)
-                                if variant_forms & self.normative_words:
-                                    return True
-            except:
-                pass
-        
-        # 6. Проверка через pymorphy3 - имена собственные и прочее
-        if self.morph:
-            try:
-                parsed = self.morph.parse(word_lower)
-                if parsed:
-                    best_parse = parsed[0]
-                    # Personal names
-                    if 'Name' in best_parse.tag or 'Surn' in best_parse.tag or 'Patr' in best_parse.tag:
-                        return True
-                    # Geographic names
-                    if 'Geox' in best_parse.tag:
-                        return True
-                    # Organizations
-                    if 'Orgn' in best_parse.tag:
-                        return True
-            except:
-                pass
-        
-        # 7. Abbreviations (all caps, up to 10 chars)
-        if word.isupper() and len(word) <= 10:
-            return True
-            
-        # 8. Capitalized words (proper nouns)
-        if word[0].isupper() and len(word) > 1:
-            return True
-        
-        # 9. Hyphenated words - проверяем каждую часть
-        if '-' in word:
-            parts = word_lower.split('-')
-            known_parts = 0
-            for part in parts:
-                if len(part) > 1:
-                    if part in self.all_forms or part in self.normative_words:
-                        known_parts += 1
-                    elif self.morph:
+                    for v in cached.get('variants', [])[:2]:
+                        if self._is_known_fast(v.lower()):
+                            return True
+                else:
+                    result = self.speller.spelled(word_lower)
+                    is_correct = (result == word_lower)
+                    variants = []
+                    if not is_correct:
                         try:
-                            part_forms = self._get_all_forms_cached(part)
-                            if part_forms & self.normative_words:
-                                known_parts += 1
+                            variants = self.speller.suggest(word_lower)[:3]
                         except:
                             pass
-            if known_parts >= len(parts) / 2:
+                    self.speller_cache[word_lower] = {'correct': is_correct, 'variants': variants}
+                    if is_correct:
+                        return True
+                    for v in variants[:2]:
+                        if self._is_known_fast(v.lower()):
+                            return True
+            except:
+                pass
+
+        if wlen <= 10 and word.isupper():
+            return True
+
+        if wlen > 1 and word[0].isupper():
+            return True
+
+        if '-' in word:
+            parts = word_lower.split('-')
+            known = 0
+            for part in parts:
+                if len(part) > 1 and self._is_known_fast(part):
+                    known += 1
+            if known >= len(parts) / 2:
                 return True
-        
+
         return False
-    
-    def check_with_speller(self, word):
-        """Check word using Yandex Speller with caching"""
-        if not self.speller or not PYASPELLER_AVAILABLE:
-            return None
-        
-        word_lower = word.lower()
-        
-        # Check cache
-        if word_lower in self.speller_cache:
-            return self.speller_cache[word_lower]
-        
-        try:
-            # Use YandexSpeller.spelled() for single word check (Word class is deprecated)
-            spelled_result = self.speller.spelled(word_lower)
-            
-            # If word unchanged - it's correct
-            is_correct = (spelled_result == word_lower)
-            
-            # Get suggestions if incorrect
-            variants = []
-            if not is_correct:
-                # Get suggestions from speller
-                try:
-                    suggestions = self.speller.suggest(word_lower)
-                    variants = suggestions[:3] if suggestions else []
-                except:
-                    pass
-            
-            result = {
-                'correct': is_correct,
-                'variants': variants,
-                'spellsafe': is_correct
-            }
-            
-            # Cache result
-            self.speller_cache[word_lower] = result
-            return result
-            
-        except Exception as e:
-            # If error, cache negative result
-            self.speller_cache[word_lower] = {'correct': False, 'variants': [], 'error': str(e)}
-            return None
     
     def get_word_normal_form(self, word):
         """Get normal form of word using pymorphy3 with improved case handling"""
@@ -842,10 +709,10 @@ class RussianLanguageChecker:
     def is_nenormative(self, word):
         """Проверка ненормативности"""
         word_lower = word.lower()
-        
+
         if word_lower in self.nenormative_words:
             return True
-        
+
         if self.morph:
             try:
                 parsed = self.morph.parse(word_lower)
@@ -853,11 +720,11 @@ class RussianLanguageChecker:
                     return True
             except:
                 pass
-        
+
         return False
-    
+
     def check_text(self, text):
-        """Проверка текста"""
+        """Оптимизированная проверка текста"""
         if not text or not text.strip():
             return {
                 'latin_words': [],
@@ -871,48 +738,44 @@ class RussianLanguageChecker:
                 'total_words': 0,
                 'unique_words': 0
             }
-        
-        # Очистка
-        text = re.sub(r'https?://[^\s]+', ' ', text)
-        text = re.sub(r'\+?\d[\d\s\-\(\)]{7,}', ' ', text)
-        
-        all_words = re.findall(r'\b[а-яёА-ЯЁa-zA-Z][а-яёА-ЯЁa-zA-Z\-]*\b', text)
-        
+
+        text = _RE_URL.sub(' ', text)
+        text = _RE_PHONE.sub(' ', text)
+
+        all_words = _RE_WORD.findall(text)
+
         latin_words = []
         unknown_cyrillic = []
         nenormative_found = []
-        
+
         skip = {'и', 'в', 'на', 'по', 'от', 'до', 'из', 'к', 'с', 'у', 'о',
                 'но', 'да', 'не', 'за', 'об', 'во', 'а', 'я'}
-        
+
         for word in all_words:
-            if len(word) == 1 or word.lower() in skip:
+            wlower = word.lower()
+            if len(wlower) <= 1 or wlower in skip:
                 continue
-            
+
             if self.is_nenormative(word):
                 nenormative_found.append(word)
                 continue
-            
-            if re.search(r'[a-zA-Z]', word):
+
+            if _RE_LATIN.search(word):
                 latin_words.append(word)
                 continue
-            
+
             if not self.is_known_word(word):
                 unknown_cyrillic.append(word)
-        
-        latin_words = sorted(list(set(latin_words)))
-        unknown_cyrillic = sorted(list(set(unknown_cyrillic)))
-        nenormative_found = sorted(list(set(nenormative_found)))
-        
+
         return {
-            'latin_words': latin_words,
-            'unknown_cyrillic': unknown_cyrillic,
-            'nenormative_words': nenormative_found,
+            'latin_words': sorted(set(latin_words)),
+            'unknown_cyrillic': sorted(set(unknown_cyrillic)),
+            'nenormative_words': sorted(set(nenormative_found)),
             'latin_count': len(latin_words),
             'unknown_count': len(unknown_cyrillic),
             'nenormative_count': len(nenormative_found),
             'violations_count': len(latin_words) + len(unknown_cyrillic) + len(nenormative_found),
-            'law_compliant': (len(latin_words) + len(unknown_cyrillic) + len(nenormative_found)) == 0,
+            'law_compliant': not (latin_words or unknown_cyrillic or nenormative_found),
             'total_words': len(all_words),
             'unique_words': len(set(all_words))
         }
