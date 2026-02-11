@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -116,10 +116,16 @@
                 <div class="card results-card" id="textResults" style="display: none;">
                     <div class="card-header">
                         <h2>Результаты проверки</h2>
-                        <button class="btn btn-sm btn-success" onclick="exportReport('text')">
-                            <i class="fas fa-download"></i>
-                            Скачать отчёт
-                        </button>
+                        <div class="btn-group">
+                            <button class="btn btn-info" onclick="deepCheck('text')">
+                                <i class="fas fa-microscope"></i>
+                                Глубокая проверка
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="exportReport('text')">
+                                <i class="fas fa-download"></i>
+                                Скачать отчёт
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div id="textResultsContent"></div>
@@ -159,10 +165,16 @@
                 <div class="card results-card" id="urlResults" style="display: none;">
                     <div class="card-header">
                         <h2>Результаты проверки сайта</h2>
-                        <button class="btn btn-sm btn-success" onclick="exportReport('url')">
-                            <i class="fas fa-download"></i>
-                            Скачать отчёт
-                        </button>
+                        <div class="btn-group">
+                            <button class="btn btn-info" onclick="deepCheck('url')">
+                                <i class="fas fa-microscope"></i>
+                                Глубокая проверка
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="exportReport('url')">
+                                <i class="fas fa-download"></i>
+                                Скачать отчёт
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div id="urlResultsContent"></div>
@@ -213,10 +225,16 @@
                 <div class="card results-card" id="batchResults" style="display: none;">
                     <div class="card-header">
                         <h2>Результаты пакетной проверки</h2>
-                        <button class="btn btn-sm btn-success" onclick="exportReport('batch')">
-                            <i class="fas fa-download"></i>
-                            Скачать отчёт
-                        </button>
+                        <div class="btn-group">
+                            <button class="btn btn-info" onclick="deepCheck('batch')">
+                                <i class="fas fa-microscope"></i>
+                                Глубокая проверка
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="exportReport('batch')">
+                                <i class="fas fa-download"></i>
+                                Скачать отчёт
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div id="batchResultsContent"></div>

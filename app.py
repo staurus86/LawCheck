@@ -204,6 +204,32 @@ def batch_check():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/deep-check', methods=['POST'])
+def deep_check():
+    """API: Глубокая проверка слов с использованием морфологии и speller"""
+    try:
+        data = request.json
+        words = data.get('words', [])
+        
+        if not words:
+            return jsonify({'error': 'Список слов пуст'}), 400
+        
+        checker_instance = get_checker()
+        results = []
+        
+        for word in words:
+            result = checker_instance._deep_check_single(word)
+            results.append(result)
+        
+        return jsonify({
+            'success': True,
+            'results': results,
+            'timestamp': datetime.now().isoformat()
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
     """API: Статистика словарей"""

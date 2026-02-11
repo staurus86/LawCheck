@@ -593,6 +593,108 @@ async function exportReport(type) {
     }
 }
 
+// Глубокая проверка слов
+async function deepCheck(type) {
+    const result = currentResults[type];
+    if (!result) {
+        alert('Нет данных для проверки! Сначала выполните проверку.');
+        return;
+    }
+    
+    const wordsToCheck = [
+        ...(result.latin_words || []),
+        ...(result.unknown_cyrillic || [])
+    ];
+    
+    if (wordsToCheck.length === 0) {
+        alert('Нет слов для глубокой проверки!');
+        return;
+    }
+    
+    showLoading();
+    console.log('🔬 Глубокая проверка:', wordsToCheck.length, 'слов');
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/deep-check`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ words: wordsToCheck })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayDeepResults(type, data.results);
+            console.log('✅ Глубокая проверка завершена:', data.results);
+        } else {
+            alert('Ошибка: ' + data.error);
+        }
+    } catch (error) {
+        alert('Ошибка глубокой проверки: ' + error.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Отображение результатов глубокой проверки
+function displayDeepResults(type, results) {
+    const resultsContent = document.getElementById(`${type}ResultsContent`);
+    
+    const validWords = results.filter(r => r.is_valid);
+    const invalidWords = results.filter(r => !r.is_valid);
+    
+    let html = `
+        <div class="deep-check-results">
+            <h3>🔬 Результаты глубокой проверки</h3>
+            <div class="deep-summary">
+                <span class="deep-valid">✅ Подтверждено: ${validWords.length}</span>
+                <span class="deep-invalid">❌ Неизвестно: ${invalidWords.length}</span>
+            </div>
+    `;
+    
+    if (validWords.length > 0) {
+        html += `
+            <div class="deep-section valid">
+                <h4>✅ Слова, подтверждённые при глубокой проверке</h4>
+                <div class="word-list">
+                    ${validWords.map(r => `
+                        <span class="word-tag valid">
+                            ${r.word}
+                            <span class="word-reason" title="${r.reasons.join(', ')}">
+                                ${r.normal_form ? `(${r.normal_form})` : ''}
+                            </span>
+                        </span>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    if (invalidWords.length > 0) {
+        html += `
+            <div class="deep-section invalid">
+                <h4>❓ Слова, не подтверждённые ( требуют замены)</h4>
+                <div class="word-list">
+                    ${invalidWords.map(r => `
+                        <span class="word-tag invalid">
+                            ${r.word}
+                            ${r.suggestions?.length > 0 ? 
+                                `<span class="word-suggestions">→ ${r.suggestions.join(', ')}</span>` : ''}
+                        </span>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    
+    resultsContent.innerHTML += html;
+    resultsContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 // Переключение отображения деталей пакетной проверки
 function toggleBatchDetails(index) {
     const detailsEl = document.getElementById(`batch-details-${index}`);
