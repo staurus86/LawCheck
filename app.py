@@ -243,12 +243,9 @@ def get_stats():
             'morph_available': c.morph is not None
         }
         
-        print(f"📊 Отправка статистики: {stats_data}")  # Для отладки
-        
         return jsonify(stats_data)
     
     except Exception as e:
-        print(f"❌ Ошибка в /api/stats: {e}")
         return jsonify({
             'normative': 0,
             'foreign': 0,

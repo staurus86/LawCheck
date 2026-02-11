@@ -587,7 +587,7 @@ class RussianLanguageChecker:
         return False
 
     def deep_check_words(self, words):
-        """Глубокая проверка списка слов с использованием морфологии и speller"""
+        """Глубокая проверка списка слов с кэшированием"""
         results = []
         for word in words:
             result = self._deep_check_single(word)
@@ -597,6 +597,11 @@ class RussianLanguageChecker:
     def _deep_check_single(self, word):
         """Глубокая проверка одного слова"""
         word_lower = word.lower()
+        
+        if word_lower in self._normal_form_cache:
+            cached = self._normal_form_cache[word_lower]
+            return cached.copy()
+
         result = {
             'word': word,
             'is_valid': False,
@@ -613,6 +618,7 @@ class RussianLanguageChecker:
                 result['suggestions'] = translations
             else:
                 result['suggestions'].append('требуется перевод')
+            self._normal_form_cache[word_lower] = result.copy()
             return result
 
         morph_result = self._check_morph_full(word_lower)
@@ -622,7 +628,7 @@ class RussianLanguageChecker:
                 result['is_valid'] = True
                 result['reasons'].append(morph_result['reason'])
 
-        if not result['is_valid']:
+        if not result['is_valid'] and self.speller and PYASPELLER_AVAILABLE:
             speller_result = self._check_speller_full(word)
             if speller_result:
                 result['suggestions'] = speller_result.get('variants', [])
@@ -638,12 +644,16 @@ class RussianLanguageChecker:
                             result['suggestions'] = [variant]
                             break
 
+        self._normal_form_cache[word_lower] = result.copy()
         return result
 
     def _check_morph_full(self, word_lower):
         """Глубокая проверка через морфологию"""
         if not self.morph:
             return None
+        
+        if word_lower in self.forms_cache:
+            return self.forms_cache[word_lower]
 
         try:
             parsed = self.morph.parse(word_lower)
@@ -653,19 +663,31 @@ class RussianLanguageChecker:
             p = parsed[0]
             normal = p.normal_form
 
-            if normal in self.normative_words or normal in self.all_forms:
-                return {'found': True, 'normal_form': normal, 'reason': 'normal_form_in_dict'}
+            if normal in self.normative_words:
+                result = {'found': True, 'normal_form': normal, 'reason': 'normal_form_in_dict'}
+                self.forms_cache[word_lower] = result
+                return result
 
-            if 'Name' in p.tag or 'Surn' in p.tag or 'Patr' in p.tag:
-                return {'found': True, 'normal_form': normal, 'reason': 'proper_name'}
+            tag = str(p.tag)
+            
+            if 'Name' in tag or 'Surn' in tag or 'Patr' in tag:
+                result = {'found': True, 'normal_form': normal, 'reason': 'proper_name'}
+                self.forms_cache[word_lower] = result
+                return result
 
-            if 'Geox' in p.tag:
-                return {'found': True, 'normal_form': normal, 'reason': 'geo_name'}
+            if 'Geox' in tag:
+                result = {'found': True, 'normal_form': normal, 'reason': 'geo_name'}
+                self.forms_cache[word_lower] = result
+                return result
 
-            if 'Orgn' in p.tag:
-                return {'found': True, 'normal_form': normal, 'reason': 'organization'}
+            if 'Orgn' in tag:
+                result = {'found': True, 'normal_form': normal, 'reason': 'organization'}
+                self.forms_cache[word_lower] = result
+                return result
 
-            return {'found': False, 'normal_form': normal, 'reason': 'unknown'}
+            result = {'found': False, 'normal_form': normal, 'reason': 'unknown'}
+            self.forms_cache[word_lower] = result
+            return result
 
         except:
             return None
