@@ -578,24 +578,12 @@ class RussianLanguageChecker:
         return word_lower
 
     def _is_known_fast(self, word_lower):
-        """Мгновенная проверка - словари + легкая морфология"""
+        """Мгновенная проверка - только словари"""
         if word_lower in self.all_forms:
             return True
-        if word_lower in self.normative_words or word_lower in self.foreign_allowed:
+        if word_lower in self.normative_words:
             self.all_forms.add(word_lower)
             return True
-
-        # Легкая проверка нормальной формы (с кэшем)
-        if len(word_lower) > 3:
-            try:
-                normal = self._get_normal_form(word_lower)
-                if normal and normal != word_lower:
-                    if normal in self.normative_words or normal in self.all_forms:
-                        self.all_forms.add(word_lower)
-                        return True
-            except:
-                pass
-
         return False
 
     def deep_check_words(self, words):
@@ -813,12 +801,12 @@ class RussianLanguageChecker:
 
         all_words = _RE_WORD.findall(text)
 
-        latin_words = []
-        unknown_cyrillic = []
-        nenormative_found = []
+        latin_words = set()
+        unknown_cyrillic = set()
+        nenormative_found = set()
 
-        skip = {'и', 'в', 'на', 'по', 'от', 'до', 'из', 'к', 'с', 'у', 'о',
-                'но', 'да', 'не', 'за', 'об', 'во', 'а', 'я'}
+        skip = frozenset({'и', 'в', 'на', 'по', 'от', 'до', 'из', 'к', 'с', 'у', 'о',
+                         'но', 'да', 'не', 'за', 'об', 'во', 'а', 'я'})
 
         for word in all_words:
             wlower = word.lower()
@@ -826,20 +814,20 @@ class RussianLanguageChecker:
                 continue
 
             if self.is_nenormative(word):
-                nenormative_found.append(word)
+                nenormative_found.add(word)
                 continue
 
             if _RE_LATIN.search(word):
-                latin_words.append(word)
+                latin_words.add(word)
                 continue
 
             if not self._is_known_fast(wlower):
-                unknown_cyrillic.append(word)
+                unknown_cyrillic.add(word)
 
         return {
-            'latin_words': sorted(set(latin_words)),
-            'unknown_cyrillic': sorted(set(unknown_cyrillic)),
-            'nenormative_words': sorted(set(nenormative_found)),
+            'latin_words': sorted(latin_words),
+            'unknown_cyrillic': sorted(unknown_cyrillic),
+            'nenormative_words': sorted(nenormative_found),
             'latin_count': len(latin_words),
             'unknown_count': len(unknown_cyrillic),
             'nenormative_count': len(nenormative_found),
