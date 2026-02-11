@@ -28,6 +28,12 @@ class RussianLanguageChecker:
         # Кэш для pyaspeller
         self.speller_cache = {}
         
+        # Кэш для склонений (word -> set of all forms)
+        self.forms_cache = {}
+        
+        # Словарь всех известных форм (для быстрой проверки)
+        self.all_forms = set()
+        
         print("\n" + "="*60)
         print("INIT RussianLanguageChecker")
         print("="*60)
@@ -527,8 +533,70 @@ class RussianLanguageChecker:
             
             print(f"[OK] Base dictionary: {len(common)} words + {forms_added} generated forms")
             print(f"  Total unique forms: {len(self.normative_words):,}")
+            
+            # Генерируем все формы для базовых слов и добавляем в all_forms
+            self._generate_all_forms_for_dictionary()
         else:
             print(f"[OK] Base dictionary: {len(common)} words")
+    
+    def _generate_all_forms_for_dictionary(self):
+        """Генерация всех форм для всех слов в словаре (ленивая загрузка)"""
+        if not self.morph:
+            return
+        
+        print("[INF] Generating all word forms...")
+        total_forms = 0
+        
+        for word in list(self.normative_words):
+            forms = self._get_all_forms_cached(word)
+            self.all_forms.update(forms)
+            total_forms += len(forms)
+        
+        print(f"[OK] Generated {total_forms:,} forms")
+    
+    def _get_all_forms_cached(self, word):
+        """Получить все формы слова с кэшированием"""
+        word_lower = word.lower()
+        
+        if word_lower in self.forms_cache:
+            return self.forms_cache[word_lower]
+        
+        if not self.morph:
+            forms = {word_lower}
+            self.forms_cache[word_lower] = forms
+            return forms
+        
+        forms = set()
+        forms.add(word_lower)
+        
+        try:
+            parsed = self.morph.parse(word_lower)
+            for p in parsed:
+                # Получаем лексему (все формы)
+                try:
+                    lexeme = p.lexeme
+                    for lex in lexeme:
+                        forms.add(lex.word.lower())
+                except:
+                    forms.add(p.word.lower())
+                
+                # Также добавляем нормальную форму
+                if p.normal_form:
+                    forms.add(p.normal_form.lower())
+                    # И формы от нормальной формы
+                    try:
+                        normal_parsed = self.morph.parse(p.normal_form)
+                        for np in normal_parsed[:1]:
+                            if hasattr(np, 'lexeme'):
+                                for lex in np.lexeme:
+                                    forms.add(lex.word.lower())
+                    except:
+                        pass
+        except Exception as e:
+            pass
+        
+        self.forms_cache[word_lower] = forms
+        return forms
     
     def load_dictionaries(self):
         """Load dictionaries from files"""
@@ -590,31 +658,59 @@ class RussianLanguageChecker:
                 print(f"[OK] Error loading {filename}: {e}")
         
         print(f"\nFiles loaded: {loaded}/{len(files_to_load)}")
+        
+        # Инициализируем all_forms копией normative_words для быстрого старта
+        # Полная генерация форм будет происходить лениво при проверке
+        self.all_forms = self.normative_words.copy()
+        print(f"[OK] Ready with {len(self.all_forms):,} base forms")
+        print(f"[INF] Additional forms will be generated on-demand during checks")
     
     def is_known_word(self, word):
-        """Improved word check with pyaspeller and pymorphy3"""
+        """Improved word check with pyaspeller and pymorphy3 - с улучшенной проверкой склонений"""
         word_lower = word.lower()
         
-        # Check in dictionaries
+        # 1. Быстрая проверка в кэше всех форм
+        if word_lower in self.all_forms:
+            return True
+        
+        # 2. Проверка в исходных словарях
         if word_lower in self.normative_words or word_lower in self.foreign_allowed:
             return True
         
-        # Check normal form in dictionaries
+        # 3. Проверка склонений через кэш
+        if word_lower in self.forms_cache:
+            return True
+        
+        # 4. Проверка через pymorphy3 - генерируем все формы на лету
         if self.morph:
             try:
-                normal_form = self.get_word_normal_form(word)
-                if normal_form in self.normative_words:
+                forms = self._get_all_forms_cached(word_lower)
+                # Проверяем, есть ли пересечение с нашим словарём
+                if forms & self.normative_words:
+                    self.all_forms.update(forms)  # Добавляем в общий кэш
                     return True
-                # Also check if word forms of normal form exist
-                parsed = self.morph.parse(normal_form)
+                # Проверяем нормальную форму
+                parsed = self.morph.parse(word_lower)
                 if parsed:
-                    for p in parsed[:3]:  # Check top 3 parses
+                    for p in parsed[:3]:
                         if p.normal_form in self.normative_words:
+                            # Добавляем все формы этого слова в кэш
+                            word_forms = self._get_all_forms_cached(p.normal_form)
+                            self.all_forms.update(word_forms)
                             return True
+                        # Проверяем лексему
+                        try:
+                            if hasattr(p, 'lexeme'):
+                                for lex in p.lexeme:
+                                    if lex.word.lower() in self.normative_words:
+                                        self.all_forms.add(word_lower)
+                                        return True
+                        except:
+                            pass
             except:
                 pass
         
-        # Check via pyaspeller (Yandex Speller) - recognizes word forms!
+        # 5. Check via pyaspeller (Yandex Speller) - recognizes word forms!
         if self.speller and PYASPELLER_AVAILABLE:
             try:
                 speller_result = self.check_with_speller(word)
@@ -623,18 +719,21 @@ class RussianLanguageChecker:
                     if speller_result.get('correct', False):
                         return True
                     # If speller suggests variants - word might have typo
-                    # but we consider the original form as "known" 
-                    # if variants are similar (same root)
                     variants = speller_result.get('variants', [])
                     if variants:
-                        # Check if any variant is in our dictionary
                         for variant in variants[:2]:
-                            if variant.lower() in self.normative_words:
+                            variant_lower = variant.lower()
+                            if variant_lower in self.normative_words or variant_lower in self.all_forms:
                                 return True
+                            # Проверяем склонения вариантов
+                            if self.morph:
+                                variant_forms = self._get_all_forms_cached(variant_lower)
+                                if variant_forms & self.normative_words:
+                                    return True
             except:
                 pass
         
-        # Check via pymorphy3 with expanded logic
+        # 6. Проверка через pymorphy3 - имена собственные и прочее
         if self.morph:
             try:
                 parsed = self.morph.parse(word_lower)
@@ -649,40 +748,32 @@ class RussianLanguageChecker:
                     # Organizations
                     if 'Orgn' in best_parse.tag:
                         return True
-                    # Has part of speech = real word
-                    if best_parse.tag.POS:
-                        # Check if normal form is known
-                        if best_parse.normal_form in self.normative_words:
-                            return True
-                        # Check score - high confidence
-                        if best_parse.score > 0.1:
-                            return True
             except:
                 pass
         
-        # Abbreviations (all caps, up to 10 chars)
+        # 7. Abbreviations (all caps, up to 10 chars)
         if word.isupper() and len(word) <= 10:
             return True
             
-        # Capitalized words (proper nouns)
+        # 8. Capitalized words (proper nouns)
         if word[0].isupper() and len(word) > 1:
             return True
         
-        # Hyphenated words
+        # 9. Hyphenated words - проверяем каждую часть
         if '-' in word:
             parts = word_lower.split('-')
             known_parts = 0
             for part in parts:
                 if len(part) > 1:
-                    if part in self.normative_words or part in self.foreign_allowed:
+                    if part in self.all_forms or part in self.normative_words:
                         known_parts += 1
                     elif self.morph:
                         try:
-                            if self.get_word_normal_form(part) in self.normative_words:
+                            part_forms = self._get_all_forms_cached(part)
+                            if part_forms & self.normative_words:
                                 known_parts += 1
                         except:
                             pass
-            # If majority of parts are known
             if known_parts >= len(parts) / 2:
                 return True
         
@@ -727,12 +818,30 @@ class RussianLanguageChecker:
         try:
             parsed = self.morph.parse(word_lower)
             if parsed:
+                # Берём первый вариант с наивысшим score
                 best = parsed[0]
                 return best.normal_form
         except:
             pass
         
         return word_lower
+    
+    def get_all_normal_forms(self, word):
+        """Получить все возможные нормальные формы слова (для омонимов)"""
+        if not self.morph or not MORPH_AVAILABLE:
+            return {word.lower()}
+        
+        word_lower = word.lower()
+        forms = set()
+        
+        try:
+            parsed = self.morph.parse(word_lower)
+            for p in parsed:
+                forms.add(p.normal_form)
+        except:
+            forms.add(word_lower)
+        
+        return forms
     
     def is_nenormative(self, word):
         """Проверка ненормативности"""
@@ -821,20 +930,54 @@ if __name__ == "__main__":
     
     checker = RussianLanguageChecker()
     
-    # Test with different word forms (cases)
+    # Test with different word forms (cases) - проверка склонений
     test_cases = [
-        "Это тестовый текст для проверки. Hello world! Профессиональный подход.",
-        "Мы работаем с документами разных видов",  # разных видов - different cases
-        "Компания предлагает услуги клиентам",      # клиентам - dative case
-        "Безопасность системы важна для нас",       # системы - genitive case
+        ("Это тестовый текст для проверки. Hello world! Профессиональный подход.", "Basic test"),
+        ("Мы работаем с документами разных видов", "родительный падеж: документами, видов"),
+        ("Компания предлагает услуги клиентам", "дательный падеж: клиентам"),
+        ("Безопасность системы важна для нас", "родительный падеж: системы"),
+        ("Пользователь нажал кнопку", "винительный падеж: кнопку"),
+        ("Мы говорили о проекте", "предложный падеж: проекте"),
+        ("Товары доставляют курьером", "творительный падеж: курьером"),
+        ("В магазине есть скидки", "предложный падеж: магазине"),
+        ("Проверка работает быстро", "наречие: быстро"),
+        ("Эти документы важны", "именительный падеж мн.ч.: документы"),
     ]
     
-    for i, test_text in enumerate(test_cases, 1):
-        print(f"\nTest {i}: {test_text[:50]}...")
+    print("\n" + "-"*60)
+    print("DECLENSION TESTS (Проверка склонений)")
+    print("-"*60)
+    
+    for i, (test_text, description) in enumerate(test_cases, 1):
+        print(f"\nTest {i}: {description}")
+        print(f"  Text: {test_text[:60]}...")
         result = checker.check_text(test_text)
-        print(f"  Violations: {result['violations_count']}")
+        print(f"  Words: {result['total_words']}, Violations: {result['violations_count']}")
         if result['unknown_cyrillic']:
-            print(f"  Unknown: {result['unknown_cyrillic']}")
+            print(f"  ⚠️  Unknown words: {result['unknown_cyrillic']}")
+        else:
+            print(f"  ✅ All words recognized!")
+    
+    # Test specific word forms
+    print("\n" + "-"*60)
+    print("SPECIFIC FORM TESTS")
+    print("-"*60)
+    
+    word_forms_tests = [
+        ("книга", "именительный падеж"),
+        ("книги", "родительный падеж"),
+        ("книге", "дательный падеж"),
+        ("книгу", "винительный падеж"),
+        ("книгой", "творительный падеж"),
+        ("книге", "предложный падеж"),
+        ("книги", "именительный падеж мн.ч."),
+        ("книг", "родительный падеж мн.ч."),
+    ]
+    
+    for word, case in word_forms_tests:
+        is_known = checker.is_known_word(word)
+        status = "✅" if is_known else "❌"
+        print(f"  {status} '{word}' ({case}): {'known' if is_known else 'unknown'}")
     
     print("\n" + "="*60)
     print("TEST COMPLETE")
