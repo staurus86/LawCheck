@@ -735,7 +735,8 @@ class RussianLanguageChecker:
             'orfoep_words.txt': 'normative_words',
             'foreign_words.txt': 'foreign_allowed',
             'Nenormativnye_slova.txt': 'nenormative_words',
-            'frequency_words.txt': 'normative_words'
+            'frequency_words.txt': 'normative_words',
+            'extra_words.txt': 'normative_words'
         }
 
         loaded = 0
