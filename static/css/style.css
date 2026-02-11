@@ -1178,3 +1178,42 @@ body {
 .deep-section {
     animation: fadeIn 0.3s ease-out;
 }
+
+.deep-section.batch {
+    background: #FAFAFA;
+    border-left-color: #2196F3;
+}
+
+.deep-section.batch h4 {
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+}
+
+.deep-section.batch h4 .batch-url {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.deep-section.batch h4 .batch-url:hover {
+    text-decoration: underline;
+}
+
+.deep-subsection {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px dashed #E0E0E0;
+}
+
+.deep-subsection:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.deep-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    display: block;
+}

@@ -600,20 +600,20 @@ async function deepCheck(type) {
         alert('Нет данных для проверки! Сначала выполните проверку.');
         return;
     }
-    
+
     const wordsToCheck = [
         ...(result.latin_words || []),
         ...(result.unknown_cyrillic || [])
     ];
-    
+
     if (wordsToCheck.length === 0) {
         alert('Нет слов для глубокой проверки!');
         return;
     }
-    
+
     showLoading();
     console.log('🔬 Глубокая проверка:', wordsToCheck.length, 'слов');
-    
+
     try {
         const response = await fetch(`${API_BASE}/api/deep-check`, {
             method: 'POST',
@@ -622,9 +622,9 @@ async function deepCheck(type) {
             },
             body: JSON.stringify({ words: wordsToCheck })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             displayDeepResults(type, data.results);
             console.log('✅ Глубокая проверка завершена:', data.results);
@@ -636,6 +636,188 @@ async function deepCheck(type) {
     } finally {
         hideLoading();
     }
+}
+
+// Глубокая проверка для пакетного режима
+async function deepCheckBatch() {
+    const results = currentResults.batch;
+    if (!results || !Array.isArray(results)) {
+        alert('Нет данных для проверки! Сначала выполните пакетную проверку.');
+        return;
+    }
+
+    // Собираем все уникальные слова со всех URL
+    const allWords = new Set();
+    const urlMap = [];
+
+    results.forEach((item, index) => {
+        if (item.success && item.result) {
+            const latin = item.result.latin_words || [];
+            const unknown = item.result.unknown_cyrillic || [];
+            if (latin.length > 0 || unknown.length > 0) {
+                const words = [...latin, ...unknown];
+                words.forEach(w => {
+                    if (!allWords.has(w)) {
+                        allWords.add(w);
+                        urlMap.push({ word: w, urlIndex: index });
+                    }
+                });
+            }
+        }
+    });
+
+    if (allWords.size === 0) {
+        alert('Нет слов для глубокой проверки!');
+        return;
+    }
+
+    showLoading();
+    console.log('🔬 Глубокая проверка batch:', allWords.size, 'слов');
+
+    try {
+        const response = await fetch(`${API_BASE}/api/deep-check`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ words: Array.from(allWords) })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            displayBatchDeepResults(results, data.results, urlMap);
+            console.log('✅ Глубокая проверка batch завершена');
+        } else {
+            alert('Ошибка: ' + data.error);
+        }
+    } catch (error) {
+        alert('Ошибка глубокой проверки: ' + error.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Отображение результатов глубокой проверки для batch
+function displayBatchDeepResults(results, deepResults, urlMap) {
+    const resultsContent = document.getElementById('batchResultsContent');
+
+    // Создаем словарь результатов
+    const resultMap = {};
+    deepResults.forEach(r => {
+        resultMap[r.word.toLowerCase()] = r;
+    });
+
+    // Группируем по URL
+    const urlResults = results.map((item, index) => {
+        if (!item.success || !item.result) return null;
+
+        const latin = item.result.latin_words || [];
+        const unknown = item.result.unknown_cyrillic || [];
+        const allWords = [...latin, ...unknown];
+
+        const validated = [];
+        const abbreviations = [];
+        const invalid = [];
+
+        allWords.forEach(word => {
+            const dr = resultMap[word.toLowerCase()];
+            if (dr) {
+                if (dr.reasons.includes('abbreviation')) {
+                    abbreviations.push(dr);
+                } else if (dr.is_valid) {
+                    validated.push(dr);
+                } else {
+                    invalid.push(dr);
+                }
+            }
+        });
+
+        return {
+            url: item.url,
+            index,
+            validated,
+            abbreviations,
+            invalid
+        };
+    }).filter(r => r !== null && (r.validated.length > 0 || r.abbreviations.length > 0 || r.invalid.length > 0));
+
+    // Считаем общую статистику
+    const totalAbbr = urlResults.reduce((sum, r) => sum + r.abbreviations.length, 0);
+    const totalValid = urlResults.reduce((sum, r) => sum + r.validated.length, 0);
+    const totalInvalid = urlResults.reduce((sum, r) => sum + r.invalid.length, 0);
+
+    let html = `
+        <div class="deep-check-results">
+            <h3>🔬 Глубокая проверка всех URL</h3>
+            <div class="deep-summary">
+                <span class="deep-valid">✅ Подтверждено: ${totalValid}</span>
+                <span class="deep-abbr">📚 Аббревиатуры: ${totalAbbr}</span>
+                <span class="deep-invalid">❌ Требуют замены: ${totalInvalid}</span>
+            </div>
+    `;
+
+    urlResults.forEach(r => {
+        html += `
+            <div class="deep-section batch">
+                <h4><a href="${r.url}" target="_blank" class="batch-url">${r.url}</a></h4>
+        `;
+
+        if (r.abbreviations.length > 0) {
+            html += `
+                <div class="deep-subsection">
+                    <span class="deep-label">📚 Аббревиатуры:</span>
+                    <div class="word-list">
+                        ${r.abbreviations.map(dr => `
+                            <span class="word-tag abbr">
+                                ${dr.word}
+                                <span class="word-translation">→ ${dr.suggestions?.join(', ') || 'перевод неизвестен'}</span>
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        if (r.validated.length > 0) {
+            html += `
+                <div class="deep-subsection">
+                    <span class="deep-label">✅ Подтверждено:</span>
+                    <div class="word-list">
+                        ${r.validated.map(dr => `
+                            <span class="word-tag valid">
+                                ${dr.word}
+                                ${dr.normal_form ? `<span class="word-reason">(${dr.normal_form})</span>` : ''}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        if (r.invalid.length > 0) {
+            html += `
+                <div class="deep-subsection">
+                    <span class="deep-label">❌ Требуют замены:</span>
+                    <div class="word-list">
+                        ${r.invalid.map(dr => `
+                            <span class="word-tag invalid">
+                                ${dr.word}
+                                ${dr.suggestions?.length > 0 ? `<span class="word-suggestions">→ ${dr.suggestions.join(', ')}</span>` : ''}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+    });
+
+    html += '</div>';
+
+    resultsContent.innerHTML += html;
+    resultsContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // Отображение результатов глубокой проверки
