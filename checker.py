@@ -721,7 +721,9 @@ class RussianLanguageChecker:
             return None
 
     def load_dictionaries(self):
-        """Load dictionaries from files - с расширенным кэшем"""
+        """Load dictionaries from files - с автораспаковкой .gz"""
+        import gzip
+        
         possible_paths = [
             Path('dictionaries'),
             Path('.') / 'dictionaries',
@@ -733,11 +735,9 @@ class RussianLanguageChecker:
         for path in possible_paths:
             if path.exists() and path.is_dir():
                 dict_path = path
-                print(f"[OK] Dictionaries folder found: {path.absolute()}")
                 break
 
         if not dict_path:
-            print("[WARN] Dictionaries folder not found")
             return
 
         files_to_load = {
@@ -749,31 +749,38 @@ class RussianLanguageChecker:
             'extra_words.txt': 'normative_words',
             'russian_dict.txt': 'normative_words'
         }
-
+        
         loaded = 0
         for filename, target_attr in files_to_load.items():
             filepath = dict_path / filename
-
-            if not filepath.exists():
-                print(f"[WARN] File not found: {filename}")
+            gz_filepath = dict_path / f'{filename}.gz'
+            
+            # Пробуем сначала .gz
+            source_path = gz_filepath if gz_filepath.exists() else filepath
+            
+            if not source_path.exists():
                 continue
 
             try:
-                with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-                    words = set()
-                    for line in f:
-                        word = line.strip().lower()
-                        if word and not word.startswith('#') and len(word) > 1:
-                            words.add(word)
+                words = set()
+                if str(source_path).endswith('.gz'):
+                    with gzip.open(source_path, 'rt', encoding='utf-8') as f:
+                        for line in f:
+                            word = line.strip().lower()
+                            if word and not word.startswith('#') and len(word) > 1:
+                                words.add(word)
+                else:
+                    with open(source_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        for line in f:
+                            word = line.strip().lower()
+                            if word and not word.startswith('#') and len(word) > 1:
+                                words.add(word)
 
-                    if words:
-                        getattr(self, target_attr).update(words)
-                        print(f"[OK] {filename}: {len(words):,} words")
-                        loaded += 1
+                if words:
+                    getattr(self, target_attr).update(words)
+                    loaded += 1
             except Exception as e:
                 print(f"[ERROR] {filename}: {e}")
-
-        print(f"\nFiles loaded: {loaded}/{len(files_to_load)}")
 
         self.all_forms = set(self.normative_words)
         self.all_forms.update(self.foreign_allowed)
