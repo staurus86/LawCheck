@@ -68,7 +68,6 @@ class RussianLanguageChecker:
         self._skip_words = None
 
         self.add_common_words()
-        self.load_abbreviations()
         self.load_dictionaries()
 
         print("\n" + "="*60)
@@ -79,60 +78,7 @@ class RussianLanguageChecker:
         print(f"[OK] Nenormative: {len(self.nenormative_words):,}")
         print(f"[OK] Abbreviations: {len(self.abbreviations):,}")
         print("="*60 + "\n")
-
-    def load_abbreviations(self):
-        """Загрузка словаря аббревиатур с поддержкой .gz"""
-        import gzip
-        
-        possible_paths = [
-            Path('dictionaries'),
-            Path('.') / 'dictionaries',
-            Path(__file__).parent / 'dictionaries',
-            Path.cwd() / 'dictionaries',
-        ]
-
-        for path in possible_paths:
-            if path.exists() and path.is_dir():
-                dict_path = path
-                break
-        else:
-            return
-
-        abbr_file = dict_path / 'abbreviations.txt'
-        abbr_gz = dict_path / 'abbreviations.txt.gz'
-        
-        # Пробуем .gz, потом .txt
-        source = abbr_gz if abbr_gz.exists() else abbr_file
-        
-        if source and source.exists():
-            try:
-                if str(source).endswith('.gz'):
-                    with gzip.open(source, 'rt', encoding='utf-8') as f:
-                        for line in f:
-                            line = line.strip()
-                            if not line or line.startswith('#'):
-                                continue
-                            if '->' in line:
-                                parts = line.split('->')
-                                abbr = parts[0].strip()
-                                translations = [t.strip() for t in parts[1].split(',')]
-                                self.abbreviations[abbr.upper()] = translations
-                                self.abbreviations[abbr] = translations
-                else:
-                    with open(source, 'r', encoding='utf-8') as f:
-                        for line in f:
-                            line = line.strip()
-                            if not line or line.startswith('#'):
-                                continue
-                            if '->' in line:
-                                parts = line.split('->')
-                                abbr = parts[0].strip()
-                                translations = [t.strip() for t in parts[1].split(',')]
-                                self.abbreviations[abbr.upper()] = translations
-                                self.abbreviations[abbr] = translations
-            except Exception as e:
-                print(f"[WARN] Abbreviations load error: {e}")
-
+    
     def _is_abbreviation(self, word):
         """Автоопределение аббревиатуры"""
         word_clean = re.sub(r'[^a-zA-Z0-9]', '', word)
