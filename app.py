@@ -257,6 +257,78 @@ def get_stats():
             'error': str(e)
         }), 500
 
+@app.route('/api/check-word', methods=['POST'])
+def check_word():
+    """API: Проверка одного слова"""
+    try:
+        data = request.json
+        word = data.get('word', '').strip()
+        
+        if not word:
+            return jsonify({'error': 'Слово не предоставлено'}), 400
+        
+        if len(word) < 2:
+            return jsonify({'error': 'Слишком короткое слово (минимум 2 символа)'}), 400
+        
+        checker_instance = get_checker()
+        
+        word_lower = word.lower()
+        word_upper = word.upper()
+        word_title = word.title()
+        
+        is_normative = (
+            word_lower in checker_instance.normative_words or
+            word_upper in checker_instance.normative_words or
+            word_title in checker_instance.normative_words
+        )
+        
+        is_foreign = (
+            word_lower in checker_instance.foreign_allowed or
+            word_upper in checker_instance.foreign_allowed or
+            word_title in checker_instance.foreign_allowed
+        )
+        
+        is_nenormative = (
+            word_lower in checker_instance.nenormative_words or
+            word_upper in checker_instance.nenormative_words or
+            word_title in checker_instance.nenormative_words
+        )
+        
+        import re
+        has_latin = bool(re.search(r'[a-zA-Z]', word))
+        
+        is_abbreviation = False
+        abbreviation_translation = None
+        if word in checker_instance.abbreviations:
+            is_abbreviation = True
+            abbreviation_translation = checker_instance.abbreviations[word]
+        
+        is_unknown = not is_normative and not is_foreign and not is_nenormative
+        
+        is_potential_fine = is_unknown and not is_foreign
+        
+        result = {
+            'word': word,
+            'is_normative': is_normative,
+            'is_foreign': is_foreign,
+            'is_nenormative': is_nenormative,
+            'has_latin': has_latin,
+            'is_abbreviation': is_abbreviation,
+            'abbreviation_translation': abbreviation_translation,
+            'is_unknown': is_unknown,
+            'is_potential_fine': is_potential_fine,
+            'status': 'ok' if is_normative else ('warning' if is_foreign else 'danger')
+        }
+        
+        return jsonify({
+            'success': True,
+            'result': result,
+            'timestamp': datetime.now().isoformat()
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/history', methods=['GET'])
 def get_history():
     """API: История проверок"""

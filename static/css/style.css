@@ -524,6 +524,12 @@ body {
     border-left: 5px solid #F44336;
 }
 
+.result-status.warning {
+    background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
+    color: #E65100;
+    border-left: 5px solid #FF9800;
+}
+
 /* Секции нарушений */
 .violations-list {
     display: flex;
@@ -964,6 +970,54 @@ body {
 .batch-words-count {
     color: var(--text-secondary);
     font-size: 0.85rem;
+}
+
+/* ============================================
+   ПРОВЕРКА СЛОВА
+   ============================================ */
+
+.word-input-group {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.word-input-group .form-input {
+    flex: 1;
+    max-width: 400px;
+}
+
+.word-detail {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #E0E0E0;
+}
+
+.word-detail:last-child {
+    border-bottom: none;
+}
+
+.word-label {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.word-value {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.word-value.text-success {
+    color: #4CAF50;
+}
+
+.word-value.text-danger {
+    color: #F44336;
+}
+
+.word-value.text-warning {
+    color: #FF9800;
 }
 
 /* ============================================

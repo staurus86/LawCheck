@@ -215,6 +215,149 @@ async function checkBatch() {
     console.log('✅ Пакетная проверка завершена:', results);
 }
 
+// Проверка одного слова
+async function checkWord() {
+    const word = document.getElementById('wordInput').value.trim();
+    
+    if (!word) {
+        alert('Введите слово для проверки!');
+        return;
+    }
+    
+    if (word.length < 2) {
+        alert('Слово должно содержать минимум 2 символа!');
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/check-word`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ word })
+        });
+        
+        const data = await response.json();
+        
+        hideLoading();
+        
+        if (data.success) {
+            currentResults.word = data.result;
+            displayWordResult(data.result);
+            console.log('✅ Слово проверено:', data.result);
+        } else {
+            alert('Ошибка: ' + data.error);
+        }
+    } catch (error) {
+        hideLoading();
+        alert('Ошибка проверки: ' + error.message);
+    }
+}
+
+// Отображение результата проверки слова
+function displayWordResult(result) {
+    const resultsCard = document.getElementById('wordResults');
+    const resultsContent = document.getElementById('wordResultsContent');
+    
+    let html = '';
+    
+    if (result.is_nenormative) {
+        html += `
+            <div class="result-status error">
+                <div class="status-icon">🚫</div>
+                <div class="status-text">
+                    <h3>ОПАСНОЕ СЛОВО - НЕНОРМАТИВНАЯ ЛЕКСИКА</h3>
+                    <p>Данное слово запрещено к использованию. Это критическое нарушение закона.</p>
+                </div>
+            </div>
+        `;
+    } else if (result.is_potential_fine) {
+        html += `
+            <div class="result-status warning">
+                <div class="status-icon">⚠️</div>
+                <div class="status-text">
+                    <h3>ПОТЕНЦИАЛЬНАЯ УГРОЗА ШТРАФА</h3>
+                    <p>Слово не найдено в базе нормативных слов. Использование может повлечь штраф до 500 000 рублей.</p>
+                </div>
+            </div>
+        `;
+    } else if (result.is_foreign) {
+        html += `
+            <div class="result-status warning">
+                <div class="status-icon">🌍</div>
+                <div class="status-text">
+                    <h3>ИНОСТРАННОЕ СЛОВО</h3>
+                    <p>Слово разрешено к использованию в определённых контекстах.</p>
+                </div>
+            </div>
+        `;
+    } else if (result.is_abbreviation) {
+        html += `
+            <div class="result-status success">
+                <div class="status-icon">📚</div>
+                <div class="status-text">
+                    <h3>АББРЕВИАТУРА</h3>
+                    <p>Расшифровка: ${result.abbreviation_translation.join(', ')}</p>
+                </div>
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="result-status success">
+                <div class="status-icon">✅</div>
+                <div class="status-text">
+                    <h3>НОРМАТИВНОЕ СЛОВО</h3>
+                    <p>Слово соответствует требованиям закона.</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    html += `
+        <div class="word-detail">
+            <div class="word-label">Проверяемое слово:</div>
+            <div class="word-value">"${result.word}"</div>
+        </div>
+    `;
+    
+    if (result.has_latin) {
+        html += `
+            <div class="word-detail">
+                <div class="word-label">Содержит латиницу:</div>
+                <div class="word-value">Да</div>
+            </div>
+        `;
+    }
+    
+    html += `
+        <div class="word-detail">
+            <div class="word-label">В базе нормативных:</div>
+            <div class="word-value ${result.is_normative ? 'text-success' : 'text-danger'}">
+                ${result.is_normative ? '✅ Да' : '❌ Нет'}
+            </div>
+        </div>
+        <div class="word-detail">
+            <div class="word-label">В базе иностранных:</div>
+            <div class="word-value ${result.is_foreign ? 'text-warning' : ''}">
+                ${result.is_foreign ? '✅ Да' : '❌ Нет'}
+            </div>
+        </div>
+        <div class="word-detail">
+            <div class="word-label">В базе ненормативных:</div>
+            <div class="word-value ${result.is_nenormative ? 'text-danger' : 'text-success'}">
+                ${result.is_nenormative ? '🚫 Да (ЗАПРЕЩЕНО)' : '✅ Нет'}
+            </div>
+        </div>
+    `;
+    
+    resultsContent.innerHTML = html;
+    resultsCard.style.display = 'block';
+    resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 // Отображение результатов проверки
 function displayResults(type, result, url = '') {
     const resultsCard = document.getElementById(`${type}Results`);
