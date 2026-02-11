@@ -2,7 +2,7 @@ Flask==3.0.0
 flask-cors==4.0.0
 pymorphy3==1.2.0
 pymorphy3-dicts-ru==2.4.417150.4580142
-pyaspeller==0.2.3
+pyaspeller>=1.0.0
 beautifulsoup4==4.12.2
 requests==2.31.0
 gunicorn==21.2.0
