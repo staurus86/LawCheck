@@ -758,46 +758,201 @@ class RussianLanguageChecker:
             return
 
         files_to_load = {
-            'orfograf_words.txt': 'normative_words',
-            'orfoep_words.txt': 'normative_words',
-            'foreign_words.txt': 'foreign_allowed',
-            'Nenormativnye_slova.txt': 'nenormative_words',
-            'frequency_words.txt': 'normative_words',
-            'extra_words.txt': 'normative_words',
-            'russian_dict.txt': 'normative_words'
+            'russian_dict.txt.gz': 'normative_words',
         }
         
+        # Загружаем основной словарь
         loaded = 0
         for filename, target_attr in files_to_load.items():
             filepath = dict_path / filename
-            gz_filepath = dict_path / f'{filename}.gz'
             
-            # Пробуем сначала .gz
-            source_path = gz_filepath if gz_filepath.exists() else filepath
-            
-            if not source_path.exists():
+            if not filepath.exists():
                 continue
 
             try:
-                words = set()
-                if str(source_path).endswith('.gz'):
-                    with gzip.open(source_path, 'rt', encoding='utf-8') as f:
-                        for line in f:
-                            word = line.strip().lower()
-                            if word and not word.startswith('#') and len(word) > 1:
-                                words.add(word)
-                else:
-                    with open(source_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        for line in f:
-                            word = line.strip().lower()
-                            if word and not word.startswith('#') and len(word) > 1:
-                                words.add(word)
-
+                with gzip.open(filepath, 'rt', encoding='utf-8') as f:
+                    words = set()
+                    for line in f:
+                        word = line.strip().lower()
+                        if word and len(word) > 1:
+                            words.add(word)
+                
                 if words:
                     getattr(self, target_attr).update(words)
                     loaded += 1
             except Exception as e:
                 print(f"[ERROR] {filename}: {e}")
+
+        # Минимальные списки - хардкод для быстрого старта
+        self.foreign_allowed.update({
+            'hello', 'world', 'web', 'site', 'internet', 'email', 'login',
+            'software', 'hardware', 'server', 'client', 'proxy', 'wifi',
+            'api', 'json', 'xml', 'html', 'css', 'js', 'java', 'python',
+            ' бизнес', 'маркетинг', 'hr', 'it', 'seo', 'smm', 'crm', 'erp',
+            'ai', 'ml', 'tv', 'vip', 'ok', 'gdz', 'hit', 'top', 'best',
+            'show', 'news', 'chat', 'bot', 'user', 'admin', 'root', 'sudo',
+            'cd', 'ls', 'cat', 'grep', 'ssh', 'ftp', 'dns', 'ip', 'url',
+            'cookie', 'bug', 'debug', 'stack', 'heap', 'byte', 'bit', 'mbyte',
+            'gbyte', 'terabyte', 'pixel', 'matrix', 'kernel', 'driver', 'patch',
+            'login', 'password', 'token', 'hash', 'md5', 'sha', 'aes', 'rsa',
+            'wifi', 'bluetooth', 'usb', 'hdmi', 'vga', 'dvi', 'ram', 'cpu', 'gpu',
+            'hdd', 'ssd', 'nvme', 'pci', 'agp', 'bios', 'uefi', 'firmware',
+            'html', 'http', 'https', 'ftp', 'smtp', 'pop3', 'imap', 'tcp', 'udp',
+            'os', 'bios', 'dos', 'unix', 'linux', 'windows', 'macos', 'android', 'ios',
+            'gpl', 'mit', 'apache', 'nginx', 'docker', 'kubernetes', 'k8s',
+            'git', 'svn', 'hg', 'cvs', 'bzr', 'ppa', 'apt', 'yum', 'rpm',
+            'npm', 'yarn', 'pip', 'conda', 'venv', 'poetry', 'make', 'cmake',
+            'gcc', 'clang', 'llvm', 'gdb', 'valgrind', 'perf', 'strace', 'ltrace',
+            'tcpdump', 'wireshark', 'nmap', 'ping', 'traceroute', 'dig', 'nslookup',
+            'who', 'finger', 'id', 'w', 'last', 'history', 'alias', 'export',
+            'env', 'var', 'cd', 'pwd', 'ls', 'mkdir', 'rm', 'cp', 'mv', 'ln',
+            'chmod', 'chown', 'chgrp', 'sudo', 'su', 'useradd', 'usermod', 'userdel',
+            'groupadd', 'groupmod', 'groupdel', 'passwd', 'shadow', 'gshadow',
+            'cron', 'at', 'batch', 'nice', 'renice', 'ionice', 'ulimit',
+            'ulimit', 'nice', 'cpulimit', 'cgroups', 'namespaces', 'cgroups',
+            'docker', 'container', 'image', 'registry', 'hub', 'compose',
+            'kubernetes', 'pod', 'service', 'deployment', 'daemonset', 'statefulset',
+            'helm', 'kubectl', 'oc', 'istio', 'linkerd', 'envoy', 'traefik', 'nginx',
+            'elk', 'efk', 'prometheus', 'grafana', 'zabbix', 'nagios', 'icinga',
+            'splunk', 'sumologic', 'datadog', 'newrelic', 'appdynamics', 'dynatrace',
+            'slack', 'telegram', 'discord', 'zoom', 'teams', 'meet', 'webex',
+            'aws', 'azure', 'gcp', 'digitalocean', 'linode', 'vultr', 'hetzner',
+            'ec2', 's3', 'ebs', 'efs', 'rds', 'dynamodb', 'lambda', 'ecs', 'eks',
+            'cloudfront', 'route53', 'vpc', 'subnet', 'sg', 'nacl', 'iam', 'sts',
+            'bucket', 'key', 'secret', 'access', 'token', 'session', 'cookie',
+            'jwt', 'oauth', 'openid', 'saml', 'ldap', 'kerberos', 'ntlm',
+            'ssl', 'tls', 'https', 'cert', 'ca', 'crl', 'ocsp', 'pkcs',
+            'aes', 'rsa', 'dsa', 'ecdsa', 'sha', 'md5', 'hmac', 'pbkdf2', 'bcrypt',
+            'sql', 'mysql', 'postgresql', 'postgres', 'sqlite', 'mongodb', 'redis',
+            'elasticsearch', 'cassandra', 'hbase', 'kafka', 'rabbitmq', 'activemq',
+            'zookeeper', 'etcd', 'consul', 'vault', 'secure', 'auth', 'authz',
+            'iam', 'rbac', 'abac', 'policies', 'roles', 'users', 'groups',
+            'jwt', 'jws', 'jwe', 'jwk', 'jwks', 'openid', 'oauth', 'sso', 'saml',
+            'graphql', 'rest', 'soap', 'grpc', 'thrift', 'avro', 'protobuf', 'flatbuffers',
+            'aws', 'gcp', 'azure', 'alibaba', 'tencent', 'yandex', 'mailru', 'vk',
+            'ok', 'facebook', 'twitter', 'instagram', 'tiktok', 'youtube', 'twitch',
+            'amazon', 'ebay', 'aliexpress', 'walmart', 'target', 'bestbuy', 'costco',
+            'visa', 'mastercard', 'amex', 'paypal', 'stripe', 'square', 'payoneer',
+            'wise', 'transferwise', 'westernunion', 'moneygram', 'swift', 'sepa', 'iban',
+            'bitcoin', 'ethereum', 'litecoin', 'ripple', 'cardano', 'solana', 'polkadot',
+            'binance', 'coinbase', 'kraken', 'bitfinex', 'huobi', 'okex', 'bybit',
+            'nft', 'dao', 'defi', 'yield', 'staking', 'liquidity', 'swap', 'bridge',
+            'metamask', 'trustwallet', 'ledger', 'trezor', 'coldwallet', 'hotwallet',
+            'ico', 'ido', 'igo', 'ieo', 'sto', 'securitytoken', 'utilitytoken',
+        })
+        
+        self.nenormative_words.update({
+            'хуй', 'пизда', 'блядь', 'сука', 'ебать', 'нахуй', 'похуй', 'нахрен',
+            ' fuck', 'shit', 'damn', 'ass', 'bitch', 'bastard', 'cunt', 'dick',
+            'cock', 'pussy', 'slut', 'whore', 'fag', 'nigger', 'chink', 'spic',
+            'уебан', 'уёбок', 'пидорас', 'пидарас', 'педик', 'педераст', 'гомик',
+            'чмо', 'быдло', 'долбоёб', 'долбаёб', 'мудак', 'мудень', 'придурок',
+            'дебил', 'имбецил', 'идиот', 'тупой', 'тупица', 'кретин', 'дегенерат',
+            'выблядок', 'выхухоль', 'пиздец', 'пиздатый', 'охуенный', 'охуеть',
+            'ебанутый', 'ебанутая', 'ебануться', 'пиздануть', 'вздрочить', 'дрочить',
+            'пососать', 'отсосать', 'сосать', 'лизнуть', 'ли舐ть', 'шлюха', 'проститутка',
+            'мамка', 'папка', 'сынок', 'дочка', 'сестра', 'брат', 'теща', 'свёкор',
+            ' тесть', 'зять', 'невестка', 'сноха', 'дядя', 'тётя', 'кум', 'кума',
+            'голубой', 'розовый', 'жёлтый', 'педерастия', 'гомосек', 'лесбиянка',
+        })
+
+        self.abbreviations.update({
+            'VIP': ['очень важная персона', 'вип'],
+            'CEO': ['главный исполнительный директор'],
+            'CTO': ['технический директор'],
+            'CFO': ['финансовый директор'],
+            'COO': ['операционный директор'],
+            'CMO': ['маркетинговый директор'],
+            'HR': ['человеческие ресурсы', 'отдел кадров'],
+            'IT': ['информационные технологии'],
+            'AI': ['искусственный интеллект'],
+            'ML': ['машинное обучение'],
+            'NLP': ['обработка естественного языка'],
+            'CV': ['компьютерное зрение'],
+            'API': ['программный интерфейс'],
+            'JSON': ['формат обмена данными'],
+            'XML': ['расширяемый язык разметки'],
+            'HTML': ['язык разметки гипертекста'],
+            'CSS': ['каскадные таблицы стилей'],
+            'JS': ['яваскрипт'],
+            'SQL': ['язык структурированных запросов'],
+            'URL': ['адрес ресурса'],
+            'HTTP': ['протокол передачи гипертекста'],
+            'HTTPS': ['защищённый протокол'],
+            'FTP': ['протокол передачи файлов'],
+            'SSH': ['защищённая оболочка'],
+            'DNS': ['система доменных имён'],
+            'IP': ['интернет-протокол'],
+            'TCP': ['протокол управления передачей'],
+            'UDP': ['протокол дейтаграмм'],
+            'VPN': ['виртуальная частная сеть'],
+            'LAN': ['локальная сеть'],
+            'WAN': ['глобальная сеть'],
+            'WLAN': ['беспроводная локальная сеть'],
+            'WiFi': ['беспроводная сеть'],
+            'OS': ['операционная система'],
+            'CPU': ['центральный процессор'],
+            'GPU': ['графический процессор'],
+            'RAM': ['оперативная память'],
+            'ROM': ['постоянная память'],
+            'HDD': ['жёсткий диск'],
+            'SSD': ['твёрдотельный накопитель'],
+            'USB': ['универсальная последовательная шина'],
+            'HDMI': ['мультимедийный интерфейс'],
+            'VGA': ['видеографический массив'],
+            'SEO': ['поисковая оптимизация'],
+            'SMM': ['маркетинг в социальных сетях'],
+            'CRM': ['управление отношениями с клиентами'],
+            'ERP': ['планирование ресурсов предприятия'],
+            'B2B': ['бизнес для бизнеса'],
+            'B2C': ['бизнес для потребителя'],
+            'C2C': ['потребитель для потребителя'],
+            'O2O': ['онлайн для офлайна'],
+            'KPI': ['ключевой показатель эффективности'],
+            'ROI': ['возврат инвестиций'],
+            'ROAS': ['возврат рекламных расходов'],
+            'CPA': ['оплата за действие'],
+            'CPC': ['оплата за клик'],
+            'CPM': ['оплата за показ'],
+            'CTR': ['показатель кликабельности'],
+            'CR': ['конверсия'],
+            'UV': ['уникальный посетитель'],
+            'PV': ['просмотр страницы'],
+            'DAU': ['активные пользователи в день'],
+            'MAU': ['активные пользователи в месяц'],
+            'LTV': ['пожизненная ценность'],
+            'CAC': ['стоимость привлечения'],
+            'GMV': ['общий товарооборот'],
+            'MRR': ['регулярный месячный доход'],
+            'ARR': ['регулярный годовой доход'],
+            'EBITDA': ['прибыль до вычета процентов'],
+            'P&L': ['прибыли и убытки'],
+            'OKR': ['цели и ключевые результаты'],
+            'SLA': ['соглашение об уровне услуг'],
+            'SLO': ['целевой уровень услуг'],
+            'SLI': ['индикатор уровня услуг'],
+            'CI/CD': ['непрерывная интеграция и доставка'],
+            'DevOps': ['разработка и эксплуатация'],
+            'Agile': ['гибкая методология'],
+            'Scrum': ['скрам'],
+            'Kanban': ['канбан'],
+            'MVP': ['минимальный жизнеспособный продукт'],
+            'PMF': ['соответствие продукта рынку'],
+            'UX': ['пользовательский опыт'],
+            'UI': ['пользовательский интерфейс'],
+            'GA': ['Google Analytics'],
+            'GTM': ['выход на рынок'],
+            'SaaS': ['программное обеспечение как услуга'],
+            'PaaS': ['платформа как услуга'],
+            'IaaS': ['инфраструктура как услуга'],
+            'FOSS': ['свободное программное обеспечение'],
+            'OSS': ['программное обеспечение с открытым кодом'],
+            'GPL': ['общественная лицензия GNU'],
+            'MIT': ['лицензия MIT'],
+            'Apache': ['лицензия Apache'],
+            'BSD': ['лицензия BSD'],
+            'LGPL': ['меньшая общественная лицензия GNU'],
+        })
 
         self.all_forms = set(self.normative_words)
         self.all_forms.update(self.foreign_allowed)
