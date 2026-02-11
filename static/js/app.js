@@ -611,8 +611,13 @@ async function deepCheck(type) {
         return;
     }
 
+    // Ограничиваем количество слов для одного запроса
+    const maxWords = 200;
+    const wordsToProcess = wordsToCheck.slice(0, maxWords);
+    const skippedCount = wordsToCheck.length - maxWords;
+
     showLoading();
-    console.log('🔬 Глубокая проверка:', wordsToCheck.length, 'слов');
+    console.log('🔬 Глубокая проверка:', wordsToProcess.length, 'слов из', wordsToCheck.length);
 
     try {
         const response = await fetch(`${API_BASE}/api/deep-check`, {
@@ -620,21 +625,25 @@ async function deepCheck(type) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ words: wordsToCheck })
+            body: JSON.stringify({ words: wordsToProcess })
         });
 
         const data = await response.json();
 
+        hideLoading();
+
         if (data.success) {
             displayDeepResults(type, data.results);
-            console.log('✅ Глубокая проверка завершена:', data.results);
+            if (skippedCount > 0) {
+                alert(`Показаны результаты для первых ${maxWords} слов. Ещё ${skippedCount} слов пропущено.`);
+            }
+            console.log('✅ Глубокая проверка завершена:', data.results.length, 'слов');
         } else {
             alert('Ошибка: ' + data.error);
         }
     } catch (error) {
-        alert('Ошибка глубокой проверки: ' + error.message);
-    } finally {
         hideLoading();
+        alert('Ошибка глубокой проверки: ' + error.message);
     }
 }
 
@@ -671,30 +680,67 @@ async function deepCheckBatch() {
         return;
     }
 
+    const wordArray = Array.from(allWords);
+    const batchSize = 100; // Обрабатываем по 100 слов за раз
+    const totalBatches = Math.ceil(wordArray.length / batchSize);
+
     showLoading();
-    console.log('🔬 Глубокая проверка batch:', allWords.size, 'слов');
+    console.log('🔬 Глубокая проверка batch:', wordArray.length, 'слов,', totalBatches, 'батчей');
 
     try {
-        const response = await fetch(`${API_BASE}/api/deep-check`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ words: Array.from(allWords) })
-        });
+        const allDeepResults = [];
+        let currentBatch = 0;
 
-        const data = await response.json();
+        while (currentBatch < totalBatches) {
+            const start = currentBatch * batchSize;
+            const end = start + batchSize;
+            const batchWords = wordArray.slice(start, end);
 
-        if (data.success) {
-            displayBatchDeepResults(results, data.results, urlMap);
-            console.log('✅ Глубокая проверка batch завершена');
-        } else {
-            alert('Ошибка: ' + data.error);
+            // Показываем прогресс
+            updateLoadingText(`Проверка батча ${currentBatch + 1}/${totalBatches} (${batchWords.length} слов)...`);
+
+            const response = await fetch(`${API_BASE}/api/deep-check`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ words: batchWords })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (data.success && data.results) {
+                allDeepResults.push(...data.results);
+            }
+
+            currentBatch++;
         }
-    } catch (error) {
-        alert('Ошибка глубокой проверки: ' + error.message);
-    } finally {
+
+        // Скрываем лоадер перед показом результатов
         hideLoading();
+
+        if (allDeepResults.length > 0) {
+            displayBatchDeepResults(results, allDeepResults, urlMap);
+            console.log('✅ Глубокая проверка batch завершена:', allDeepResults.length, 'слов');
+        } else {
+            alert('Не удалось получить результаты глубокой проверки');
+        }
+
+    } catch (error) {
+        hideLoading();
+        console.error('❌ Ошибка глубокой проверки:', error);
+        alert('Ошибка глубокой проверки: ' + error.message);
+    }
+}
+
+function updateLoadingText(text) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        const p = overlay.querySelector('p');
+        if (p) p.textContent = text;
     }
 }
 

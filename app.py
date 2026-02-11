@@ -18,6 +18,7 @@ import uuid
 from collections import defaultdict
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max request size
 # CORS - разрешаем все домены
 CORS(app, resources={
     r"/api/*": {
