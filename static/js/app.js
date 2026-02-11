@@ -357,7 +357,7 @@ function displayResults(type, result, url = '') {
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// Отображение пакетных результатов
+// Отображение пакетных результатов с детализацией нарушений
 function displayBatchResults(results) {
     const resultsCard = document.getElementById('batchResults');
     const resultsContent = document.getElementById('batchResultsContent');
@@ -366,6 +366,11 @@ function displayBatchResults(results) {
     let critical = 0;
     let successful = 0;
     
+    // Собираем уникальные слова по всем сайтам
+    const allLatinWords = new Set();
+    const allUnknownWords = new Set();
+    const allNenormativeWords = new Set();
+    
     results.forEach(item => {
         if (item.success) {
             successful++;
@@ -373,6 +378,10 @@ function displayBatchResults(results) {
             if (hasViolations) {
                 totalViolations++;
                 if (item.result.nenormative_count > 0) critical++;
+                // Собираем слова
+                (item.result.latin_words || []).forEach(w => allLatinWords.add(w));
+                (item.result.unknown_cyrillic || []).forEach(w => allUnknownWords.add(w));
+                (item.result.nenormative_words || []).forEach(w => allNenormativeWords.add(w));
             }
         }
     });
@@ -400,8 +409,54 @@ function displayBatchResults(results) {
                 ` : ''}
             </div>
         </div>
-        <div class="batch-results-list">
     `;
+    
+    // Сводка уникальных нарушений по всем сайтам
+    if (allLatinWords.size > 0 || allUnknownWords.size > 0 || allNenormativeWords.size > 0) {
+        html += `
+            <div class="batch-global-violations">
+                <h4>🌍 Уникальные нарушения по всем сайтам</h4>
+                <div class="batch-violations-summary">
+                    ${allNenormativeWords.size > 0 ? `
+                        <div class="batch-violation-category critical">
+                            <h5>🚫 Ненормативная лексика (${allNenormativeWords.size})</h5>
+                            <div class="word-list">
+                                ${Array.from(allNenormativeWords).slice(0, 20).map(w => {
+                                    const censored = w[0] + '*'.repeat(Math.max(0, w.length - 2)) + w.slice(-1);
+                                    return `<span class="word-tag critical">${censored}</span>`;
+                                }).join('')}
+                                ${allNenormativeWords.size > 20 ? `<span class="more-words">... и ещё ${allNenormativeWords.size - 20}</span>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${allLatinWords.size > 0 ? `
+                        <div class="batch-violation-category">
+                            <h5>🌍 Латиница (${allLatinWords.size})</h5>
+                            <div class="word-list">
+                                ${Array.from(allLatinWords).slice(0, 30).map(w => 
+                                    `<span class="word-tag">${w}</span>`
+                                ).join('')}
+                                ${allLatinWords.size > 30 ? `<span class="more-words">... и ещё ${allLatinWords.size - 30}</span>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${allUnknownWords.size > 0 ? `
+                        <div class="batch-violation-category">
+                            <h5>❓ Англицизмы / Неизвестные (${allUnknownWords.size})</h5>
+                            <div class="word-list">
+                                ${Array.from(allUnknownWords).slice(0, 30).map(w => 
+                                    `<span class="word-tag">${w}</span>`
+                                ).join('')}
+                                ${allUnknownWords.size > 30 ? `<span class="more-words">... и ещё ${allUnknownWords.size - 30}</span>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    html += '<div class="batch-results-list">';
     
     results.forEach((item, index) => {
         const statusIcon = !item.success ? '❌' : 
@@ -412,12 +467,22 @@ function displayBatchResults(results) {
                            item.result.law_compliant ? 'success' : 
                            item.result.nenormative_count > 0 ? 'critical' : 'warning';
         
+        const hasDetails = item.success && !item.result.law_compliant && 
+                          (item.result.latin_words?.length > 0 || 
+                           item.result.unknown_cyrillic?.length > 0 || 
+                           item.result.nenormative_words?.length > 0);
+        
         html += `
             <div class="batch-item ${statusClass}">
                 <div class="batch-item-header">
                     <span class="batch-icon">${statusIcon}</span>
                     <span class="batch-number">[${index + 1}]</span>
                     <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
+                    ${hasDetails ? `
+                        <button class="batch-details-btn" id="batch-btn-${index}" onclick="toggleBatchDetails(${index})">
+                            Показать детали
+                        </button>
+                    ` : ''}
                 </div>
                 ${item.success ? `
                     <div class="batch-item-stats">
@@ -425,8 +490,48 @@ function displayBatchResults(results) {
                         <span>Латиница: ${item.result.latin_count}</span>
                         <span>Англицизмы: ${item.result.unknown_count}</span>
                         ${item.result.nenormative_count > 0 ? `<span class="critical-badge">Ненорматив: ${item.result.nenormative_count}</span>` : ''}
+                        <span class="batch-words-count">Всего слов: ${item.result.total_words || 0}</span>
                     </div>
                 ` : `<div class="batch-item-error">Ошибка: ${item.error}</div>`}
+                
+                ${hasDetails ? `
+                    <div class="batch-details" id="batch-details-${index}" style="display: none;">
+                        ${item.result.nenormative_words?.length > 0 ? `
+                            <div class="batch-detail-section critical">
+                                <h6>🚫 Ненормативная лексика:</h6>
+                                <div class="word-list">
+                                    ${item.result.nenormative_words.slice(0, 15).map(w => {
+                                        const censored = w[0] + '*'.repeat(Math.max(0, w.length - 2)) + w.slice(-1);
+                                        return `<span class="word-tag critical">${censored}</span>`;
+                                    }).join('')}
+                                    ${item.result.nenormative_words.length > 15 ? `<span class="more-words">... и ещё ${item.result.nenormative_words.length - 15}</span>` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${item.result.latin_words?.length > 0 ? `
+                            <div class="batch-detail-section">
+                                <h6>🌍 Латиница:</h6>
+                                <div class="word-list">
+                                    ${item.result.latin_words.slice(0, 20).map(w => 
+                                        `<span class="word-tag">${w}</span>`
+                                    ).join('')}
+                                    ${item.result.latin_words.length > 20 ? `<span class="more-words">... и ещё ${item.result.latin_words.length - 20}</span>` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${item.result.unknown_cyrillic?.length > 0 ? `
+                            <div class="batch-detail-section">
+                                <h6>❓ Англицизмы / Неизвестные:</h6>
+                                <div class="word-list">
+                                    ${item.result.unknown_cyrillic.slice(0, 20).map(w => 
+                                        `<span class="word-tag">${w}</span>`
+                                    ).join('')}
+                                    ${item.result.unknown_cyrillic.length > 20 ? `<span class="more-words">... и ещё ${item.result.unknown_cyrillic.length - 20}</span>` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                ` : ''}
             </div>
         `;
     });
@@ -450,12 +555,17 @@ async function exportReport(type) {
         showLoading();
         console.log('📥 Экспорт отчета:', type, result);
         
-        const response = await fetch(`${API_BASE}/api/export/txt`, {
+        // Для пакетной проверки используем специальный endpoint
+        const isBatch = type === 'batch';
+        const endpoint = isBatch ? '/api/export/batch-txt' : '/api/export/txt';
+        const payload = isBatch ? { results: result } : { result };
+        
+        const response = await fetch(`${API_BASE}${endpoint}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ result })
+            body: JSON.stringify(payload)
         });
         
         if (!response.ok) {
@@ -466,7 +576,8 @@ async function exportReport(type) {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `law_check_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
+        const prefix = isBatch ? 'lawcheck_batch_' : 'lawcheck_';
+        a.download = `${prefix}${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -479,6 +590,21 @@ async function exportReport(type) {
         alert('Ошибка экспорта: ' + error.message);
     } finally {
         hideLoading();
+    }
+}
+
+// Переключение отображения деталей пакетной проверки
+function toggleBatchDetails(index) {
+    const detailsEl = document.getElementById(`batch-details-${index}`);
+    if (detailsEl) {
+        const isVisible = detailsEl.style.display !== 'none';
+        detailsEl.style.display = isVisible ? 'none' : 'block';
+        
+        // Обновляем текст кнопки
+        const btnEl = document.getElementById(`batch-btn-${index}`);
+        if (btnEl) {
+            btnEl.textContent = isVisible ? 'Показать детали' : 'Скрыть детали';
+        }
     }
 }
 

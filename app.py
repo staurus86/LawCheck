@@ -411,6 +411,154 @@ def export_json():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/export/batch-txt', methods=['POST'])
+def export_batch_txt():
+    """Экспорт пакетного отчета в TXT с детализацией всех нарушений"""
+    try:
+        data = request.get_json()
+        results = data.get('results', [])
+        
+        if not results:
+            return jsonify({'error': 'Нет данных для экспорта'}), 400
+        
+        lines = []
+        lines.append("=" * 80)
+        lines.append("ПАКЕТНЫЙ ОТЧЕТ ПРОВЕРКИ САЙТОВ НА СООТВЕТСТВИЕ ФЗ-168")
+        lines.append("=" * 80)
+        lines.append(f"Дата проверки: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+        lines.append(f"Всего проверено сайтов: {len(results)}")
+        lines.append("")
+        
+        # Общая сводка
+        total_violations = 0
+        total_sites_with_violations = 0
+        total_critical = 0
+        successful_checks = 0
+        
+        all_latin_words = set()
+        all_unknown_words = set()
+        all_nenormative_words = set()
+        
+        for item in results:
+            if item.get('success') and item.get('result'):
+                successful_checks += 1
+                result = item['result']
+                if not result.get('law_compliant', True):
+                    total_sites_with_violations += 1
+                    total_violations += result.get('violations_count', 0)
+                    if result.get('nenormative_count', 0) > 0:
+                        total_critical += 1
+                    # Собираем все слова
+                    all_latin_words.update(result.get('latin_words', []))
+                    all_unknown_words.update(result.get('unknown_cyrillic', []))
+                    all_nenormative_words.update(result.get('nenormative_words', []))
+        
+        lines.append("-" * 80)
+        lines.append("ОБЩАЯ СВОДКА:")
+        lines.append("-" * 80)
+        lines.append(f"  ✅ Успешно проверено:     {successful_checks} сайтов")
+        lines.append(f"  ❌ С нарушениями:         {total_sites_with_violations} сайтов")
+        lines.append(f"  🚫 Критических (мат):     {total_critical} сайтов")
+        lines.append(f"  📊 Всего нарушений:       {total_violations}")
+        lines.append("")
+        
+        # Уникальные слова по всем сайтам
+        if all_latin_words or all_unknown_words or all_nenormative_words:
+            lines.append("-" * 80)
+            lines.append("УНИКАЛЬНЫЕ НАРУШЕНИЯ ПО ВСЕМ САЙТАМ:")
+            lines.append("-" * 80)
+            lines.append("")
+            
+            if all_nenormative_words:
+                lines.append(f"🚫 НЕНОРМАТИВНАЯ ЛЕКСИКА ({len(all_nenormative_words)} уникальных слов):")
+                for i, word in enumerate(sorted(all_nenormative_words), 1):
+                    lines.append(f"  {i:3d}. {word}")
+                lines.append("")
+            
+            if all_latin_words:
+                lines.append(f"🌍 ЛАТИНИЦА ({len(all_latin_words)} уникальных слов):")
+                for i, word in enumerate(sorted(all_latin_words), 1):
+                    lines.append(f"  {i:3d}. {word}")
+                lines.append("")
+            
+            if all_unknown_words:
+                lines.append(f"❓ АНГЛИЦИЗМЫ / НЕИЗВЕСТНЫЕ ({len(all_unknown_words)} уникальных слов):")
+                for i, word in enumerate(sorted(all_unknown_words), 1):
+                    lines.append(f"  {i:3d}. {word}")
+                lines.append("")
+        
+        # Детализация по каждому сайту
+        lines.append("=" * 80)
+        lines.append("ДЕТАЛЬНЫЙ ОТЧЕТ ПО КАЖДОМУ САЙТУ:")
+        lines.append("=" * 80)
+        lines.append("")
+        
+        for i, item in enumerate(results, 1):
+            url = item.get('url', 'Неизвестный URL')
+            lines.append(f"{'─' * 80}")
+            lines.append(f"[{i}] {url}")
+            lines.append(f"{'─' * 80}")
+            
+            if not item.get('success'):
+                lines.append(f"  ❌ ОШИБКА: {item.get('error', 'Неизвестная ошибка')}")
+                lines.append("")
+                continue
+            
+            result = item.get('result', {})
+            
+            # Статус
+            if result.get('law_compliant', False):
+                lines.append("  ✅ СТАТУС: Соответствует закону")
+            else:
+                lines.append(f"  ⚠️  СТАТУС: Нарушений: {result.get('violations_count', 0)}")
+            
+            lines.append(f"  📊 Слов в тексте: {result.get('total_words', 0)}")
+            lines.append("")
+            
+            # Нарушения по категориям
+            if result.get('nenormative_count', 0) > 0:
+                lines.append(f"  🚫 НЕНОРМАТИВНАЯ ЛЕКСИКА ({result['nenormative_count']}):")
+                for word in result.get('nenormative_words', []):
+                    lines.append(f"      • {word}")
+                lines.append("")
+            
+            if result.get('latin_count', 0) > 0:
+                lines.append(f"  🌍 ЛАТИНИЦА ({result['latin_count']}):")
+                for word in result.get('latin_words', []):
+                    lines.append(f"      • {word}")
+                lines.append("")
+            
+            if result.get('unknown_count', 0) > 0:
+                lines.append(f"  ❓ АНГЛИЦИЗМЫ ({result['unknown_count']}):")
+                for word in result.get('unknown_cyrillic', []):
+                    lines.append(f"      • {word}")
+                lines.append("")
+        
+        # Подвал
+        lines.append("=" * 80)
+        lines.append("Создано: LawChecker Online")
+        lines.append("Сайт: https://lawcheck-production.up.railway.app")
+        lines.append("Закон: Федеральный закон №168-ФЗ «О русском языке»")
+        lines.append("=" * 80)
+        
+        report = "\n".join(lines)
+        
+        # Создаем файл с BOM для Windows-совместимости
+        output = io.BytesIO()
+        output.write('\ufeff'.encode('utf-8'))  # UTF-8 BOM
+        output.write(report.encode('utf-8'))
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='text/plain; charset=utf-8',
+            as_attachment=True,
+            download_name=f'lawcheck_batch_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
+        )
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 
 def save_to_history(check_type, result, context):
