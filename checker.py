@@ -507,7 +507,7 @@ class RussianLanguageChecker:
         print(f"[OK] Base dictionary: {len(common)} words")
 
     def _is_known_fast(self, word_lower):
-        """Быстрая проверка без генерации форм"""
+        """Мгновенная проверка - только словари, без морфологии"""
         if word_lower in self.all_forms:
             return True
         if word_lower in self.normative_words or word_lower in self.foreign_allowed:
@@ -516,33 +516,11 @@ class RussianLanguageChecker:
         return False
 
     def _check_morph_fast(self, word_lower):
-        """Быстрая проверка через морфологию"""
-        if not self.morph:
-            return False
-
-        try:
-            parsed = self.morph.parse(word_lower)
-            if not parsed:
-                return False
-
-            p = parsed[0]
-            normal = p.normal_form
-
-            if normal in self.normative_words or normal in self.all_forms:
-                self.all_forms.add(word_lower)
-                return True
-
-            if 'Name' in p.tag or 'Surn' in p.tag or 'Patr' in p.tag:
-                return True
-            if 'Geox' in p.tag or 'Orgn' in p.tag:
-                return True
-
-        except:
-            pass
+        """Медленная проверка через морфологию - только для неизвестных слов"""
         return False
 
     def load_dictionaries(self):
-        """Load dictionaries from files"""
+        """Load dictionaries from files - с расширенным кэшем"""
         possible_paths = [
             Path('dictionaries'),
             Path('.') / 'dictionaries',
@@ -559,8 +537,6 @@ class RussianLanguageChecker:
 
         if not dict_path:
             print("[WARN] Dictionaries folder not found")
-            print("   Check that dictionaries/ folder exists")
-            print("   Current directory:", Path.cwd())
             return
 
         files_to_load = {
@@ -571,9 +547,9 @@ class RussianLanguageChecker:
         }
 
         MAX_WORDS_PER_FILE = {
-            'orfograf_words.txt': 50000,
-            'orfoep_words.txt': 10000,
-            'foreign_words.txt': 5000,
+            'orfograf_words.txt': 100000,
+            'orfoep_words.txt': 20000,
+            'foreign_words.txt': 10000,
             'Nenormativnye_slova.txt': 10000
         }
 
@@ -586,35 +562,31 @@ class RussianLanguageChecker:
                 continue
 
             try:
-                max_words = MAX_WORDS_PER_FILE.get(filename, 50000)
+                max_words = MAX_WORDS_PER_FILE.get(filename, 100000)
                 with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
                     words = set()
-                    line_count = 0
                     for line in f:
-                        line_count += 1
                         word = line.strip().lower()
                         if word and not word.startswith('#') and len(word) > 1:
                             words.add(word)
                         if len(words) >= max_words:
-                            print(f"[INF] {filename}: limit reached ({max_words})")
                             break
 
                     if words:
                         getattr(self, target_attr).update(words)
                         print(f"[OK] {filename}: {len(words):,} words")
                         loaded += 1
-                    else:
-                        print(f"[WARN] {filename}: empty file")
             except Exception as e:
                 print(f"[ERROR] {filename}: {e}")
 
         print(f"\nFiles loaded: {loaded}/{len(files_to_load)}")
 
-        self.all_forms = self.normative_words.copy()
-        print(f"[OK] Ready with {len(self.all_forms):,} base forms")
+        self.all_forms = set(self.normative_words)
+        self.all_forms.update(self.foreign_allowed)
+        print(f"[OK] Ready with {len(self.all_forms):,} total forms")
     
     def is_known_word(self, word):
-        """Оптимизированная проверка слова"""
+        """Мгновенная проверка - только словари"""
         word_lower = word.lower()
         wlen = len(word_lower)
 
@@ -624,36 +596,6 @@ class RussianLanguageChecker:
         if self._is_known_fast(word_lower):
             return True
 
-        if self._check_morph_fast(word_lower):
-            return True
-
-        if self.speller and PYASPELLER_AVAILABLE:
-            try:
-                if word_lower in self.speller_cache:
-                    cached = self.speller_cache[word_lower]
-                    if cached.get('correct'):
-                        return True
-                    for v in cached.get('variants', [])[:2]:
-                        if self._is_known_fast(v.lower()):
-                            return True
-                else:
-                    result = self.speller.spelled(word_lower)
-                    is_correct = (result == word_lower)
-                    variants = []
-                    if not is_correct:
-                        try:
-                            variants = self.speller.suggest(word_lower)[:3]
-                        except:
-                            pass
-                    self.speller_cache[word_lower] = {'correct': is_correct, 'variants': variants}
-                    if is_correct:
-                        return True
-                    for v in variants[:2]:
-                        if self._is_known_fast(v.lower()):
-                            return True
-            except:
-                pass
-
         if wlen <= 10 and word.isupper():
             return True
 
@@ -662,66 +604,21 @@ class RussianLanguageChecker:
 
         if '-' in word:
             parts = word_lower.split('-')
-            known = 0
             for part in parts:
                 if len(part) > 1 and self._is_known_fast(part):
-                    known += 1
-            if known >= len(parts) / 2:
-                return True
-
-        return False
-    
-    def get_word_normal_form(self, word):
-        """Get normal form of word using pymorphy3 with improved case handling"""
-        if not self.morph or not MORPH_AVAILABLE:
-            return word.lower()
-        
-        word_lower = word.lower()
-        
-        try:
-            parsed = self.morph.parse(word_lower)
-            if parsed:
-                # Берём первый вариант с наивысшим score
-                best = parsed[0]
-                return best.normal_form
-        except:
-            pass
-        
-        return word_lower
-    
-    def get_all_normal_forms(self, word):
-        """Получить все возможные нормальные формы слова (для омонимов)"""
-        if not self.morph or not MORPH_AVAILABLE:
-            return {word.lower()}
-        
-        word_lower = word.lower()
-        forms = set()
-        
-        try:
-            parsed = self.morph.parse(word_lower)
-            for p in parsed:
-                forms.add(p.normal_form)
-        except:
-            forms.add(word_lower)
-        
-        return forms
-    
-    def is_nenormative(self, word):
-        """Проверка ненормативности"""
-        word_lower = word.lower()
-
-        if word_lower in self.nenormative_words:
-            return True
-
-        if self.morph:
-            try:
-                parsed = self.morph.parse(word_lower)
-                if parsed and parsed[0].normal_form in self.nenormative_words:
                     return True
-            except:
-                pass
 
         return False
+
+    def get_word_normal_form(self, word):
+        return word.lower()
+
+    def get_all_normal_forms(self, word):
+        return {word.lower()}
+
+    def is_nenormative(self, word):
+        """Проверка ненормативности - без морфологии"""
+        return word.lower() in self.nenormative_words
 
     def check_text(self, text):
         """Оптимизированная проверка текста"""
