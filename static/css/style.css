@@ -1022,3 +1022,159 @@ body {
         width: 100%;
     }
 }
+
+/* ============================================
+   ГЛУБОКАЯ ПРОВЕРКА - НОВЫЕ СТИЛИ
+   ============================================ */
+
+.deep-check-results {
+    background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+    border-left: 4px solid #2196F3;
+}
+
+.deep-check-results h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #1565C0;
+}
+
+.deep-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.deep-valid {
+    color: #4CAF50;
+    background: #E8F5E9;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+}
+
+.deep-abbr {
+    color: #9C27B0;
+    background: #F3E5F5;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+}
+
+.deep-invalid {
+    color: #F44336;
+    background: #FFEBEE;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+}
+
+.deep-section {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.deep-section:last-child {
+    margin-bottom: 0;
+}
+
+.deep-section.valid {
+    border-left: 3px solid #4CAF50;
+}
+
+.deep-section.abbreviation {
+    border-left: 3px solid #9C27B0;
+    background: #F3E5F5;
+}
+
+.deep-section.invalid {
+    border-left: 3px solid #F44336;
+}
+
+.deep-section h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+}
+
+.deep-section.valid h4 {
+    color: #2E7D32;
+}
+
+.deep-section.abbreviation h4 {
+    color: #6A1B9A;
+}
+
+.deep-section.invalid h4 {
+    color: #C62828;
+}
+
+/* Стили для слов в глубокой проверке */
+.word-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    margin: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.word-tag.valid {
+    background: #E8F5E9;
+    color: #2E7D32;
+    border: 1px solid #A5D6A7;
+}
+
+.word-tag.abbr {
+    background: #F3E5F5;
+    color: #6A1B9A;
+    border: 1px solid #CE93D8;
+}
+
+.word-tag.invalid {
+    background: #FFEBEE;
+    color: #C62828;
+    border: 1px solid #EF9A9A;
+}
+
+.word-reason,
+.word-translation,
+.word-suggestions {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+.word-tag:hover .word-reason,
+.word-tag:hover .word-translation,
+.word-tag:hover .word-suggestions {
+    color: var(--text-primary);
+}
+
+.word-translation {
+    color: #9C27B0;
+    font-weight: 500;
+}
+
+.word-suggestions {
+    color: #FF9800;
+    font-weight: 500;
+}
+
+/* Анимация появления */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.deep-section {
+    animation: fadeIn 0.3s ease-out;
+}

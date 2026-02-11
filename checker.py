@@ -26,7 +26,7 @@ _RE_WORD = re.compile(r'\b[а-яёА-ЯЁa-zA-Z][а-яёА-ЯЁa-zA-Z\-]*\b')
 class RussianLanguageChecker:
     __slots__ = ('normative_words', 'foreign_allowed', 'nenormative_words',
                  'speller_cache', 'forms_cache', 'all_forms', 'morph', 'speller',
-                 '_word_prefixes', '_skip_words')
+                 '_word_prefixes', '_skip_words', 'abbreviations')
 
     def __init__(self):
         self.normative_words = set()
@@ -35,6 +35,7 @@ class RussianLanguageChecker:
         self.speller_cache = {}
         self.forms_cache = {}
         self.all_forms = set()
+        self.abbreviations = {}  # abbreviation -> translations
 
         print("\n" + "="*60)
         print("INIT RussianLanguageChecker (OPTIMIZED)")
@@ -66,6 +67,7 @@ class RussianLanguageChecker:
         self._skip_words = None
 
         self.add_common_words()
+        self.load_abbreviations()
         self.load_dictionaries()
 
         print("\n" + "="*60)
@@ -74,7 +76,55 @@ class RussianLanguageChecker:
         print(f"[OK] Normative: {len(self.normative_words):,}")
         print(f"[OK] Foreign: {len(self.foreign_allowed):,}")
         print(f"[OK] Nenormative: {len(self.nenormative_words):,}")
+        print(f"[OK] Abbreviations: {len(self.abbreviations):,}")
         print("="*60 + "\n")
+
+    def load_abbreviations(self):
+        """Загрузка словаря аббревиатур"""
+        dict_path = None
+        possible_paths = [
+            Path('dictionaries'),
+            Path('.') / 'dictionaries',
+            Path(__file__).parent / 'dictionaries',
+            Path.cwd() / 'dictionaries',
+        ]
+
+        for path in possible_paths:
+            if path.exists() and path.is_dir():
+                dict_path = path
+                break
+
+        abbr_file = dict_path / 'abbreviations.txt' if dict_path else None
+
+        if abbr_file and abbr_file.exists():
+            try:
+                with open(abbr_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith('#'):
+                            continue
+                        if '->' in line:
+                            parts = line.split('->')
+                            abbr = parts[0].strip()
+                            translations = [t.strip() for t in parts[1].split(',')]
+                            self.abbreviations[abbr.upper()] = translations
+                            self.abbreviations[abbr] = translations
+                print(f"[OK] Abbreviations: {len(self.abbreviations)} loaded")
+            except Exception as e:
+                print(f"[WARN] Abbreviations load error: {e}")
+        else:
+            print("[WARN] abbreviations.txt not found")
+
+    def _is_abbreviation(self, word):
+        """Автоопределение аббревиатуры"""
+        word_clean = re.sub(r'[^a-zA-Z0-9]', '', word)
+        if len(word_clean) < 2 or len(word_clean) > 8:
+            return False
+        if not word_clean.isupper():
+            return False
+        if not word_clean.isalpha():
+            return False
+        return True
     
     def add_common_words(self):
         """Базовые слова - расширенный набор частых русских слов"""
@@ -533,6 +583,16 @@ class RussianLanguageChecker:
             'normal_form': None,
             'suggestions': []
         }
+
+        if self._is_abbreviation(word):
+            result['is_valid'] = True
+            result['reasons'].append('abbreviation')
+            translations = self.abbreviations.get(word.upper(), [])
+            if translations:
+                result['suggestions'] = translations
+            else:
+                result['suggestions'].append('требуется перевод')
+            return result
 
         morph_result = self._check_morph_full(word_lower)
         if morph_result:
