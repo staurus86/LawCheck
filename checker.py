@@ -14,7 +14,7 @@ except:
     MORPH_AVAILABLE = False
 
 try:
-    from pyaspeller import YandexSpeller, Word
+    from pyaspeller import YandexSpeller
     PYASPELLER_AVAILABLE = True
 except:
     PYASPELLER_AVAILABLE = False
@@ -502,40 +502,10 @@ class RussianLanguageChecker:
         }
         self.normative_words.update(common)
         
-        # Generate all word forms via pymorphy3
+        # Note: Word form generation is now done on-demand (lazy loading)
+        # to avoid memory issues on Railway
         if self.morph:
-            forms_added = 0
-            unique_forms = set()
-            
-            for word in list(common):
-                try:
-                    parsed = self.morph.parse(word)
-                    if parsed:
-                        for p in parsed[:2]:  # Top 2 parses
-                            # Get lexeme (all word forms)
-                            try:
-                                lexeme = p.lexeme
-                                for lex in lexeme:
-                                    form = lex.word.lower()
-                                    if form not in unique_forms:
-                                        unique_forms.add(form)
-                                        self.normative_words.add(form)
-                                        forms_added += 1
-                            except:
-                                # Fallback: just add the word form
-                                form = p.word.lower()
-                                if form not in unique_forms:
-                                    unique_forms.add(form)
-                                    self.normative_words.add(form)
-                                    forms_added += 1
-                except Exception as e:
-                    pass
-            
-            print(f"[OK] Base dictionary: {len(common)} words + {forms_added} generated forms")
-            print(f"  Total unique forms: {len(self.normative_words):,}")
-            
-            # Генерируем все формы для базовых слов и добавляем в all_forms
-            self._generate_all_forms_for_dictionary()
+            print(f"[OK] Base dictionary: {len(common)} words (forms generated on-demand)")
         else:
             print(f"[OK] Base dictionary: {len(common)} words")
     
@@ -599,7 +569,7 @@ class RussianLanguageChecker:
         return forms
     
     def load_dictionaries(self):
-        """Load dictionaries from files"""
+        """Load dictionaries from files - с ограничением размера для Railway"""
         # All possible paths
         possible_paths = [
             Path('dictionaries'),
@@ -621,12 +591,20 @@ class RussianLanguageChecker:
             print("   Current directory:", Path.cwd())
             return
         
-        # Files to load
+        # Files to load - ограничиваем размер для Railway
         files_to_load = {
             'orfograf_words.txt': 'normative_words',
             'orfoep_words.txt': 'normative_words',
             'foreign_words.txt': 'foreign_allowed',
             'Nenormativnye_slova.txt': 'nenormative_words'
+        }
+        
+        # Максимальное количество слов из каждого файла (для экономии памяти)
+        MAX_WORDS_PER_FILE = {
+            'orfograf_words.txt': 50000,      # Только частые слова
+            'orfoep_words.txt': 10000,        # Орфоэпические
+            'foreign_words.txt': 5000,        # Иностранные
+            'Nenormativnye_slova.txt': 10000  # Ненормативные
         }
         
         loaded = 0
@@ -638,6 +616,7 @@ class RussianLanguageChecker:
                 continue
             
             try:
+                max_words = MAX_WORDS_PER_FILE.get(filename, 50000)
                 with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
                     words = set()
                     line_count = 0
@@ -646,6 +625,10 @@ class RussianLanguageChecker:
                         word = line.strip().lower()
                         if word and not word.startswith('#') and len(word) > 1:
                             words.add(word)
+                        # Ограничиваем количество слов
+                        if len(words) >= max_words:
+                            print(f"[INF] {filename}: limit reached ({max_words})")
+                            break
                     
                     if words:
                         getattr(self, target_attr).update(words)
@@ -660,10 +643,9 @@ class RussianLanguageChecker:
         print(f"\nFiles loaded: {loaded}/{len(files_to_load)}")
         
         # Инициализируем all_forms копией normative_words для быстрого старта
-        # Полная генерация форм будет происходить лениво при проверке
         self.all_forms = self.normative_words.copy()
         print(f"[OK] Ready with {len(self.all_forms):,} base forms")
-        print(f"[INF] Additional forms will be generated on-demand during checks")
+        print(f"[INF] Word forms generated on-demand to save memory")
     
     def is_known_word(self, word):
         """Improved word check with pyaspeller and pymorphy3 - с улучшенной проверкой склонений"""
@@ -791,12 +773,26 @@ class RussianLanguageChecker:
             return self.speller_cache[word_lower]
         
         try:
-            # Use Word class for single word check
-            check = Word(word_lower)
+            # Use YandexSpeller.spelled() for single word check (Word class is deprecated)
+            spelled_result = self.speller.spelled(word_lower)
+            
+            # If word unchanged - it's correct
+            is_correct = (spelled_result == word_lower)
+            
+            # Get suggestions if incorrect
+            variants = []
+            if not is_correct:
+                # Get suggestions from speller
+                try:
+                    suggestions = self.speller.suggest(word_lower)
+                    variants = suggestions[:3] if suggestions else []
+                except:
+                    pass
+            
             result = {
-                'correct': check.correct,
-                'variants': check.variants if hasattr(check, 'variants') else [],
-                'spellsafe': check.spellsafe if hasattr(check, 'spellsafe') else True
+                'correct': is_correct,
+                'variants': variants,
+                'spellsafe': is_correct
             }
             
             # Cache result

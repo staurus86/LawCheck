@@ -27,8 +27,20 @@ CORS(app, resources={
     }
 })
 
-# Инициализация чекера
-checker = RussianLanguageChecker()
+# Lazy initialization - checker будет создан при первом запросе
+checker = None
+
+def get_checker():
+    """Get or create checker instance with lazy initialization"""
+    global checker
+    if checker is None:
+        import time
+        print("[INFO] Initializing RussianLanguageChecker...")
+        start_time = time.time()
+        checker = RussianLanguageChecker()
+        elapsed = time.time() - start_time
+        print(f"[OK] Checker initialized in {elapsed:.2f}s")
+    return checker
 
 # Хранилище истории проверок (в продакшене используйте Redis/Database)
 check_history = []
@@ -81,7 +93,7 @@ def check_text():
         if not text or not text.strip():
             return jsonify({'error': 'Текст не предоставлен'}), 400
         
-        result = checker.check_text(text)
+        result = get_checker().check_text(text)
         
         # Добавляем рекомендации
         result['recommendations'] = generate_recommendations(result)
@@ -129,7 +141,7 @@ def check_url():
         title = soup.find('title')
         title_text = title.get_text() if title else 'Без названия'
         
-        result = checker.check_text(text)
+        result = get_checker().check_text(text)
         result['page_title'] = title_text
         result['recommendations'] = generate_recommendations(result)
         
@@ -167,7 +179,7 @@ def batch_check():
                 for tag in soup(['script', 'style']):
                     tag.decompose()
                 text = soup.get_text(separator=' ', strip=True)
-                result = checker.check_text(text)
+                result = get_checker().check_text(text)
                 
                 results.append({
                     'url': url,
@@ -196,11 +208,12 @@ def batch_check():
 def get_stats():
     """API: Статистика словарей"""
     try:
+        c = get_checker()
         stats_data = {
-            'normative': len(checker.normative_words),
-            'foreign': len(checker.foreign_allowed),
-            'nenormative': len(checker.nenormative_words),
-            'morph_available': checker.morph is not None
+            'normative': len(c.normative_words),
+            'foreign': len(c.foreign_allowed),
+            'nenormative': len(c.nenormative_words),
+            'morph_available': c.morph is not None
         }
         
         print(f"📊 Отправка статистики: {stats_data}")  # Для отладки
