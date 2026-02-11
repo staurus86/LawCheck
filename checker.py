@@ -515,8 +515,52 @@ class RussianLanguageChecker:
             return True
         return False
 
+    def deep_check_words(self, words):
+        """Глубокая проверка списка слов с использованием морфологии и speller"""
+        results = []
+        for word in words:
+            result = self._deep_check_single(word)
+            results.append(result)
+        return results
+
+    def _deep_check_single(self, word):
+        """Глубокая проверка одного слова"""
+        word_lower = word.lower()
+        result = {
+            'word': word,
+            'is_valid': False,
+            'reasons': [],
+            'normal_form': None,
+            'suggestions': []
+        }
+
+        morph_result = self._check_morph_full(word_lower)
+        if morph_result:
+            result['normal_form'] = morph_result['normal_form']
+            if morph_result['found']:
+                result['is_valid'] = True
+                result['reasons'].append(morph_result['reason'])
+
+        if not result['is_valid']:
+            speller_result = self._check_speller_full(word)
+            if speller_result:
+                result['suggestions'] = speller_result.get('variants', [])
+                if speller_result.get('correct'):
+                    result['is_valid'] = True
+                    result['reasons'].append('speller_confirmed')
+
+                if not result['is_valid'] and speller_result.get('variants'):
+                    for variant in speller_result['variants'][:3]:
+                        if self._is_known_fast(variant.lower()):
+                            result['is_valid'] = True
+                            result['reasons'].append(f'speller_variant: {variant}')
+                            result['suggestions'] = [variant]
+                            break
+
+        return result
+
     def _check_morph_full(self, word_lower):
-        """Глубокая проверка через морфологию - для подозрительных слов"""
+        """Глубокая проверка через морфологию"""
         if not self.morph:
             return None
 
@@ -572,46 +616,6 @@ class RussianLanguageChecker:
 
         except:
             return None
-
-    def deep_check_word(self, word):
-        """Полная глубокая проверка слова - возвращает детали"""
-        word_lower = word.lower()
-        result = {
-            'word': word,
-            'is_valid': False,
-            'reasons': [],
-            'normal_form': None,
-            'suggestions': []
-        }
-
-        if self._is_known_fast(word_lower):
-            result['is_valid'] = True
-            result['reasons'].append('found_in_dictionary')
-            return result
-
-        morph_result = self._check_morph_full(word_lower)
-        if morph_result:
-            result['normal_form'] = morph_result['normal_form']
-            if morph_result['found']:
-                result['is_valid'] = True
-                result['reasons'].append(morph_result['reason'])
-
-        speller_result = self._check_speller_full(word)
-        if speller_result:
-            result['suggestions'] = speller_result.get('variants', [])
-            if speller_result.get('correct'):
-                result['is_valid'] = True
-                result['reasons'].append('speller_confirmed')
-
-            if not result['is_valid'] and speller_result.get('variants'):
-                for variant in speller_result['variants'][:3]:
-                    if self._is_known_fast(variant.lower()):
-                        result['is_valid'] = True
-                        result['reasons'].append(f'speller_variant: {variant}')
-                        result['suggestions'] = [variant]
-                        break
-
-        return result
 
     def load_dictionaries(self):
         """Load dictionaries from files - с расширенным кэшем"""
@@ -694,13 +698,12 @@ class RussianLanguageChecker:
         return word.lower() in self.nenormative_words
 
     def check_text(self, text):
-        """Проверка текста - быстрая + глубокая для подозрительных слов"""
+        """Быстрая проверка текста - O(1) на слово"""
         if not text or not text.strip():
             return {
                 'latin_words': [],
                 'unknown_cyrillic': [],
                 'nenormative_words': [],
-                'deep_check_results': [],
                 'latin_count': 0,
                 'unknown_count': 0,
                 'nenormative_count': 0,
@@ -738,52 +741,15 @@ class RussianLanguageChecker:
             if not self._is_known_fast(wlower):
                 unknown_cyrillic.append(word)
 
-        latin_words = sorted(set(latin_words))
-        unknown_cyrillic = sorted(set(unknown_cyrillic))
-        nenormative_found = sorted(set(nenormative_found))
-
-        deep_results = []
-        confirmed_unknown = []
-        validated_words = []
-
-        if unknown_cyrillic or latin_words:
-            for word in unknown_cyrillic:
-                result = self.deep_check_word(word)
-                deep_results.append(result)
-                if not result['is_valid']:
-                    confirmed_unknown.append(word)
-                else:
-                    validated_words.append({
-                        'word': word,
-                        'reason': result['reasons'],
-                        'normal_form': result.get('normal_form'),
-                        'suggestions': result.get('suggestions', [])
-                    })
-
-            for word in latin_words:
-                result = self.deep_check_word(word)
-                deep_results.append(result)
-                if not result['is_valid']:
-                    confirmed_unknown.append(word)
-                else:
-                    validated_words.append({
-                        'word': word,
-                        'reason': result['reasons'],
-                        'normal_form': result.get('normal_form'),
-                        'suggestions': result.get('suggestions', [])
-                    })
-
         return {
-            'latin_words': latin_words,
-            'unknown_cyrillic': confirmed_unknown,
-            'nenormative_words': nenormative_found,
-            'deep_check_results': deep_results,
-            'validated_words': validated_words,
+            'latin_words': sorted(set(latin_words)),
+            'unknown_cyrillic': sorted(set(unknown_cyrillic)),
+            'nenormative_words': sorted(set(nenormative_found)),
             'latin_count': len(latin_words),
-            'unknown_count': len(confirmed_unknown),
+            'unknown_count': len(unknown_cyrillic),
             'nenormative_count': len(nenormative_found),
-            'violations_count': len(confirmed_unknown) + len(nenormative_found),
-            'law_compliant': len(confirmed_unknown) == 0 and len(nenormative_found) == 0,
+            'violations_count': len(latin_words) + len(unknown_cyrillic) + len(nenormative_found),
+            'law_compliant': not (latin_words or unknown_cyrillic or nenormative_found),
             'total_words': len(all_words),
             'unique_words': len(set(all_words))
         }
@@ -792,35 +758,33 @@ class RussianLanguageChecker:
 # Test on run
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("TESTING RussianLanguageChecker (FAST + DEEP CHECK)")
+    print("TESTING RussianLanguageChecker (FAST + DEEP)")
     print("="*60)
 
     checker = RussianLanguageChecker()
 
-    test_text = "Это тестовый текст для проверки. Hello world! Профессиональный подход к работе с документами."
+    test_text = "Это тестовый текст для проверки. Hello world! Профессиональный подход."
 
     print(f"\nTest text: {test_text}")
+
+    print("\n=== FAST CHECK ===")
     result = checker.check_text(test_text)
-
-    print(f"\n=== QUICK RESULTS ===")
     print(f"Total words: {result['total_words']}")
-    print(f"Unknown (quick): {result['unknown_count']}")
-    print(f"Latin words: {result['latin_count']}")
-    print(f"Nenormative: {result['nenormative_count']}")
-    print(f"Law compliant: {result['law_compliant']}")
-
-    if result['validated_words']:
-        print(f"\n=== VALIDATED WORDS (Deep Check) ===")
-        for item in result['validated_words']:
-            print(f"  '{item['word']}' -> VALID")
-            print(f"    Reason: {item['reason']}")
-            if item['normal_form']:
-                print(f"    Normal form: {item['normal_form']}")
+    print(f"Unknown words: {result['unknown_cyrillic']}")
+    print(f"Latin words: {result['latin_words']}")
 
     if result['unknown_cyrillic']:
-        print(f"\n=== CONFIRMED UNKNOWN WORDS ===")
-        for word in result['unknown_cyrillic']:
-            print(f"  '{word}' -> UNKNOWN")
+        print("\n=== DEEP CHECK ===")
+        deep_results = checker.deep_check_words(result['unknown_cyrillic'])
+        for r in deep_results:
+            status = "VALID" if r['is_valid'] else "UNKNOWN"
+            print(f"  '{r['word']}' -> {status}")
+            if r['reasons']:
+                print(f"    Reasons: {r['reasons']}")
+            if r['normal_form']:
+                print(f"    Normal form: {r['normal_form']}")
+            if r['suggestions']:
+                print(f"    Suggestions: {r['suggestions']}")
 
     print("\n" + "="*60)
     print("TEST COMPLETE")
