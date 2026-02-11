@@ -26,7 +26,7 @@ _RE_WORD = re.compile(r'\b[а-яёА-ЯЁa-zA-Z][а-яёА-ЯЁa-zA-Z\-]*\b')
 class RussianLanguageChecker:
     __slots__ = ('normative_words', 'foreign_allowed', 'nenormative_words',
                  'speller_cache', 'forms_cache', 'all_forms', 'morph', 'speller',
-                 '_word_prefixes', '_skip_words', 'abbreviations')
+                 '_word_prefixes', '_skip_words', 'abbreviations', '_normal_form_cache')
 
     def __init__(self):
         self.normative_words = set()
@@ -35,7 +35,8 @@ class RussianLanguageChecker:
         self.speller_cache = {}
         self.forms_cache = {}
         self.all_forms = set()
-        self.abbreviations = {}  # abbreviation -> translations
+        self.abbreviations = {}
+        self._normal_form_cache = {}  # Кэш для нормальных форм
 
         print("\n" + "="*60)
         print("INIT RussianLanguageChecker (OPTIMIZED)")
@@ -556,13 +557,45 @@ class RussianLanguageChecker:
         self.normative_words.update(common)
         print(f"[OK] Base dictionary: {len(common)} words")
 
+    def _get_normal_form(self, word_lower):
+        """Получить нормальную форму с кэшированием"""
+        if word_lower in self._normal_form_cache:
+            return self._normal_form_cache[word_lower]
+
+        if not self.morph:
+            return word_lower
+
+        try:
+            parsed = self.morph.parse(word_lower)
+            if parsed:
+                normal = parsed[0].normal_form
+                self._normal_form_cache[word_lower] = normal
+                return normal
+        except:
+            pass
+
+        self._normal_form_cache[word_lower] = word_lower
+        return word_lower
+
     def _is_known_fast(self, word_lower):
-        """Мгновенная проверка - только словари, без морфологии"""
+        """Мгновенная проверка - словари + легкая морфология"""
         if word_lower in self.all_forms:
             return True
         if word_lower in self.normative_words or word_lower in self.foreign_allowed:
             self.all_forms.add(word_lower)
             return True
+
+        # Легкая проверка нормальной формы (с кэшем)
+        if len(word_lower) > 3:
+            try:
+                normal = self._get_normal_form(word_lower)
+                if normal and normal != word_lower:
+                    if normal in self.normative_words or normal in self.all_forms:
+                        self.all_forms.add(word_lower)
+                        return True
+            except:
+                pass
+
         return False
 
     def deep_check_words(self, words):
@@ -754,8 +787,18 @@ class RussianLanguageChecker:
         return {word.lower()}
 
     def is_nenormative(self, word):
-        """Проверка ненормативности - без морфологии"""
-        return word.lower() in self.nenormative_words
+        """Проверка ненормативности - с кэшем нормальных форм"""
+        word_lower = word.lower()
+
+        if word_lower in self.nenormative_words:
+            return True
+
+        if self.morph:
+            normal = self._get_normal_form(word_lower)
+            if normal in self.nenormative_words:
+                return True
+
+        return False
 
     def check_text(self, text):
         """Быстрая проверка текста - O(1) на слово"""
