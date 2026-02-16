@@ -11,6 +11,13 @@ let currentResults = {
     imagesBatch: null,
     multi: null
 };
+let currentDeepResults = {
+    text: null,
+    url: null,
+    images: null,
+    batch: null,
+    multi: null
+};
 const ACTIVE_TAB_KEY = 'lawchecker.activeTab';
 
 // App bootstrap
@@ -206,6 +213,7 @@ async function checkText() {
         
         if (data.success) {
             currentResults.text = data.result;
+            currentDeepResults.text = null;
             displayResults('text', data.result);
             console.log('✅ Текст проверен:', data.result);
         } else {
@@ -243,6 +251,7 @@ async function checkUrl() {
         
         if (data.success) {
             currentResults.url = data.result;
+            currentDeepResults.url = null;
             displayResults('url', data.result, url);
             console.log('✅ URL проверен:', data.result);
         } else {
@@ -293,6 +302,7 @@ async function checkBatch() {
         progressFill.style.width = '100%';
         progressText.textContent = `${results.length} / ${results.length}`;
         currentResults.batch = results;
+        currentDeepResults.batch = null;
         displayBatchResults(results);
         console.log('✅ Пакетная проверка завершена:', results);
     } catch (error) {
@@ -484,6 +494,7 @@ async function runStandardCheckForImageText(text, sourceUrl = '', ocr = null) {
     if (ocr) result.ocr = ocr;
 
     currentResults.images = result;
+    currentDeepResults.images = null;
     displayResults('images', result, result.source_url || '');
     const resultsContent = document.getElementById('imagesResultsContent');
     appendImageOcrSummary(result.ocr, resultsContent);
@@ -557,6 +568,7 @@ async function checkImagesByDatabase() {
         if (!data.success) throw new Error(data.error || 'OCR + check failed');
 
         currentResults.images = data.result;
+        currentDeepResults.images = null;
         if (extractedTextArea) {
             extractedTextArea.value = data.result.extracted_text || '';
             updateImagesInputMeta();
@@ -991,6 +1003,7 @@ async function runMultiScan() {
         const data = await response.json();
         if (!data.success) throw new Error(data.error || 'MultiScan failed');
         currentResults.multi = data;
+        currentDeepResults.multi = null;
         displayMultiResults(data);
         const tokenInput = document.getElementById('multiTokenInput');
         if (tokenInput) tokenInput.value = '';
@@ -1023,6 +1036,7 @@ function clearMultiScanInputs() {
     const resultsCard = document.getElementById('multiResults');
     if (resultsCard) resultsCard.style.display = 'none';
     currentResults.multi = null;
+    currentDeepResults.multi = null;
     updateMultiUrlsInputMeta();
     onMultiProviderChange();
     onMultiModeChange();
@@ -1085,6 +1099,11 @@ async function deepCheckMultiScan() {
             }
         }
 
+        currentDeepResults.multi = {
+            kind: 'multi',
+            deepResults,
+            results
+        };
         displayMultiDeepResults(results, deepResults);
     } catch (e) {
         alert('Multi deep check error: ' + e.message);
@@ -1682,6 +1701,159 @@ function displayBatchResults(results) {
 }
 
 // Экспорт отчета
+function downloadUtf8Txt(filename, text) {
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + (text || '')], { type: 'text/plain;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+function deepSummaryFromList(deepResults) {
+    const list = Array.isArray(deepResults) ? deepResults : [];
+    const abbreviations = list.filter(r => (r.reasons || []).includes('abbreviation'));
+    const valid = list.filter(r => r.is_valid && !(r.reasons || []).includes('abbreviation'));
+    const invalid = list.filter(r => !r.is_valid);
+    return { abbreviations, valid, invalid };
+}
+
+function buildSingleDeepReport(type, result, deepPayload) {
+    const deepResults = (deepPayload && deepPayload.deepResults) || [];
+    const summary = deepSummaryFromList(deepResults);
+    const lines = [];
+    lines.push('======================================================================');
+    lines.push(`DEEP CHECK REPORT: ${type.toUpperCase()}`);
+    lines.push('======================================================================');
+    lines.push(`Date: ${new Date().toLocaleString()}`);
+    lines.push(`Total words in text: ${result?.total_words || 0}`);
+    lines.push(`Violations (base check): ${result?.violations_count || 0}`);
+    lines.push(`Deep validated: ${summary.valid.length}`);
+    lines.push(`Deep abbreviations: ${summary.abbreviations.length}`);
+    lines.push(`Deep need replace: ${summary.invalid.length}`);
+    lines.push('');
+
+    if (summary.abbreviations.length) {
+        lines.push('[ABBREVIATIONS]');
+        summary.abbreviations.forEach(item => {
+            lines.push(`- ${item.word} -> ${(item.suggestions || []).join(', ') || 'translation unknown'}`);
+        });
+        lines.push('');
+    }
+
+    if (summary.valid.length) {
+        lines.push('[VALIDATED]');
+        summary.valid.forEach(item => {
+            lines.push(`- ${item.word}${item.normal_form ? ` (${item.normal_form})` : ''}`);
+        });
+        lines.push('');
+    }
+
+    if (summary.invalid.length) {
+        lines.push('[NEED REPLACE]');
+        summary.invalid.forEach(item => {
+            lines.push(`- ${item.word}${item.suggestions?.length ? ` -> ${item.suggestions.join(', ')}` : ''}`);
+        });
+        lines.push('');
+    }
+
+    return lines.join('\n');
+}
+
+function buildCollectionDeepReport(type, results, deepPayload) {
+    const deepResults = (deepPayload && deepPayload.deepResults) || [];
+    const resultMap = {};
+    deepResults.forEach(item => {
+        resultMap[(item.word || '').toLowerCase()] = item;
+    });
+
+    const lines = [];
+    lines.push('======================================================================');
+    lines.push(`DEEP CHECK REPORT: ${type.toUpperCase()}`);
+    lines.push('======================================================================');
+    lines.push(`Date: ${new Date().toLocaleString()}`);
+    lines.push(`Resources total: ${results.length}`);
+    lines.push('');
+
+    let totalValid = 0;
+    let totalAbbr = 0;
+    let totalInvalid = 0;
+
+    results.forEach((entry, idx) => {
+        lines.push('----------------------------------------------------------------------');
+        lines.push(`[${idx + 1}] ${entry.url || '-'}`);
+        if (entry.resource_type) lines.push(`Type: ${entry.resource_type}`);
+
+        if (!entry.success || !entry.result) {
+            lines.push(`Status: ERROR (${entry.error || 'Unknown error'})`);
+            lines.push('');
+            return;
+        }
+
+        const words = [...(entry.result.latin_words || []), ...(entry.result.unknown_cyrillic || [])];
+        const abbreviations = [];
+        const valid = [];
+        const invalid = [];
+        words.forEach(word => {
+            const dr = resultMap[word.toLowerCase()];
+            if (!dr) return;
+            if ((dr.reasons || []).includes('abbreviation')) {
+                abbreviations.push(dr);
+            } else if (dr.is_valid) {
+                valid.push(dr);
+            } else {
+                invalid.push(dr);
+            }
+        });
+
+        totalValid += valid.length;
+        totalAbbr += abbreviations.length;
+        totalInvalid += invalid.length;
+        lines.push(`Deep summary: validated=${valid.length}, abbr=${abbreviations.length}, need_replace=${invalid.length}`);
+
+        if (abbreviations.length) {
+            lines.push('  ABBR:');
+            abbreviations.forEach(item => {
+                lines.push(`    - ${item.word} -> ${(item.suggestions || []).join(', ') || 'translation unknown'}`);
+            });
+        }
+        if (valid.length) {
+            lines.push('  VALIDATED:');
+            valid.forEach(item => {
+                lines.push(`    - ${item.word}${item.normal_form ? ` (${item.normal_form})` : ''}`);
+            });
+        }
+        if (invalid.length) {
+            lines.push('  NEED REPLACE:');
+            invalid.forEach(item => {
+                lines.push(`    - ${item.word}${item.suggestions?.length ? ` -> ${item.suggestions.join(', ')}` : ''}`);
+            });
+        }
+        lines.push('');
+    });
+
+    lines.splice(5, 0, `Deep totals: validated=${totalValid}, abbr=${totalAbbr}, need_replace=${totalInvalid}`);
+    return lines.join('\n');
+}
+
+function buildDeepExportText(type) {
+    const deep = currentDeepResults[type];
+    const result = currentResults[type];
+    if (!deep || !result) return null;
+    if (type === 'batch') {
+        return buildCollectionDeepReport(type, result, deep);
+    }
+    if (type === 'multi') {
+        const multiItems = Array.isArray(result.results) ? result.results : [];
+        return buildCollectionDeepReport(type, multiItems, deep);
+    }
+    return buildSingleDeepReport(type, result, deep);
+}
+
 async function exportReport(type) {
     const result = currentResults[type];
     if (!result) {
@@ -1692,6 +1864,12 @@ async function exportReport(type) {
     try {
         showLoading();
         console.log('📥 Экспорт отчета:', type, result);
+        const deepText = buildDeepExportText(type);
+        if (deepText) {
+            const filename = `lawcheck_${type}_deep_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
+            downloadUtf8Txt(filename, deepText);
+            return;
+        }
         
         // Для пакетной проверки используем специальный endpoint
         const isBatch = type === 'batch';
@@ -1781,6 +1959,13 @@ async function deepCheck(type) {
         hideLoading();
 
         if (data.success) {
+            currentDeepResults[type] = {
+                kind: 'single',
+                deepResults: data.results || [],
+                checkedWords: wordsToProcess,
+                totalWords: wordsToCheck.length,
+                createdAt: new Date().toISOString()
+            };
             displayDeepResults(type, data.results);
             if (skippedCount > 0) {
                 alert(`Показаны результаты для первых ${maxWords} слов. Ещё ${skippedCount} слов пропущено.`);
@@ -1871,6 +2056,11 @@ async function deepCheckBatch() {
         hideLoading();
 
         if (allDeepResults.length > 0) {
+            currentDeepResults.batch = {
+                kind: 'batch',
+                deepResults: allDeepResults,
+                results
+            };
             displayBatchDeepResults(results, allDeepResults, urlMap);
             console.log('✅ Глубокая проверка batch завершена:', allDeepResults.length, 'слов');
         } else {
@@ -2111,6 +2301,7 @@ function clearText() {
     document.getElementById('textInput').value = '';
     document.getElementById('textResults').style.display = 'none';
     currentResults.text = null;
+    currentDeepResults.text = null;
     updateTextInputMeta();
 }
 
@@ -2155,6 +2346,7 @@ function clearImageInputs() {
     if (batchProgress) batchProgress.style.display = 'none';
     currentResults.images = null;
     currentResults.imagesBatch = null;
+    currentDeepResults.images = null;
     updateImagesInputMeta();
     updateImagesBatchInputMeta();
 }
