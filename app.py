@@ -296,6 +296,11 @@ def payment():
     """Страница тарифов/оплаты"""
     tariff = (request.args.get('tariff') or 'symbols-20000').strip()
     return render_template('payment.html', selected_tariff=tariff)
+
+@app.route('/admin/metrics')
+def admin_metrics():
+    """Простой дашборд метрик (read-only)"""
+    return render_template('admin_metrics.html')
     
 @app.route('/robots.txt')
 def robots():

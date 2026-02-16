@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Metrics - LawChecker Online</title>
+    <meta name="description" content="Сервисные метрики LawChecker: запросы, ошибки, скорость, топ-слова и история запусков.">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo" aria-label="На главную LawChecker">
+                    <span class="logo-icon">🇷🇺</span>
+                    <span class="logo-text">LawChecker <span class="logo-badge">Online</span></span>
+                </a>
+                <nav class="nav">
+                    <a href="/" class="nav-link">Проверка</a>
+                    <a href="/api-docs" class="nav-link">API</a>
+                    <a href="/admin/metrics" class="nav-link active">Admin Metrics</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <section class="page-hero">
+        <div class="container">
+            <h1 class="page-hero-title">Admin Metrics</h1>
+            <p class="page-hero-subtitle">Read-only дашборд по событиям, ошибкам и последним запускам.</p>
+            <div class="quick-links">
+                <a class="btn btn-secondary" href="/">← Назад к проверке</a>
+                <button class="btn btn-primary" onclick="refreshDashboard()">Обновить</button>
+            </div>
+        </div>
+    </section>
+
+    <main class="main">
+        <div class="container">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Ключевые показатели</h2>
+                    <p class="text-muted" id="updatedAt">Загрузка...</p>
+                </div>
+                <div class="card-body">
+                    <div class="stats-grid" id="kpiGrid"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Топ endpoint (7 дней)</h2>
+                </div>
+                <div class="card-body">
+                    <table class="simple-table">
+                        <thead>
+                            <tr><th>Endpoint</th><th>Запросов</th></tr>
+                        </thead>
+                        <tbody id="topEndpointsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Топ слов нарушений</h2>
+                </div>
+                <div class="card-body">
+                    <div class="chip-row" id="topWords"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Последние ошибки</h2>
+                </div>
+                <div class="card-body">
+                    <table class="simple-table">
+                        <thead>
+                            <tr><th>Время</th><th>Endpoint</th><th>Код</th><th>Сообщение</th></tr>
+                        </thead>
+                        <tbody id="errorsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Последние запуски</h2>
+                </div>
+                <div class="card-body">
+                    <table class="simple-table">
+                        <thead>
+                            <tr><th>Время</th><th>Тип</th><th>Endpoint</th><th>Статус</th><th>Нарушения</th><th>Время, ms</th></tr>
+                        </thead>
+                        <tbody id="runsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        function fmtDate(v) {
+            if (!v) return '-';
+            return new Date(v).toLocaleString();
+        }
+
+        function row(cells) {
+            return `<tr>${cells.map(c => `<td>${c}</td>`).join('')}</tr>`;
+        }
+
+        async function refreshDashboard() {
+            try {
+                const [mResp, hResp] = await Promise.all([
+                    fetch(`${API_BASE}/api/metrics`),
+                    fetch(`${API_BASE}/api/run-history?limit=20`)
+                ]);
+                const metrics = await mResp.json();
+                const history = await hResp.json();
+
+                if (!mResp.ok || !metrics.enabled) throw new Error(metrics.error || 'Metrics unavailable');
+
+                const w = metrics.window || {};
+                document.getElementById('updatedAt').textContent = `Обновлено: ${fmtDate(metrics.timestamp)}`;
+                document.getElementById('kpiGrid').innerHTML = `
+                    <div class="stat-item"><span class="stat-number">${w.events_24h ?? 0}</span><span class="stat-label">События 24ч</span></div>
+                    <div class="stat-item"><span class="stat-number">${w.events_7d ?? 0}</span><span class="stat-label">События 7д</span></div>
+                    <div class="stat-item"><span class="stat-number">${w.error_rate_24h ?? 0}%</span><span class="stat-label">Ошибка 24ч</span></div>
+                    <div class="stat-item"><span class="stat-number">${w.error_rate_7d ?? 0}%</span><span class="stat-label">Ошибка 7д</span></div>
+                    <div class="stat-item"><span class="stat-number">${w.avg_duration_ms_24h ?? 0}</span><span class="stat-label">Avg ms 24ч</span></div>
+                    <div class="stat-item"><span class="stat-number">${w.violations_7d ?? 0}</span><span class="stat-label">Нарушения 7д</span></div>
+                `;
+
+                const topEndpoints = metrics.top_endpoints_7d || [];
+                document.getElementById('topEndpointsBody').innerHTML =
+                    topEndpoints.length
+                        ? topEndpoints.map(i => row([i.endpoint, i.total])).join('')
+                        : row(['-', '0']);
+
+                const topWords = metrics.top_violation_words || [];
+                document.getElementById('topWords').innerHTML =
+                    topWords.length
+                        ? topWords.map(i => `<span class="word-tag">${i.word} (${i.count})</span>`).join('')
+                        : '<span class="text-muted">Нет данных</span>';
+
+                const errors = metrics.recent_errors || [];
+                document.getElementById('errorsBody').innerHTML =
+                    errors.length
+                        ? errors.map(i => row([fmtDate(i.created_at), i.endpoint, i.status_code, i.message_short])).join('')
+                        : row(['-', '-', '-', 'Нет ошибок']);
+
+                const runs = (history && history.items) ? history.items : [];
+                document.getElementById('runsBody').innerHTML =
+                    runs.length
+                        ? runs.map(i => row([
+                            fmtDate(i.created_at),
+                            i.check_type || '-',
+                            i.endpoint || '-',
+                            i.success ? 'ok' : 'error',
+                            i.violations_count ?? 0,
+                            i.duration_ms ?? 0
+                        ])).join('')
+                        : row(['-', '-', '-', '-', '-', '-']);
+            } catch (e) {
+                document.getElementById('updatedAt').textContent = `Ошибка: ${e.message}`;
+            }
+        }
+
+        refreshDashboard();
+    </script>
+</body>
+</html>
