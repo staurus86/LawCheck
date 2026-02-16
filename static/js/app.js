@@ -7,7 +7,8 @@ let currentResults = {
     text: null,
     url: null,
     batch: null,
-    images: null
+    images: null,
+    imagesBatch: null
 };
 const ACTIVE_TAB_KEY = 'lawchecker.activeTab';
 
@@ -86,16 +87,31 @@ function updateImagesInputMeta() {
     meta.textContent = `${chars} chars | ${words} words`;
 }
 
+function updateImagesBatchInputMeta() {
+    const input = document.getElementById('imagesBatchInput');
+    const meta = document.getElementById('imagesBatchInputMeta');
+    if (!input || !meta) return;
+    const urls = (input.value || '')
+        .split('\n')
+        .map(v => v.trim())
+        .filter(v => v.startsWith('http'));
+    const unique = new Set(urls);
+    meta.textContent = `${urls.length} image URLs (${unique.size} unique)`;
+}
+
 function initFieldMetrics() {
     const textInput = document.getElementById('textInput');
     const batchInput = document.getElementById('batchInput');
     const imagesInput = document.getElementById('imagesInput');
+    const imagesBatchInput = document.getElementById('imagesBatchInput');
     if (textInput) textInput.addEventListener('input', updateTextInputMeta);
     if (batchInput) batchInput.addEventListener('input', updateBatchInputMeta);
     if (imagesInput) imagesInput.addEventListener('input', updateImagesInputMeta);
+    if (imagesBatchInput) imagesBatchInput.addEventListener('input', updateImagesBatchInputMeta);
     updateTextInputMeta();
     updateBatchInputMeta();
     updateImagesInputMeta();
+    updateImagesBatchInputMeta();
 }
 
 async function loadStats() {
@@ -531,6 +547,152 @@ async function checkImagesByDatabase() {
     } finally {
         hideLoading();
     }
+}
+
+function sleepMs(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function renderImageBatchItem(item, index) {
+    if (!item.success || !item.result) {
+        return `
+            <div class="batch-item error">
+                <div class="batch-item-header">
+                    <span class="batch-number">[${index + 1}]</span>
+                    <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
+                </div>
+                <div class="batch-item-error">Error: ${item.error || 'Unknown error'}</div>
+            </div>
+        `;
+    }
+
+    const r = item.result;
+    const statusIcon = r.law_compliant ? '✅' : '⚠️';
+    const statusText = r.law_compliant ? 'compliant' : `violations: ${r.violations_count || 0}`;
+    return `
+        <div class="batch-item ${r.law_compliant ? 'success' : 'warning'}">
+            <div class="batch-item-header">
+                <span class="batch-icon">${statusIcon}</span>
+                <span class="batch-number">[${index + 1}]</span>
+                <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
+            </div>
+            <div class="batch-item-stats">
+                <span class="batch-violations-count">${statusText}</span>
+                <span class="batch-words-count">words: ${r.total_words || 0}</span>
+                <span class="batch-words-count">ocr chars: ${(r.extracted_text || '').length}</span>
+            </div>
+        </div>
+    `;
+}
+
+function displayImagesBatchResults(results) {
+    const resultsCard = document.getElementById('imagesBatchResults');
+    const resultsContent = document.getElementById('imagesBatchResultsContent');
+    if (!resultsCard || !resultsContent) return;
+
+    const total = results.length;
+    const success = results.filter(r => r.success).length;
+    const failed = total - success;
+    const withViolations = results.filter(r => r.success && r.result && !r.result.law_compliant).length;
+
+    let html = `
+        <div class="batch-summary">
+            <div class="summary-stats">
+                <div class="summary-stat">
+                    <span class="summary-value">${total}</span>
+                    <span class="summary-label">Total images</span>
+                </div>
+                <div class="summary-stat success">
+                    <span class="summary-value">${success}</span>
+                    <span class="summary-label">Processed</span>
+                </div>
+                <div class="summary-stat warning">
+                    <span class="summary-value">${withViolations}</span>
+                    <span class="summary-label">With violations</span>
+                </div>
+                <div class="summary-stat error">
+                    <span class="summary-value">${failed}</span>
+                    <span class="summary-label">Failed</span>
+                </div>
+            </div>
+        </div>
+        <div class="batch-results-list">
+            ${results.map((item, idx) => renderImageBatchItem(item, idx)).join('')}
+        </div>
+    `;
+
+    resultsContent.innerHTML = html;
+    resultsCard.style.display = 'block';
+    resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function checkImagesBatchQueue() {
+    const batchInput = document.getElementById('imagesBatchInput');
+    const delayInput = document.getElementById('imagesBatchDelayMs');
+    const progress = document.getElementById('imagesBatchProgress');
+    const progressBar = document.getElementById('imagesBatchProgressBar');
+    const progressText = document.getElementById('imagesBatchProgressText');
+    const modelInput = document.getElementById('imagesModelInput');
+
+    const urls = (batchInput ? batchInput.value : '')
+        .split('\n')
+        .map(v => v.trim())
+        .filter(v => v.startsWith('http'));
+    if (!urls.length) {
+        alert('Provide at least one image URL');
+        return;
+    }
+
+    const provider = getImagesProvider();
+    const model = modelInput && modelInput.value.trim() ? modelInput.value.trim() : getDefaultModelByProvider(provider);
+    const delayMsRaw = parseInt(delayInput ? delayInput.value : '400', 10);
+    const delayMs = Number.isFinite(delayMsRaw) ? Math.max(0, Math.min(delayMsRaw, 10000)) : 400;
+
+    if (progress) progress.style.display = 'block';
+    if (progressBar) {
+        progressBar.style.animation = 'none';
+        progressBar.style.width = '0%';
+    }
+    if (progressText) progressText.textContent = `0 / ${urls.length}`;
+
+    const results = [];
+    for (let i = 0; i < urls.length; i += 1) {
+        const imageUrl = urls[i];
+        try {
+            const response = await fetch(`${API_BASE}/api/images/check`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    provider,
+                    model,
+                    image_url: imageUrl,
+                    image_data_url: null
+                })
+            });
+            const data = await response.json();
+            if (!data.success) {
+                results.push({ url: imageUrl, success: false, error: data.error || 'Request failed' });
+                if (response.status === 401) {
+                    throw new Error(data.error || 'Set API token first');
+                }
+            } else {
+                results.push({ url: imageUrl, success: true, result: data.result });
+            }
+        } catch (error) {
+            results.push({ url: imageUrl, success: false, error: error.message });
+        }
+
+        const completed = i + 1;
+        if (progressBar) progressBar.style.width = `${Math.round((completed / urls.length) * 100)}%`;
+        if (progressText) progressText.textContent = `${completed} / ${urls.length}`;
+        if (completed < urls.length && delayMs > 0) {
+            await sleepMs(delayMs);
+        }
+    }
+
+    currentResults.imagesBatch = results;
+    displayImagesBatchResults(results);
 }
 
 async function checkWord() {
@@ -1454,13 +1616,21 @@ function clearImageInputs() {
     const urlInput = document.getElementById('imagesUrlInput');
     const fileInput = document.getElementById('imagesFileInput');
     const textInput = document.getElementById('imagesInput');
+    const batchInput = document.getElementById('imagesBatchInput');
     const resultsCard = document.getElementById('imagesResults');
+    const batchResultsCard = document.getElementById('imagesBatchResults');
+    const batchProgress = document.getElementById('imagesBatchProgress');
     if (urlInput) urlInput.value = '';
     if (fileInput) fileInput.value = '';
     if (textInput) textInput.value = '';
+    if (batchInput) batchInput.value = '';
     if (resultsCard) resultsCard.style.display = 'none';
+    if (batchResultsCard) batchResultsCard.style.display = 'none';
+    if (batchProgress) batchProgress.style.display = 'none';
     currentResults.images = null;
+    currentResults.imagesBatch = null;
     updateImagesInputMeta();
+    updateImagesBatchInputMeta();
 }
 
 function showLoading() {
