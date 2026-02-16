@@ -272,7 +272,7 @@
                                 type="text" 
                                 id="wordInput" 
                                 class="form-input" 
-                                placeholder="Введите слово..."
+                                placeholder="Введите одно слово, например: маркетинг"
                                 onkeypress="if(event.key==='Enter')checkWord()"
                             >
                             <button class="btn btn-primary" onclick="checkWord()">
@@ -287,6 +287,16 @@
                 <div class="card results-card" id="wordResults" style="display: none;">
                     <div class="card-header">
                         <h2>Результат проверки</h2>
+                        <div class="btn-group">
+                            <button class="btn btn-info btn-sm" onclick="deepCheck('word')">
+                                <i class="fas fa-microscope"></i>
+                                Глубокая проверка
+                            </button>
+                            <button class="btn btn-success btn-sm" onclick="exportReport('word')">
+                                <i class="fas fa-download"></i>
+                                Скачать отчёт
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div id="wordResultsContent"></div>

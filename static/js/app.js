@@ -1275,7 +1275,10 @@ function displayMultiDeepResults(results, deepResults) {
 }
 
 async function checkWord() {
-    const word = document.getElementById('wordInput').value.trim();
+    const inputEl = document.getElementById('wordInput');
+    if (!inputEl) return;
+    const word = inputEl.value.trim().split(/\s+/)[0] || '';
+    inputEl.value = word;
     
     if (!word) {
         alert('Введите слово для проверки!');
@@ -1304,6 +1307,7 @@ async function checkWord() {
         
         if (data.success) {
             currentResults.word = data.result;
+            currentDeepResults.word = null;
             displayWordResult(data.result);
             console.log('✅ Слово проверено:', data.result);
         } else {
@@ -1319,6 +1323,7 @@ async function checkWord() {
 function displayWordResult(result) {
     const resultsCard = document.getElementById('wordResults');
     const resultsContent = document.getElementById('wordResultsContent');
+    if (!resultsCard || !resultsContent || !result) return;
     
     let html = '';
     
@@ -1358,7 +1363,7 @@ function displayWordResult(result) {
                 <div class="status-icon">📚</div>
                 <div class="status-text">
                     <h3>АББРЕВИАТУРА</h3>
-                    <p>Расшифровка: ${result.abbreviation_translation.join(', ')}</p>
+                    <p>Расшифровка: ${(result.abbreviation_translation || []).join(', ') || 'не указана'}</p>
                 </div>
             </div>
         `;
@@ -1971,10 +1976,12 @@ async function deepCheck(type) {
         return;
     }
 
-    const wordsToCheck = [
-        ...(result.latin_words || []),
-        ...(result.unknown_cyrillic || [])
-    ];
+    const wordsToCheck = type === 'word'
+        ? [result.word].filter(Boolean)
+        : [
+            ...(result.latin_words || []),
+            ...(result.unknown_cyrillic || [])
+        ];
 
     if (wordsToCheck.length === 0) {
         alert('Нет слов для глубокой проверки!');

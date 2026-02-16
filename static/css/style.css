@@ -1461,14 +1461,15 @@ body {
    ============================================ */
 
 .word-input-group {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 1rem;
-    align-items: center;
+    align-items: start;
 }
 
 .word-input-group .form-input {
-    flex: 1;
-    max-width: 400px;
+    width: 100%;
+    max-width: 100%;
 }
 
 .word-detail {
@@ -1660,6 +1661,10 @@ body {
     
     .url-input-group {
         flex-direction: column;
+    }
+
+    .word-input-group {
+        grid-template-columns: 1fr;
     }
     
     .btn-group {
