@@ -308,24 +308,26 @@
                             </div>
                         </div>
 
-                        <div class="images-config-grid">
-                            <div>
-                                <label class="text-muted" for="imagesModelInput">Custom model (optional)</label>
-                                <input type="text" id="imagesModelInput" class="form-input" placeholder="custom model or mode">
+                        <form id="imagesTokenForm" onsubmit="event.preventDefault(); saveImageApiToken();">
+                            <div class="images-config-grid">
+                                <div>
+                                    <label class="text-muted" for="imagesModelInput">Custom model (optional)</label>
+                                    <input type="text" id="imagesModelInput" class="form-input" placeholder="custom model or mode">
+                                </div>
+                                <div>
+                                    <label class="text-muted" for="imagesTokenInput">API token</label>
+                                    <input type="password" id="imagesTokenInput" class="form-input" placeholder="provider API token" autocomplete="new-password">
+                                </div>
                             </div>
-                            <div>
-                                <label class="text-muted" for="imagesTokenInput">API token</label>
-                                <input type="password" id="imagesTokenInput" class="form-input" placeholder="provider API token">
-                            </div>
-                        </div>
 
-                        <div class="images-token-row">
-                            <button class="btn btn-secondary" onclick="saveImageApiToken()">
-                                <i class="fas fa-key"></i>
-                                Save token
-                            </button>
-                            <span id="imagesTokenStatus" class="images-token-status"></span>
-                        </div>
+                            <div class="images-token-row">
+                                <button type="submit" class="btn btn-secondary">
+                                    <i class="fas fa-key"></i>
+                                    Save token
+                                </button>
+                                <span id="imagesTokenStatus" class="images-token-status"></span>
+                            </div>
+                        </form>
 
                         <label class="text-muted" for="imagesUrlInput">Image URL (optional)</label>
                         <input type="url" id="imagesUrlInput" class="form-input" placeholder="https://example.com/image.jpg">

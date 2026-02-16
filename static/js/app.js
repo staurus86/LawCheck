@@ -222,9 +222,13 @@ async function checkBatch() {
 
 
 const IMAGE_MODEL_PRESETS = {
-    openai: ['gpt-4.1-mini', 'gpt-4.1'],
+    openai: ['gpt-4.1-mini', 'gpt-4.1', 'gpt-4o-mini', 'gpt-4o'],
     google: ['DOCUMENT_TEXT_DETECTION', 'TEXT_DETECTION'],
-    ocrspace: ['rus', 'eng', 'deu', 'fra']
+    ocrspace: [
+        'rus', 'eng', 'ger', 'fre', 'spa', 'ita', 'por', 'pol', 'tur',
+        'ukr', 'cze', 'hun', 'swe', 'dan', 'dut', 'fin', 'slv', 'hrv',
+        'rum', 'bul', 'gre', 'jpn', 'kor', 'chs', 'cht', 'ara'
+    ]
 };
 
 const MAX_IMAGE_FILE_SIZE_BYTES = 8 * 1024 * 1024;
