@@ -22,6 +22,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from collections import deque
 from urllib.parse import urljoin, urldefrag, urlparse
+from sqlalchemy import create_engine, text
 
 try:
     from pypdf import PdfReader
@@ -41,6 +42,19 @@ MULTISCAN_MAX_RESOURCES_HARD = int(os.getenv('MULTISCAN_MAX_RESOURCES_HARD', '80
 MULTISCAN_MAX_TEXT_CHARS = int(os.getenv('MULTISCAN_MAX_TEXT_CHARS', '200000'))
 MULTISCAN_MAX_DOWNLOAD_BYTES = int(os.getenv('MULTISCAN_MAX_DOWNLOAD_BYTES', str(8 * 1024 * 1024)))
 MULTISCAN_USER_AGENT = os.getenv('MULTISCAN_USER_AGENT', 'LawChecker-MultiScan/1.0')
+
+# Database (Railway PostgreSQL)
+RAW_DATABASE_URL = (os.getenv('DATABASE_URL') or os.getenv('database_URL') or '').strip()
+if RAW_DATABASE_URL.startswith('postgres://'):
+    RAW_DATABASE_URL = RAW_DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+db_engine = None
+if RAW_DATABASE_URL:
+    try:
+        db_engine = create_engine(RAW_DATABASE_URL, pool_pre_ping=True, future=True)
+    except Exception as _db_init_error:
+        print(f"[WARN] Database init failed: {_db_init_error}")
+        db_engine = None
 # CORS - разрешаем все домены
 CORS(app, resources={
     r"/api/*": {
@@ -72,6 +86,86 @@ statistics = {
     'total_violations': 0,
     'most_common_violations': defaultdict(int)
 }
+
+
+def init_analytics_db():
+    if db_engine is None:
+        return
+    try:
+        with db_engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS events (
+                    id BIGSERIAL PRIMARY KEY,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    event_type VARCHAR(32) NOT NULL,
+                    endpoint VARCHAR(128) NOT NULL,
+                    success BOOLEAN NOT NULL,
+                    duration_ms DOUBLE PRECISION,
+                    source_type VARCHAR(32),
+                    items_total INTEGER NOT NULL DEFAULT 0,
+                    items_error INTEGER NOT NULL DEFAULT 0,
+                    violations_total INTEGER NOT NULL DEFAULT 0
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS errors (
+                    id BIGSERIAL PRIMARY KEY,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    endpoint VARCHAR(128) NOT NULL,
+                    status_code INTEGER NOT NULL,
+                    message_short TEXT NOT NULL
+                )
+            """))
+    except Exception as e:
+        print(f"[WARN] DB schema init failed: {e}")
+
+
+def log_event(event_type, endpoint, success, duration_ms=None, source_type=None, items_total=0, items_error=0, violations_total=0):
+    if db_engine is None:
+        return
+    try:
+        with db_engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO events (
+                    event_type, endpoint, success, duration_ms, source_type, items_total, items_error, violations_total
+                ) VALUES (
+                    :event_type, :endpoint, :success, :duration_ms, :source_type, :items_total, :items_error, :violations_total
+                )
+            """), {
+                'event_type': event_type,
+                'endpoint': endpoint,
+                'success': bool(success),
+                'duration_ms': float(duration_ms) if duration_ms is not None else None,
+                'source_type': source_type,
+                'items_total': int(items_total or 0),
+                'items_error': int(items_error or 0),
+                'violations_total': int(violations_total or 0)
+            })
+    except Exception:
+        pass
+
+
+def log_error(endpoint, status_code, message):
+    if db_engine is None:
+        return
+    short = (message or '').strip()[:1000]
+    if not short:
+        short = 'unknown error'
+    try:
+        with db_engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO errors (endpoint, status_code, message_short)
+                VALUES (:endpoint, :status_code, :message_short)
+            """), {
+                'endpoint': endpoint,
+                'status_code': int(status_code),
+                'message_short': short
+            })
+    except Exception:
+        pass
+
+
+init_analytics_db()
 
 @app.route('/')
 def index():
@@ -412,6 +506,7 @@ def _build_resource_result(url, resource_type, check_result, source_meta=None):
 def check_text():
     """API: Проверка текста"""
     try:
+        started_at = time.perf_counter()
         data = request.json
         text = data.get('text', '')
         save_history = data.get('save_history', True)
@@ -430,6 +525,17 @@ def check_text():
         
         # Обновляем статистику
         update_statistics(result)
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        log_event(
+            event_type='check',
+            endpoint='/api/check',
+            success=True,
+            duration_ms=duration_ms,
+            source_type='text',
+            items_total=1,
+            items_error=0,
+            violations_total=result.get('violations_count', 0)
+        )
         
         return jsonify({
             'success': True,
@@ -439,12 +545,15 @@ def check_text():
         })
     
     except Exception as e:
+        log_error('/api/check', 500, str(e))
+        log_event(event_type='check', endpoint='/api/check', success=False, source_type='text', items_total=1, items_error=1)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/check-url', methods=['POST'])
 def check_url():
     """API: Проверка URL"""
     try:
+        started_at = time.perf_counter()
         data = request.json
         url = data.get('url', '')
         
@@ -474,6 +583,17 @@ def check_url():
         # Сохраняем в историю
         save_to_history('url', result, url)
         update_statistics(result)
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        log_event(
+            event_type='check',
+            endpoint='/api/check-url',
+            success=True,
+            duration_ms=duration_ms,
+            source_type='url',
+            items_total=1,
+            items_error=0,
+            violations_total=result.get('violations_count', 0)
+        )
         
         return jsonify({
             'success': True,
@@ -483,12 +603,15 @@ def check_url():
         })
     
     except Exception as e:
+        log_error('/api/check-url', 500, str(e))
+        log_event(event_type='check', endpoint='/api/check-url', success=False, source_type='url', items_total=1, items_error=1)
         return jsonify({'error': f'Ошибка загрузки: {str(e)}'}), 500
 
 @app.route('/api/batch-check', methods=['POST'])
 def batch_check():
     """API: Пакетная проверка"""
     try:
+        started_at = time.perf_counter()
         data = request.get_json(silent=True) or {}
         urls = data.get('urls', [])
         
@@ -538,6 +661,20 @@ def batch_check():
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             results = list(executor.map(process_single_url, clean_urls))
+        success_items = [item for item in results if item.get('success')]
+        error_items = [item for item in results if not item.get('success')]
+        violations_total = sum((item.get('result') or {}).get('violations_count', 0) for item in success_items)
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        log_event(
+            event_type='batch',
+            endpoint='/api/batch-check',
+            success=True,
+            duration_ms=duration_ms,
+            source_type='url',
+            items_total=len(clean_urls),
+            items_error=len(error_items),
+            violations_total=violations_total
+        )
         
         return jsonify({
             'success': True,
@@ -548,6 +685,8 @@ def batch_check():
         })
     
     except Exception as e:
+        log_error('/api/batch-check', 500, str(e))
+        log_event(event_type='batch', endpoint='/api/batch-check', success=False, source_type='url', items_error=1)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/deep-check', methods=['POST'])
@@ -600,6 +739,81 @@ def get_stats():
             'morph_available': False,
             'error': str(e)
         }), 500
+
+
+@app.route('/api/metrics', methods=['GET'])
+def get_metrics():
+    """Мини-метрики по событиям сервиса из PostgreSQL"""
+    if db_engine is None:
+        return jsonify({
+            'enabled': False,
+            'error': 'Database is not configured'
+        }), 503
+    try:
+        with db_engine.begin() as conn:
+            totals_row = conn.execute(text("""
+                SELECT
+                    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS events_24h,
+                    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') AS events_7d,
+                    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours' AND success = FALSE) AS errors_24h,
+                    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days' AND success = FALSE) AS errors_7d,
+                    AVG(duration_ms) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS avg_duration_24h,
+                    AVG(duration_ms) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') AS avg_duration_7d,
+                    COALESCE(SUM(violations_total) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours'), 0) AS violations_24h,
+                    COALESCE(SUM(violations_total) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days'), 0) AS violations_7d
+                FROM events
+            """)).mappings().first()
+
+            by_endpoint = conn.execute(text("""
+                SELECT endpoint, COUNT(*) AS total
+                FROM events
+                WHERE created_at >= NOW() - INTERVAL '7 days'
+                GROUP BY endpoint
+                ORDER BY total DESC
+                LIMIT 10
+            """)).mappings().all()
+
+            recent_errors = conn.execute(text("""
+                SELECT created_at, endpoint, status_code, message_short
+                FROM errors
+                ORDER BY created_at DESC
+                LIMIT 20
+            """)).mappings().all()
+
+        events_24h = int(totals_row['events_24h'] or 0)
+        events_7d = int(totals_row['events_7d'] or 0)
+        errors_24h = int(totals_row['errors_24h'] or 0)
+        errors_7d = int(totals_row['errors_7d'] or 0)
+
+        return jsonify({
+            'enabled': True,
+            'window': {
+                'events_24h': events_24h,
+                'events_7d': events_7d,
+                'errors_24h': errors_24h,
+                'errors_7d': errors_7d,
+                'error_rate_24h': round((errors_24h / events_24h) * 100, 2) if events_24h else 0.0,
+                'error_rate_7d': round((errors_7d / events_7d) * 100, 2) if events_7d else 0.0,
+                'avg_duration_ms_24h': round(float(totals_row['avg_duration_24h'] or 0), 2),
+                'avg_duration_ms_7d': round(float(totals_row['avg_duration_7d'] or 0), 2),
+                'violations_24h': int(totals_row['violations_24h'] or 0),
+                'violations_7d': int(totals_row['violations_7d'] or 0)
+            },
+            'top_endpoints_7d': [{'endpoint': row['endpoint'], 'total': int(row['total'])} for row in by_endpoint],
+            'recent_errors': [
+                {
+                    'created_at': row['created_at'].isoformat() if row.get('created_at') else None,
+                    'endpoint': row['endpoint'],
+                    'status_code': int(row['status_code']),
+                    'message_short': row['message_short']
+                }
+                for row in recent_errors
+            ],
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        log_error('/api/metrics', 500, str(e))
+        return jsonify({'enabled': True, 'error': str(e)}), 500
 
 @app.route('/api/check-word', methods=['POST'])
 def check_word():
@@ -815,9 +1029,22 @@ def check_images():
 
         update_statistics(result)
         save_to_history('image', result, image_url or 'uploaded_file')
+        total_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        log_event(
+            event_type='ocr_check',
+            endpoint='/api/images/check',
+            success=True,
+            duration_ms=total_ms,
+            source_type='image',
+            items_total=1,
+            items_error=0,
+            violations_total=result.get('violations_count', 0)
+        )
 
         return jsonify({'success': True, 'provider': provider, 'result': result, 'timestamp': datetime.now().isoformat()})
     except Exception as e:
+        log_error('/api/images/check', 500, str(e))
+        log_event(event_type='ocr_check', endpoint='/api/images/check', success=False, source_type='image', items_total=1, items_error=1)
         return jsonify({'error': str(e)}), 500
 
 
@@ -1075,6 +1302,18 @@ def multiscan_run():
         totals_by_type = defaultdict(int)
         for item in results:
             totals_by_type[item.get('resource_type', 'unknown')] += 1
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        violations_total = sum(item.get('violations_count', 0) for item in success_items)
+        log_event(
+            event_type='multiscan',
+            endpoint='/api/multiscan/run',
+            success=True,
+            duration_ms=duration_ms,
+            source_type='mixed',
+            items_total=len(results),
+            items_error=len(error_items),
+            violations_total=violations_total
+        )
 
         return jsonify({
             'success': True,
@@ -1095,13 +1334,17 @@ def multiscan_run():
             'totals_by_type': dict(totals_by_type),
             'results': results,
             'timings_ms': {
-                'total': round((time.perf_counter() - started_at) * 1000, 2)
+                'total': duration_ms
             },
             'timestamp': datetime.now().isoformat()
         })
     except RuntimeError as e:
+        log_error('/api/multiscan/run', 400, str(e))
+        log_event(event_type='multiscan', endpoint='/api/multiscan/run', success=False, source_type='mixed', items_error=1)
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        log_error('/api/multiscan/run', 500, str(e))
+        log_event(event_type='multiscan', endpoint='/api/multiscan/run', success=False, source_type='mixed', items_error=1)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/history', methods=['GET'])
