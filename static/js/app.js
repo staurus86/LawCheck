@@ -9,37 +9,95 @@ let currentResults = {
     batch: null,
     images: null
 };
+const ACTIVE_TAB_KEY = 'lawchecker.activeTab';
 
-// Инициализация при загрузке страницы
+// App bootstrap
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
+    initFieldMetrics();
     loadStats();
     onImagesProviderChange();
     loadImageTokenStatus();
-    console.log('✅ LawChecker Online загружен');
+    console.log('App loaded');
 });
 
-// Переключение вкладок
 function initTabs() {
     const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-    
     tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tabName = btn.dataset.tab;
-            
-            // Удаляем активные классы
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            
-            // Добавляем активные классы
-            btn.classList.add('active');
-            document.getElementById(`${tabName}-tab`).classList.add('active');
-        });
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
+
+    const hashTab = (window.location.hash || '').replace('#', '').trim();
+    const savedTab = localStorage.getItem(ACTIVE_TAB_KEY);
+    switchTab(hashTab || savedTab || 'text');
 }
 
-// Загрузка статистики словарей
+function switchTab(tabName) {
+    if (!tabName) return;
+    const targetBtn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+    const targetContent = document.getElementById(`${tabName}-tab`);
+    if (!targetBtn || !targetContent) return;
+
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+    targetBtn.classList.add('active');
+    targetContent.classList.add('active');
+    localStorage.setItem(ACTIVE_TAB_KEY, tabName);
+    if (window.location.hash !== `#${tabName}`) {
+        history.replaceState(null, '', `#${tabName}`);
+    }
+}
+
+function getActiveTabName() {
+    const activeBtn = document.querySelector('.tab-btn.active');
+    return activeBtn ? activeBtn.dataset.tab : 'text';
+}
+
+function updateTextInputMeta() {
+    const input = document.getElementById('textInput');
+    const meta = document.getElementById('textInputMeta');
+    if (!input || !meta) return;
+    const text = input.value || '';
+    const chars = text.length;
+    const words = (text.trim().match(/\S+/g) || []).length;
+    meta.textContent = `${chars} chars | ${words} words`;
+}
+
+function updateBatchInputMeta() {
+    const input = document.getElementById('batchInput');
+    const meta = document.getElementById('batchInputMeta');
+    if (!input || !meta) return;
+    const urls = (input.value || '')
+        .split('\n')
+        .map(v => v.trim())
+        .filter(v => v.startsWith('http'));
+    const unique = new Set(urls);
+    meta.textContent = `${urls.length} URLs (${unique.size} unique)`;
+}
+
+function updateImagesInputMeta() {
+    const input = document.getElementById('imagesInput');
+    const meta = document.getElementById('imagesInputMeta');
+    if (!input || !meta) return;
+    const text = input.value || '';
+    const chars = text.length;
+    const words = (text.trim().match(/\S+/g) || []).length;
+    meta.textContent = `${chars} chars | ${words} words`;
+}
+
+function initFieldMetrics() {
+    const textInput = document.getElementById('textInput');
+    const batchInput = document.getElementById('batchInput');
+    const imagesInput = document.getElementById('imagesInput');
+    if (textInput) textInput.addEventListener('input', updateTextInputMeta);
+    if (batchInput) batchInput.addEventListener('input', updateBatchInputMeta);
+    if (imagesInput) imagesInput.addEventListener('input', updateImagesInputMeta);
+    updateTextInputMeta();
+    updateBatchInputMeta();
+    updateImagesInputMeta();
+}
+
 async function loadStats() {
     try {
         const response = await fetch(`${API_BASE}/api/stats`);
@@ -177,48 +235,32 @@ async function checkBatch() {
     progressBar.style.display = 'block';
     progressFill.style.width = '0%';
     progressFill.style.animation = 'none';
-    
-    const results = [];
-    let completed = 0;
-    
-    for (const url of urls) {
-        progressText.textContent = `${completed} / ${urls.length}`;
-        
-        try {
-            const response = await fetch(`${API_BASE}/api/check-url`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ url })
-            });
-            
-            const data = await response.json();
-            results.push({
-                url,
-                success: data.success,
-                result: data.result,
-                error: data.error
-            });
-        } catch (error) {
-            results.push({
-                url,
-                success: false,
-                error: error.message
-            });
-        }
-        
-        completed++;
-        progressFill.style.width = `${(completed / urls.length) * 100}%`;
-    }
-    
-    progressText.textContent = `${completed} / ${urls.length}`;
-    currentResults.batch = results;
-    displayBatchResults(results);
-    console.log('✅ Пакетная проверка завершена:', results);
-}
+    progressText.textContent = `0 / ${urls.length}`;
 
-// Проверка одного слова
+    try {
+        const response = await fetch(`${API_BASE}/api/batch-check`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ urls })
+        });
+
+        const data = await response.json();
+        if (!data.success) {
+            throw new Error(data.error || 'Batch check failed');
+        }
+
+        const results = data.results || [];
+        progressFill.style.width = '100%';
+        progressText.textContent = `${results.length} / ${results.length}`;
+        currentResults.batch = results;
+        displayBatchResults(results);
+        console.log('✅ Пакетная проверка завершена:', results);
+    } catch (error) {
+        alert('Ошибка пакетной проверки: ' + error.message);
+    }
+}
 
 
 const IMAGE_MODEL_PRESETS = {
@@ -427,7 +469,10 @@ async function scrapTextFromImageAndCheck() {
 
         const extractedText = (data.extracted_text || '').trim();
         if (!extractedText) throw new Error('OCR returned empty text');
-        if (extractedTextArea) extractedTextArea.value = extractedText;
+        if (extractedTextArea) {
+            extractedTextArea.value = extractedText;
+            updateImagesInputMeta();
+        }
 
         await runStandardCheckForImageText(extractedText, data.source_url || '', data.ocr || null);
     } catch (e) {
@@ -474,7 +519,10 @@ async function checkImagesByDatabase() {
         if (!data.success) throw new Error(data.error || 'OCR + check failed');
 
         currentResults.images = data.result;
-        if (extractedTextArea) extractedTextArea.value = data.result.extracted_text || '';
+        if (extractedTextArea) {
+            extractedTextArea.value = data.result.extracted_text || '';
+            updateImagesInputMeta();
+        }
         displayResults('images', data.result, data.result.source_url || '');
         const resultsContent = document.getElementById('imagesResultsContent');
         appendImageOcrSummary(data.result.ocr, resultsContent);
@@ -1375,6 +1423,7 @@ function clearText() {
     document.getElementById('textInput').value = '';
     document.getElementById('textResults').style.display = 'none';
     currentResults.text = null;
+    updateTextInputMeta();
 }
 
 function loadSample() {
@@ -1384,10 +1433,41 @@ function loadSample() {
 Он находит слова на латинице, англицизмы и ненормативную лексику.
 
 Попробуйте добавить english words или специальные термины для проверки!`;
+    updateTextInputMeta();
+}
+
+async function copyExtractedImageText() {
+    const input = document.getElementById('imagesInput');
+    if (!input || !input.value.trim()) {
+        alert('No extracted text to copy');
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(input.value);
+    } catch (_e) {
+        input.select();
+        document.execCommand('copy');
+    }
+}
+
+function clearImageInputs() {
+    const urlInput = document.getElementById('imagesUrlInput');
+    const fileInput = document.getElementById('imagesFileInput');
+    const textInput = document.getElementById('imagesInput');
+    const resultsCard = document.getElementById('imagesResults');
+    if (urlInput) urlInput.value = '';
+    if (fileInput) fileInput.value = '';
+    if (textInput) textInput.value = '';
+    if (resultsCard) resultsCard.style.display = 'none';
+    currentResults.images = null;
+    updateImagesInputMeta();
 }
 
 function showLoading() {
     const overlay = document.getElementById('loadingOverlay');
+    document.querySelectorAll('.btn').forEach(btn => {
+        btn.disabled = true;
+    });
     if (overlay) {
         overlay.style.display = 'flex';
     }
@@ -1395,6 +1475,9 @@ function showLoading() {
 
 function hideLoading() {
     const overlay = document.getElementById('loadingOverlay');
+    document.querySelectorAll('.btn').forEach(btn => {
+        btn.disabled = false;
+    });
     if (overlay) {
         overlay.style.display = 'none';
     }
@@ -1402,11 +1485,12 @@ function hideLoading() {
 
 // Горячие клавиши
 document.addEventListener('keydown', (e) => {
-    // Ctrl+Enter для проверки текста
-    if (e.ctrlKey && e.key === 'Enter') {
-        const textTab = document.getElementById('text-tab');
-        if (textTab && textTab.classList.contains('active')) {
-            checkText();
-        }
-    }
+    if (!(e.ctrlKey && e.key === 'Enter')) return;
+
+    const activeTab = getActiveTabName();
+    if (activeTab === 'text') return checkText();
+    if (activeTab === 'url') return checkUrl();
+    if (activeTab === 'batch') return checkBatch();
+    if (activeTab === 'word') return checkWord();
+    if (activeTab === 'images') return checkExtractedImageText();
 });

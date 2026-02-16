@@ -102,6 +102,7 @@
                             placeholder="Вставьте ваш текст сюда..."
                             rows="12"
                         ></textarea>
+                        <div class="field-meta" id="textInputMeta">0 chars | 0 words</div>
                         
                         <div class="btn-group">
                             <button class="btn btn-primary" onclick="checkText()">
@@ -216,6 +217,7 @@
                             placeholder="https://example1.com&#10;https://example2.com&#10;https://example3.com"
                             rows="10"
                         ></textarea>
+                        <div class="field-meta" id="batchInputMeta">0 URLs (0 unique)</div>
                         
                         <button class="btn btn-primary" onclick="checkBatch()">
                             <i class="fas fa-list-check"></i>
@@ -336,6 +338,7 @@
                         <input type="file" id="imagesFileInput" class="form-input" accept="image/png,image/jpeg,image/webp">
 
                         <textarea id="imagesInput" class="form-textarea" placeholder="Extracted text will be shown here" rows="10"></textarea>
+                        <div class="field-meta" id="imagesInputMeta">0 chars | 0 words</div>
 
                         <div class="btn-group">
                             <button class="btn btn-primary" onclick="checkImagesByDatabase()">
@@ -349,6 +352,14 @@
                             <button class="btn btn-info" onclick="checkExtractedImageText()">
                                 <i class="fas fa-spell-check"></i>
                                 Check extracted text
+                            </button>
+                            <button class="btn btn-secondary" onclick="copyExtractedImageText()">
+                                <i class="fas fa-copy"></i>
+                                Copy extracted text
+                            </button>
+                            <button class="btn btn-secondary" onclick="clearImageInputs()">
+                                <i class="fas fa-eraser"></i>
+                                Clear image fields
                             </button>
                         </div>
                     </div>

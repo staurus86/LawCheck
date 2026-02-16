@@ -144,6 +144,11 @@ body {
     gap: 1rem;
     margin-bottom: 2rem;
     flex-wrap: wrap;
+    position: sticky;
+    top: 78px;
+    z-index: 900;
+    background: var(--background);
+    padding: 0.5rem 0;
 }
 
 .tab-btn {
@@ -240,6 +245,12 @@ body {
     flex: 1;
 }
 
+.field-meta {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
 /* Buttons */
 .btn-group {
     display: flex;
@@ -259,6 +270,13 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
+}
+
+.btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+    transform: none;
+    box-shadow: none;
 }
 
 .btn:hover {
