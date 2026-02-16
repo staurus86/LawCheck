@@ -1411,6 +1411,108 @@ def export_batch_txt():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/export/multiscan-txt', methods=['POST'])
+def export_multiscan_txt():
+    """Экспорт отчета MultiScan в TXT с разбивкой по типам ресурсов"""
+    try:
+        data = request.get_json(silent=True) or {}
+        scan = data.get('scan') or {}
+        results = scan.get('results') or []
+
+        if not results:
+            return jsonify({'error': 'Нет данных для экспорта'}), 400
+
+        lines = []
+        lines.append("=" * 90)
+        lines.append("MULTISCAN SITE REPORT")
+        lines.append("=" * 90)
+        lines.append(f"Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+        lines.append(f"Режим: {scan.get('mode', '-')}")
+        lines.append(f"OCR provider: {scan.get('provider', '-')}")
+        lines.append(f"Model: {scan.get('model') or '-'}")
+        lines.append("")
+
+        total = len(results)
+        success_count = sum(1 for item in results if item.get('success'))
+        error_count = total - success_count
+        violations_count = sum(1 for item in results if item.get('success') and not item.get('law_compliant', True))
+
+        by_type = defaultdict(int)
+        for item in results:
+            by_type[item.get('resource_type', 'unknown')] += 1
+
+        lines.append("-" * 90)
+        lines.append("СВОДКА")
+        lines.append("-" * 90)
+        lines.append(f"Всего ресурсов: {total}")
+        lines.append(f"Успешно обработано: {success_count}")
+        lines.append(f"С ошибками: {error_count}")
+        lines.append(f"С нарушениями: {violations_count}")
+        lines.append(f"Страницы: {by_type.get('page', 0)}")
+        lines.append(f"Картинки: {by_type.get('image', 0)}")
+        lines.append(f"PDF: {by_type.get('pdf', 0)}")
+        lines.append("")
+
+        lines.append("=" * 90)
+        lines.append("ДЕТАЛЬНЫЙ ОТЧЕТ ПО URL")
+        lines.append("=" * 90)
+        lines.append("")
+
+        all_forbidden = set()
+        for idx, item in enumerate(results, 1):
+            url = item.get('url', 'unknown')
+            resource_type = item.get('resource_type', 'unknown')
+            lines.append(f"[{idx}] {url}")
+            lines.append(f"Тип: {resource_type}")
+
+            if not item.get('success'):
+                lines.append(f"Статус: ОШИБКА ({item.get('error', 'Unknown error')})")
+                lines.append("-" * 90)
+                continue
+
+            item_result = item.get('result') or {}
+            compliant = item.get('law_compliant', True)
+            forbidden_words = item.get('forbidden_words') or []
+            all_forbidden.update(forbidden_words)
+
+            lines.append(f"Статус: {'OK' if compliant else 'НАРУШЕНИЯ'}")
+            lines.append(f"Нарушений: {item.get('violations_count', 0)}")
+            lines.append(f"Слов в тексте: {item_result.get('total_words', 0)}")
+
+            if forbidden_words:
+                lines.append(f"Запрещенные/подозрительные слова ({len(forbidden_words)}):")
+                for word in forbidden_words:
+                    lines.append(f"  - {word}")
+            else:
+                lines.append("Запрещенные/подозрительные слова: не найдены")
+
+            lines.append("-" * 90)
+
+        if all_forbidden:
+            lines.append("")
+            lines.append("=" * 90)
+            lines.append("УНИКАЛЬНЫЕ СЛОВА ПО ВСЕМ РЕСУРСАМ")
+            lines.append("=" * 90)
+            for word in sorted(all_forbidden):
+                lines.append(f"- {word}")
+
+        report = "\n".join(lines)
+
+        output = io.BytesIO()
+        output.write('\ufeff'.encode('utf-8'))
+        output.write(report.encode('utf-8'))
+        output.seek(0)
+
+        return send_file(
+            output,
+            mimetype='text/plain; charset=utf-8',
+            as_attachment=True,
+            download_name=f'lawcheck_multiscan_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 
 def save_to_history(check_type, result, context):

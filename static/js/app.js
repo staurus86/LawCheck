@@ -1695,8 +1695,19 @@ async function exportReport(type) {
         
         // Для пакетной проверки используем специальный endpoint
         const isBatch = type === 'batch';
-        const endpoint = isBatch ? '/api/export/batch-txt' : '/api/export/txt';
-        const payload = isBatch ? { results: result } : { result };
+        const isMulti = type === 'multi';
+        let endpoint = '/api/export/txt';
+        let payload = { result };
+        let prefix = 'lawcheck_';
+        if (isBatch) {
+            endpoint = '/api/export/batch-txt';
+            payload = { results: result };
+            prefix = 'lawcheck_batch_';
+        } else if (isMulti) {
+            endpoint = '/api/export/multiscan-txt';
+            payload = { scan: result };
+            prefix = 'lawcheck_multiscan_';
+        }
         
         const response = await fetch(`${API_BASE}${endpoint}`, {
             method: 'POST',
@@ -1714,7 +1725,6 @@ async function exportReport(type) {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        const prefix = isBatch ? 'lawcheck_batch_' : 'lawcheck_';
         a.download = `${prefix}${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
         document.body.appendChild(a);
         a.click();
