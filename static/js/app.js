@@ -6,13 +6,16 @@ console.log('🔗 Using API:', API_BASE);
 let currentResults = {
     text: null,
     url: null,
-    batch: null
+    batch: null,
+    images: null
 };
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     loadStats();
+    onImagesProviderChange();
+    loadImageTokenStatus();
     console.log('✅ LawChecker Online загружен');
 });
 
@@ -216,6 +219,192 @@ async function checkBatch() {
 }
 
 // Проверка одного слова
+
+
+const IMAGE_MODEL_PRESETS = {
+    openai: ['gpt-4.1-mini', 'gpt-4.1'],
+    google: ['DOCUMENT_TEXT_DETECTION', 'TEXT_DETECTION'],
+    ocrspace: ['rus', 'eng', 'deu', 'fra']
+};
+
+const MAX_IMAGE_FILE_SIZE_BYTES = 8 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+function getImagesProvider() {
+    const el = document.getElementById('imagesProviderSelect');
+    return el ? el.value : 'openai';
+}
+
+function getDefaultModelByProvider(provider) {
+    const list = IMAGE_MODEL_PRESETS[provider] || [];
+    return list.length ? list[0] : '';
+}
+
+function onImagesProviderChange() {
+    const provider = getImagesProvider();
+    const presetEl = document.getElementById('imagesModelPresetSelect');
+    const modelInput = document.getElementById('imagesModelInput');
+    if (!presetEl) return;
+
+    presetEl.innerHTML = '';
+    (IMAGE_MODEL_PRESETS[provider] || []).forEach(model => {
+        const option = document.createElement('option');
+        option.value = model;
+        option.textContent = model;
+        presetEl.appendChild(option);
+    });
+    const customOption = document.createElement('option');
+    customOption.value = '__custom__';
+    customOption.textContent = 'custom';
+    presetEl.appendChild(customOption);
+
+    if (modelInput && !modelInput.value.trim()) {
+        modelInput.value = getDefaultModelByProvider(provider);
+    }
+    onImagesModelPresetChange();
+    loadImageTokenStatus();
+}
+
+function onImagesModelPresetChange() {
+    const presetEl = document.getElementById('imagesModelPresetSelect');
+    const modelInput = document.getElementById('imagesModelInput');
+    if (!presetEl || !modelInput) return;
+    if (presetEl.value !== '__custom__') {
+        modelInput.value = presetEl.value;
+    }
+}
+
+async function loadImageTokenStatus() {
+    const statusEl = document.getElementById('imagesTokenStatus');
+    if (!statusEl) return;
+    const provider = getImagesProvider();
+    try {
+        const response = await fetch(`${API_BASE}/api/images/token?provider=${encodeURIComponent(provider)}`, {
+            credentials: 'same-origin'
+        });
+        const data = await response.json();
+        if (data.success && data.has_token) {
+            statusEl.textContent = `token: ${data.token_masked || 'saved'}`;
+            statusEl.className = 'images-token-status success';
+        } else {
+            statusEl.textContent = 'token not set';
+            statusEl.className = 'images-token-status';
+        }
+    } catch (e) {
+        statusEl.textContent = 'token status error';
+        statusEl.className = 'images-token-status error';
+    }
+}
+
+async function saveImageApiToken() {
+    const input = document.getElementById('imagesTokenInput');
+    const statusEl = document.getElementById('imagesTokenStatus');
+    if (!input || !statusEl) return;
+    const provider = getImagesProvider();
+    const token = input.value.trim();
+    if (!token) {
+        alert('Enter API token');
+        return;
+    }
+    try {
+        const response = await fetch(`${API_BASE}/api/images/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ provider, token })
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Token save failed');
+        statusEl.textContent = `token saved: ${data.token_masked || ''}`;
+        statusEl.className = 'images-token-status success';
+        input.value = '';
+    } catch (e) {
+        statusEl.textContent = `error: ${e.message}`;
+        statusEl.className = 'images-token-status error';
+    }
+}
+
+function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('File read error'));
+        reader.readAsDataURL(file);
+    });
+}
+
+async function checkImagesByDatabase() {
+    const provider = getImagesProvider();
+    const modelInput = document.getElementById('imagesModelInput');
+    const urlInput = document.getElementById('imagesUrlInput');
+    const fileInput = document.getElementById('imagesFileInput');
+    const extractedTextArea = document.getElementById('imagesInput');
+
+    const model = modelInput && modelInput.value.trim() ? modelInput.value.trim() : getDefaultModelByProvider(provider);
+    const imageUrl = urlInput ? urlInput.value.trim() : '';
+    const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+
+    if (!imageUrl && !file) {
+        alert('Provide image URL or upload file');
+        return;
+    }
+
+    if (file) {
+        if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+            alert('Only jpg/png/webp are supported');
+            return;
+        }
+        if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
+            alert('Image is too large. Max size is 8MB');
+            return;
+        }
+    }
+
+    let imageDataUrl = '';
+    if (file) imageDataUrl = await fileToDataUrl(file);
+
+    showLoading();
+    try {
+        const response = await fetch(`${API_BASE}/api/images/check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                provider,
+                model,
+                image_url: imageUrl || null,
+                image_data_url: imageDataUrl || null
+            })
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'OCR failed');
+
+        currentResults.images = data.result;
+        if (extractedTextArea) extractedTextArea.value = data.result.extracted_text || '';
+
+        displayResults('images', data.result, data.result.source_url || '');
+
+        const resultsContent = document.getElementById('imagesResultsContent');
+        const ocr = data.result.ocr || {};
+        const timings = ocr.timings_ms || {};
+        const usage = ocr.usage || {};
+        if (resultsContent) {
+            resultsContent.innerHTML += `
+                <div class="image-db-summary">
+                    <h4>OCR log</h4>
+                    <p>provider: ${ocr.provider || '-'} | model: ${ocr.model || '-'} | source: ${ocr.source || '-'}</p>
+                    <p>timings ms: ocr=${timings.ocr ?? '-'}, check=${timings.text_check ?? '-'}, total=${timings.total ?? '-'}</p>
+                    <p>usage: ${Object.keys(usage).length ? Object.entries(usage).map(([k, v]) => `${k}=${v}`).join(', ') : 'n/a'}</p>
+                </div>
+            `;
+        }
+    } catch (e) {
+        alert('Image check error: ' + e.message);
+    } finally {
+        hideLoading();
+    }
+}
+
 async function checkWord() {
     const word = document.getElementById('wordInput').value.trim();
     

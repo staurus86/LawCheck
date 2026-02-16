@@ -82,6 +82,10 @@
                     <i class="fas fa-search"></i>
                     <span>Проверка слова</span>
                 </button>
+                <button class="tab-btn" data-tab="images">
+                    <i class="fas fa-image"></i>
+                    <span>Images OCR</span>
+                </button>
             </div>
 
             <!-- Tab Content: Text Check -->
@@ -277,6 +281,85 @@
                     </div>
                     <div class="card-body">
                         <div id="wordResultsContent"></div>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="tab-content" id="images-tab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Images OCR + text check</h2>
+                        <p class="text-muted">Choose provider, model preset, token, then URL or file.</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="images-config-grid">
+                            <div>
+                                <label class="text-muted" for="imagesProviderSelect">OCR provider</label>
+                                <select id="imagesProviderSelect" class="form-input" onchange="onImagesProviderChange()">
+                                    <option value="openai">OpenAI</option>
+                                    <option value="google">Google Vision</option>
+                                    <option value="ocrspace">OCR.Space</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-muted" for="imagesModelPresetSelect">Model preset</label>
+                                <select id="imagesModelPresetSelect" class="form-input" onchange="onImagesModelPresetChange()"></select>
+                            </div>
+                        </div>
+
+                        <div class="images-config-grid">
+                            <div>
+                                <label class="text-muted" for="imagesModelInput">Custom model (optional)</label>
+                                <input type="text" id="imagesModelInput" class="form-input" placeholder="custom model or mode">
+                            </div>
+                            <div>
+                                <label class="text-muted" for="imagesTokenInput">API token</label>
+                                <input type="password" id="imagesTokenInput" class="form-input" placeholder="provider API token">
+                            </div>
+                        </div>
+
+                        <div class="images-token-row">
+                            <button class="btn btn-secondary" onclick="saveImageApiToken()">
+                                <i class="fas fa-key"></i>
+                                Save token
+                            </button>
+                            <span id="imagesTokenStatus" class="images-token-status"></span>
+                        </div>
+
+                        <label class="text-muted" for="imagesUrlInput">Image URL (optional)</label>
+                        <input type="url" id="imagesUrlInput" class="form-input" placeholder="https://example.com/image.jpg">
+
+                        <label class="text-muted" for="imagesFileInput">Or upload file (jpg/png/webp, max 8MB)</label>
+                        <input type="file" id="imagesFileInput" class="form-input" accept="image/png,image/jpeg,image/webp">
+
+                        <textarea id="imagesInput" class="form-textarea" placeholder="Extracted text will be shown here" rows="10"></textarea>
+
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="checkImagesByDatabase()">
+                                <i class="fas fa-database"></i>
+                                OCR + check
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card results-card" id="imagesResults" style="display: none;">
+                    <div class="card-header">
+                        <h2>Image check results</h2>
+                        <div class="btn-group">
+                            <button class="btn btn-info" onclick="deepCheck('images')">
+                                <i class="fas fa-microscope"></i>
+                                Deep check
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="exportReport('images')">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="imagesResultsContent"></div>
                     </div>
                 </div>
             </div>
