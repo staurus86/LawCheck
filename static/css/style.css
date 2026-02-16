@@ -481,10 +481,10 @@ body {
 }
 
 /* ============================================
-   РЈР›РЈР§РЁР•РќРќР«Р• РЎРўРР›Р Р Р•Р—РЈР›Р¬РўРђРўРћР’ РџР РћР’Р•Р РљР
+   УЛУЧШЕННЫЕ СТИЛИ РЕЗУЛЬТАТОВ ПРОВЕРКИ
    ============================================ */
 
-/* РЎС‚Р°С‚СѓСЃ СЂРµР·СѓР»СЊС‚Р°С‚Р° СЃ РёРєРѕРЅРєРѕР№ */
+/* Статус результата с иконкой */
 .result-status {
     display: flex;
     align-items: center;
@@ -530,7 +530,7 @@ body {
     border-left: 5px solid #FF9800;
 }
 
-/* РЎРµРєС†РёРё РЅР°СЂСѓС€РµРЅРёР№ */
+/* Секции нарушений */
 .violations-list {
     display: flex;
     flex-direction: column;
@@ -600,7 +600,7 @@ body {
     font-style: italic;
 }
 
-/* РЎРІРѕРґРЅР°СЏ СЃС‚Р°С‚РёСЃС‚РёРєР° */
+/* Сводная статистика */
 .stats-summary {
     background: linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%);
     border-radius: 12px;
@@ -657,7 +657,7 @@ body {
     text-decoration: underline;
 }
 
-/* Р РµРєРѕРјРµРЅРґР°С†РёРё */
+/* Рекомендации */
 .recommendations {
     margin-top: 1.5rem;
 }
@@ -725,7 +725,7 @@ body {
     font-weight: 500;
 }
 
-/* РџР°РєРµС‚РЅР°СЏ РїСЂРѕРІРµСЂРєР° */
+/* Пакетная проверка */
 .batch-summary {
     background: linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%);
     border-radius: 12px;
@@ -860,7 +860,7 @@ body {
 }
 
 /* ============================================
-   РџРђРљР•РўРќРђРЇ РџР РћР’Р•Р РљРђ - Р”РћРџРћР›РќРРўР•Р›Р¬РќР«Р• РЎРўРР›Р
+   ПАКЕТНАЯ ПРОВЕРКА - ДОПОЛНИТЕЛЬНЫЕ СТИЛИ
    ============================================ */
 
 .batch-global-violations {
@@ -973,7 +973,7 @@ body {
 }
 
 /* ============================================
-   РџР РћР’Р•Р РљРђ РЎР›РћР’Рђ
+   ПРОВЕРКА СЛОВА
    ============================================ */
 
 .word-input-group {
@@ -1021,50 +1021,9 @@ body {
 }
 
 /* ============================================
-   РђР”РђРџРўРР’РќРћРЎРўР¬
+   АДАПТИВНОСТЬ
    ============================================ */
 
-
-/* ============================================
-   ВКЛАДКА КАРТИНКИ
-   ============================================ */
-
-.images-config-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.images-token-row {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    margin-bottom: 0.5rem;
-}
-
-.images-token-status {
-    min-height: 1.2rem;
-    margin: 0 0 1rem 0;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-}
-
-.images-token-status.success {
-    color: #2E7D32;
-}
-
-.images-token-status.error {
-    color: #C62828;
-}
-
-.image-db-summary {
-    margin-top: 1rem;
-    padding: 0.75rem 1rem;
-    border-radius: 8px;
-    background: #F5F8FF;
-    border: 1px solid #DDE5FF;
-}
 @media (max-width: 768px) {
     .hero-title {
         font-size: 2rem;
@@ -1077,15 +1036,6 @@ body {
     
     .url-input-group {
         flex-direction: column;
-    }
-
-    .images-token-row {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .images-config-grid {
-        grid-template-columns: 1fr;
     }
     
     .btn-group {
@@ -1128,7 +1078,7 @@ body {
 }
 
 /* ============================================
-   Р“Р›РЈР‘РћРљРђРЇ РџР РћР’Р•Р РљРђ - РќРћР’Р«Р• РЎРўРР›Р
+   ГЛУБОКАЯ ПРОВЕРКА - НОВЫЕ СТИЛИ
    ============================================ */
 
 .deep-check-results {
@@ -1219,7 +1169,7 @@ body {
     color: #C62828;
 }
 
-/* РЎС‚РёР»Рё РґР»СЏ СЃР»РѕРІ РІ РіР»СѓР±РѕРєРѕР№ РїСЂРѕРІРµСЂРєРµ */
+/* Стили для слов в глубокой проверке */
 .word-tag {
     display: inline-flex;
     align-items: center;
@@ -1273,7 +1223,7 @@ body {
     font-weight: 500;
 }
 
-/* РђРЅРёРјР°С†РёСЏ РїРѕСЏРІР»РµРЅРёСЏ */
+/* Анимация появления */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-10px); }
     to { opacity: 1; transform: translateY(0); }
@@ -1321,4 +1271,3 @@ body {
     margin-bottom: 0.5rem;
     display: block;
 }
-
