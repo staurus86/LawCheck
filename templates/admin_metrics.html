@@ -39,11 +39,57 @@
         <div class="container">
             <div class="card">
                 <div class="card-header">
+                    <h2>Фильтры</h2>
+                </div>
+                <div class="card-body">
+                    <div class="admin-filters">
+                        <div>
+                            <label class="text-muted" for="fDays">Период</label>
+                            <select id="fDays" class="form-input">
+                                <option value="1">1 день</option>
+                                <option value="7" selected>7 дней</option>
+                                <option value="30">30 дней</option>
+                                <option value="90">90 дней</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-muted" for="fType">Тип проверки</label>
+                            <select id="fType" class="form-input">
+                                <option value="all">Все</option>
+                                <option value="text">text</option>
+                                <option value="url">url</option>
+                                <option value="batch">batch</option>
+                                <option value="image">image</option>
+                                <option value="multiscan">multiscan</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-muted" for="fStatus">Статус</label>
+                            <select id="fStatus" class="form-input">
+                                <option value="all">Все</option>
+                                <option value="ok">ok</option>
+                                <option value="error">error</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="refreshDashboard()">Применить</button>
+                        <button class="btn btn-secondary" onclick="resetFilters()">Сбросить</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
                     <h2>Ключевые показатели</h2>
                     <p class="text-muted" id="updatedAt">Загрузка...</p>
                 </div>
                 <div class="card-body">
                     <div class="stats-grid" id="kpiGrid"></div>
+                    <div class="trend-block">
+                        <h3>Тренд по дням</h3>
+                        <div id="trendBars" class="trend-bars"></div>
+                    </div>
                 </div>
             </div>
 
@@ -112,11 +158,60 @@
             return `<tr>${cells.map(c => `<td>${c}</td>`).join('')}</tr>`;
         }
 
+        function getFilters() {
+            const days = document.getElementById('fDays').value || '7';
+            const checkType = document.getElementById('fType').value || 'all';
+            const status = document.getElementById('fStatus').value || 'all';
+            return { days, checkType, status };
+        }
+
+        function resetFilters() {
+            document.getElementById('fDays').value = '7';
+            document.getElementById('fType').value = 'all';
+            document.getElementById('fStatus').value = 'all';
+            refreshDashboard();
+        }
+
+        function renderTrend(rows) {
+            const container = document.getElementById('trendBars');
+            if (!container) return;
+            if (!rows || !rows.length) {
+                container.innerHTML = '<div class="text-muted">Недостаточно данных для тренда.</div>';
+                return;
+            }
+            const max = Math.max(...rows.map(r => r.total || 0), 1);
+            container.innerHTML = rows.map(r => {
+                const total = r.total || 0;
+                const errors = r.errors || 0;
+                const w = Math.max(6, Math.round((total / max) * 100));
+                const ew = total ? Math.round((errors / total) * 100) : 0;
+                return `
+                    <div class="trend-row">
+                        <span class="trend-day">${r.day}</span>
+                        <div class="trend-bar-wrap">
+                            <div class="trend-bar" style="width:${w}%">
+                                <span class="trend-bar-errors" style="width:${ew}%"></span>
+                            </div>
+                        </div>
+                        <span class="trend-val">${total}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
         async function refreshDashboard() {
             try {
+                const f = getFilters();
+                const qMetrics = new URLSearchParams({ days: f.days }).toString();
+                const qHistory = new URLSearchParams({
+                    limit: '20',
+                    days: f.days,
+                    check_type: f.checkType,
+                    status: f.status
+                }).toString();
                 const [mResp, hResp] = await Promise.all([
-                    fetch(`${API_BASE}/api/metrics`),
-                    fetch(`${API_BASE}/api/run-history?limit=20`)
+                    fetch(`${API_BASE}/api/metrics?${qMetrics}`),
+                    fetch(`${API_BASE}/api/run-history?${qHistory}`)
                 ]);
                 const metrics = await mResp.json();
                 const history = await hResp.json();
@@ -126,13 +221,13 @@
                 const w = metrics.window || {};
                 document.getElementById('updatedAt').textContent = `Обновлено: ${fmtDate(metrics.timestamp)}`;
                 document.getElementById('kpiGrid').innerHTML = `
-                    <div class="stat-item"><span class="stat-number">${w.events_24h ?? 0}</span><span class="stat-label">События 24ч</span></div>
-                    <div class="stat-item"><span class="stat-number">${w.events_7d ?? 0}</span><span class="stat-label">События 7д</span></div>
-                    <div class="stat-item"><span class="stat-number">${w.error_rate_24h ?? 0}%</span><span class="stat-label">Ошибка 24ч</span></div>
-                    <div class="stat-item"><span class="stat-number">${w.error_rate_7d ?? 0}%</span><span class="stat-label">Ошибка 7д</span></div>
-                    <div class="stat-item"><span class="stat-number">${w.avg_duration_ms_24h ?? 0}</span><span class="stat-label">Avg ms 24ч</span></div>
-                    <div class="stat-item"><span class="stat-number">${w.violations_7d ?? 0}</span><span class="stat-label">Нарушения 7д</span></div>
+                    <div class="stat-item"><span class="stat-number">${w.events_total ?? 0}</span><span class="stat-label">События (${w.days ?? f.days}д)</span></div>
+                    <div class="stat-item"><span class="stat-number">${w.errors_total ?? 0}</span><span class="stat-label">Ошибки</span></div>
+                    <div class="stat-item"><span class="stat-number">${w.error_rate ?? 0}%</span><span class="stat-label">Error rate</span></div>
+                    <div class="stat-item"><span class="stat-number">${w.avg_duration_ms ?? 0}</span><span class="stat-label">Avg ms</span></div>
+                    <div class="stat-item"><span class="stat-number">${w.violations_total ?? 0}</span><span class="stat-label">Нарушения</span></div>
                 `;
+                renderTrend(metrics.trend_by_day || []);
 
                 const topEndpoints = metrics.top_endpoints_7d || [];
                 document.getElementById('topEndpointsBody').innerHTML =

@@ -905,29 +905,44 @@ def get_metrics():
             'enabled': False,
             'error': 'Database is not configured'
         }), 503
+    days = _safe_int(request.args.get('days', 7), 7, 1, 90)
+    event_type = (request.args.get('event_type') or '').strip()
+    source_type = (request.args.get('source_type') or '').strip()
+    endpoint_filter = (request.args.get('endpoint') or '').strip()
+
+    where_clauses = ["created_at >= NOW() - make_interval(days => :days)"]
+    query_params = {'days': days}
+    if event_type:
+        where_clauses.append("event_type = :event_type")
+        query_params['event_type'] = event_type
+    if source_type:
+        where_clauses.append("source_type = :source_type")
+        query_params['source_type'] = source_type
+    if endpoint_filter:
+        where_clauses.append("endpoint ILIKE :endpoint_like")
+        query_params['endpoint_like'] = f"%{endpoint_filter}%"
+    where_sql = " AND ".join(where_clauses)
+
     try:
         with db_engine.begin() as conn:
-            totals_row = conn.execute(text("""
+            totals_row = conn.execute(text(f"""
                 SELECT
-                    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS events_24h,
-                    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') AS events_7d,
-                    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours' AND success = FALSE) AS errors_24h,
-                    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days' AND success = FALSE) AS errors_7d,
-                    AVG(duration_ms) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS avg_duration_24h,
-                    AVG(duration_ms) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') AS avg_duration_7d,
-                    COALESCE(SUM(violations_total) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours'), 0) AS violations_24h,
-                    COALESCE(SUM(violations_total) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days'), 0) AS violations_7d
+                    COUNT(*) AS events_total,
+                    COUNT(*) FILTER (WHERE success = FALSE) AS errors_total,
+                    AVG(duration_ms) AS avg_duration_ms,
+                    COALESCE(SUM(violations_total), 0) AS violations_total
                 FROM events
-            """)).mappings().first()
+                WHERE {where_sql}
+            """), query_params).mappings().first()
 
-            by_endpoint = conn.execute(text("""
+            by_endpoint = conn.execute(text(f"""
                 SELECT endpoint, COUNT(*) AS total
                 FROM events
-                WHERE created_at >= NOW() - INTERVAL '7 days'
+                WHERE {where_sql}
                 GROUP BY endpoint
                 ORDER BY total DESC
                 LIMIT 10
-            """)).mappings().all()
+            """), query_params).mappings().all()
 
             recent_errors = conn.execute(text("""
                 SELECT created_at, endpoint, status_code, message_short
@@ -938,28 +953,37 @@ def get_metrics():
             top_words = conn.execute(text("""
                 SELECT word, count, last_seen_at
                 FROM violation_words
+                WHERE last_seen_at >= NOW() - make_interval(days => :days)
                 ORDER BY count DESC, last_seen_at DESC
                 LIMIT 20
-            """)).mappings().all()
+            """), {'days': days}).mappings().all()
+            trend_rows = conn.execute(text(f"""
+                SELECT date_trunc('day', created_at) AS day, COUNT(*) AS total, COUNT(*) FILTER (WHERE success = FALSE) AS errors
+                FROM events
+                WHERE {where_sql}
+                GROUP BY date_trunc('day', created_at)
+                ORDER BY day ASC
+            """), query_params).mappings().all()
 
-        events_24h = int(totals_row['events_24h'] or 0)
-        events_7d = int(totals_row['events_7d'] or 0)
-        errors_24h = int(totals_row['errors_24h'] or 0)
-        errors_7d = int(totals_row['errors_7d'] or 0)
+        events_total = int(totals_row['events_total'] or 0)
+        errors_total = int(totals_row['errors_total'] or 0)
+        avg_duration = round(float(totals_row['avg_duration_ms'] or 0), 2)
+        violations_total = int(totals_row['violations_total'] or 0)
 
         return jsonify({
             'enabled': True,
             'window': {
-                'events_24h': events_24h,
-                'events_7d': events_7d,
-                'errors_24h': errors_24h,
-                'errors_7d': errors_7d,
-                'error_rate_24h': round((errors_24h / events_24h) * 100, 2) if events_24h else 0.0,
-                'error_rate_7d': round((errors_7d / events_7d) * 100, 2) if events_7d else 0.0,
-                'avg_duration_ms_24h': round(float(totals_row['avg_duration_24h'] or 0), 2),
-                'avg_duration_ms_7d': round(float(totals_row['avg_duration_7d'] or 0), 2),
-                'violations_24h': int(totals_row['violations_24h'] or 0),
-                'violations_7d': int(totals_row['violations_7d'] or 0)
+                'days': days,
+                'events_total': events_total,
+                'errors_total': errors_total,
+                'error_rate': round((errors_total / events_total) * 100, 2) if events_total else 0.0,
+                'avg_duration_ms': avg_duration,
+                'violations_total': violations_total
+            },
+            'filters': {
+                'event_type': event_type or None,
+                'source_type': source_type or None,
+                'endpoint': endpoint_filter or None
             },
             'top_endpoints_7d': [{'endpoint': row['endpoint'], 'total': int(row['total'])} for row in by_endpoint],
             'top_violation_words': [
@@ -969,6 +993,14 @@ def get_metrics():
                     'last_seen_at': row['last_seen_at'].isoformat() if row.get('last_seen_at') else None
                 }
                 for row in top_words
+            ],
+            'trend_by_day': [
+                {
+                    'day': row['day'].date().isoformat() if row.get('day') else None,
+                    'total': int(row['total'] or 0),
+                    'errors': int(row['errors'] or 0)
+                }
+                for row in trend_rows
             ],
             'recent_errors': [
                 {
@@ -992,18 +1024,35 @@ def get_run_history():
     if db_engine is None:
         return jsonify({'enabled': False, 'error': 'Database is not configured'}), 503
     limit = _safe_int(request.args.get('limit', 20), 20, 1, 100)
+    days = _safe_int(request.args.get('days', 7), 7, 1, 90)
+    check_type = (request.args.get('check_type') or '').strip().lower()
+    status_filter = (request.args.get('status') or '').strip().lower()
     try:
+        where_clauses = ["created_at >= NOW() - make_interval(days => :days)"]
+        params = {'limit': limit, 'days': days}
+        if check_type and check_type != 'all':
+            where_clauses.append("check_type = :check_type")
+            params['check_type'] = check_type
+        if status_filter == 'ok':
+            where_clauses.append("success = TRUE")
+        elif status_filter == 'error':
+            where_clauses.append("success = FALSE")
+        where_sql = " AND ".join(where_clauses)
+
         with db_engine.begin() as conn:
-            rows = conn.execute(text("""
+            rows = conn.execute(text(f"""
                 SELECT created_at, check_type, endpoint, source_type, context_short, success, duration_ms, violations_count
                 FROM run_history
+                WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :limit
-            """), {'limit': limit}).mappings().all()
+            """), params).mappings().all()
 
         return jsonify({
             'enabled': True,
             'limit': limit,
+            'days': days,
+            'filters': {'check_type': check_type or 'all', 'status': status_filter or 'all'},
             'items': [
                 {
                     'created_at': row['created_at'].isoformat() if row.get('created_at') else None,
