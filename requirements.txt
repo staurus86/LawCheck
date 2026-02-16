@@ -7,3 +7,5 @@ beautifulsoup4==4.12.2
 requests>=2.27.1
 gunicorn==21.2.0
 pypdf==5.1.0
+SQLAlchemy>=2.0
+psycopg2-binary>=2.9
