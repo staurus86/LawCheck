@@ -337,12 +337,11 @@ function fileToDataUrl(file) {
     });
 }
 
-async function checkImagesByDatabase() {
+async function buildImagesPayload() {
     const provider = getImagesProvider();
     const modelInput = document.getElementById('imagesModelInput');
     const urlInput = document.getElementById('imagesUrlInput');
     const fileInput = document.getElementById('imagesFileInput');
-    const extractedTextArea = document.getElementById('imagesInput');
 
     const model = modelInput && modelInput.value.trim() ? modelInput.value.trim() : getDefaultModelByProvider(provider);
     const imageUrl = urlInput ? urlInput.value.trim() : '';
@@ -367,41 +366,118 @@ async function checkImagesByDatabase() {
     let imageDataUrl = '';
     if (file) imageDataUrl = await fileToDataUrl(file);
 
+    return {
+        provider,
+        model,
+        image_url: imageUrl || null,
+        image_data_url: imageDataUrl || null
+    };
+}
+
+function appendImageOcrSummary(ocr, targetEl) {
+    if (!targetEl || !ocr) return;
+    const timings = ocr.timings_ms || {};
+    const usage = ocr.usage || {};
+    targetEl.innerHTML += `
+        <div class="image-db-summary">
+            <h4>OCR log</h4>
+            <p>provider: ${ocr.provider || '-'} | model: ${ocr.model || '-'} | source: ${ocr.source || '-'}</p>
+            <p>timings ms: ocr=${timings.ocr ?? '-'}, check=${timings.text_check ?? '-'}, total=${timings.total ?? '-'}</p>
+            <p>usage: ${Object.keys(usage).length ? Object.entries(usage).map(([k, v]) => `${k}=${v}`).join(', ') : 'n/a'}</p>
+        </div>
+    `;
+}
+
+async function runStandardCheckForImageText(text, sourceUrl = '', ocr = null) {
+    const response = await fetch(`${API_BASE}/api/check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+    });
+    const data = await response.json();
+    if (!data.success) throw new Error(data.error || 'Text check failed');
+
+    const result = data.result;
+    result.source_url = sourceUrl || '';
+    result.source_type = 'image';
+    result.extracted_text = text;
+    if (ocr) result.ocr = ocr;
+
+    currentResults.images = result;
+    displayResults('images', result, result.source_url || '');
+    const resultsContent = document.getElementById('imagesResultsContent');
+    appendImageOcrSummary(result.ocr, resultsContent);
+}
+
+async function scrapTextFromImageAndCheck() {
+    const extractedTextArea = document.getElementById('imagesInput');
+    const payload = await buildImagesPayload();
+    if (!payload) return;
+
+    showLoading();
+    try {
+        const response = await fetch(`${API_BASE}/api/images/ocr`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'OCR failed');
+
+        const extractedText = (data.extracted_text || '').trim();
+        if (!extractedText) throw new Error('OCR returned empty text');
+        if (extractedTextArea) extractedTextArea.value = extractedText;
+
+        await runStandardCheckForImageText(extractedText, data.source_url || '', data.ocr || null);
+    } catch (e) {
+        alert('Image scrape error: ' + e.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function checkExtractedImageText() {
+    const extractedTextArea = document.getElementById('imagesInput');
+    const text = extractedTextArea ? extractedTextArea.value.trim() : '';
+    if (!text) {
+        alert('No extracted text to check');
+        return;
+    }
+
+    const ocr = currentResults.images && currentResults.images.ocr ? currentResults.images.ocr : null;
+    const sourceUrl = currentResults.images && currentResults.images.source_url ? currentResults.images.source_url : '';
+    showLoading();
+    try {
+        await runStandardCheckForImageText(text, sourceUrl, ocr);
+    } catch (e) {
+        alert('Text check error: ' + e.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function checkImagesByDatabase() {
+    const payload = await buildImagesPayload();
+    if (!payload) return;
+    const extractedTextArea = document.getElementById('imagesInput');
+
     showLoading();
     try {
         const response = await fetch(`${API_BASE}/api/images/check`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
-            body: JSON.stringify({
-                provider,
-                model,
-                image_url: imageUrl || null,
-                image_data_url: imageDataUrl || null
-            })
+            body: JSON.stringify(payload)
         });
         const data = await response.json();
-        if (!data.success) throw new Error(data.error || 'OCR failed');
+        if (!data.success) throw new Error(data.error || 'OCR + check failed');
 
         currentResults.images = data.result;
         if (extractedTextArea) extractedTextArea.value = data.result.extracted_text || '';
-
         displayResults('images', data.result, data.result.source_url || '');
-
         const resultsContent = document.getElementById('imagesResultsContent');
-        const ocr = data.result.ocr || {};
-        const timings = ocr.timings_ms || {};
-        const usage = ocr.usage || {};
-        if (resultsContent) {
-            resultsContent.innerHTML += `
-                <div class="image-db-summary">
-                    <h4>OCR log</h4>
-                    <p>provider: ${ocr.provider || '-'} | model: ${ocr.model || '-'} | source: ${ocr.source || '-'}</p>
-                    <p>timings ms: ocr=${timings.ocr ?? '-'}, check=${timings.text_check ?? '-'}, total=${timings.total ?? '-'}</p>
-                    <p>usage: ${Object.keys(usage).length ? Object.entries(usage).map(([k, v]) => `${k}=${v}`).join(', ') : 'n/a'}</p>
-                </div>
-            `;
-        }
+        appendImageOcrSummary(data.result.ocr, resultsContent);
     } catch (e) {
         alert('Image check error: ' + e.message);
     } finally {

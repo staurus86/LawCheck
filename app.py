@@ -496,6 +496,63 @@ def image_api_token():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/images/ocr', methods=['POST'])
+def image_ocr():
+    try:
+        started_at = time.perf_counter()
+        data = request.get_json(silent=True) or {}
+        provider = (data.get('provider') or session.get('images_provider') or 'openai').strip().lower()
+        model = (data.get('model') or '').strip()
+        image_url = (data.get('image_url') or '').strip()
+        image_data_url = (data.get('image_data_url') or '').strip()
+
+        if provider not in ('openai', 'google', 'ocrspace'):
+            return jsonify({'error': 'Unsupported provider'}), 400
+
+        token = (session.get('image_api_tokens', {}).get(provider) or '').strip()
+        if not token:
+            return jsonify({'error': f'Set API token first for provider={provider}'}), 401
+        if not image_url and not image_data_url:
+            return jsonify({'error': 'Pass image_url or image_data_url'}), 400
+
+        ocr_started = time.perf_counter()
+        if provider == 'openai':
+            extracted_text, raw_response = _ocr_openai(token, model, image_url=image_url, image_data_url=image_data_url)
+        elif provider == 'google':
+            extracted_text, raw_response = _ocr_google(token, model, image_url=image_url, image_data_url=image_data_url)
+        else:
+            extracted_text, raw_response = _ocr_ocrspace(token, model, image_url=image_url, image_data_url=image_data_url)
+        ocr_elapsed_ms = round((time.perf_counter() - ocr_started) * 1000, 2)
+
+        if not extracted_text.strip():
+            return jsonify({'error': 'OCR returned empty text'}), 422
+
+        resolved_model = model or ('gpt-4.1-mini' if provider == 'openai' else 'DOCUMENT_TEXT_DETECTION' if provider == 'google' else 'rus')
+        ocr_payload = {
+            'provider': provider,
+            'model': resolved_model,
+            'source': image_url if image_url else 'uploaded_file',
+            'text_length': len(extracted_text),
+            'timings_ms': {
+                'ocr': ocr_elapsed_ms,
+                'total': round((time.perf_counter() - started_at) * 1000, 2)
+            },
+            'usage': _extract_ocr_usage(provider, raw_response),
+            'raw_preview': str(raw_response)[:1500]
+        }
+
+        return jsonify({
+            'success': True,
+            'provider': provider,
+            'source_url': image_url,
+            'extracted_text': extracted_text,
+            'ocr': ocr_payload,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/images/check', methods=['POST'])
 def check_images():
     try:
