@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🇷🇺 LawChecker Online - Проверка текста на соответствие ФЗ №168</title>
+    <title>🇷🇺 Проверка текста на соответствие федеральному закону №168</title>
     <meta name="description" content="Онлайн проверка текста и сайтов на соответствие Федеральному закону №168-ФЗ о русском языке">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,14 +19,14 @@
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <a href="/" class="logo" aria-label="На главную LawChecker">
+                <a href="/" class="logo" aria-label="На главную">
                     <span class="logo-icon">🇷🇺</span>
-                    <span class="logo-text">LawChecker <span class="logo-badge">Online</span></span>
+                    <span class="logo-text">Проверка текста <span class="logo-badge">онлайн</span></span>
                 </a>
 					<nav class="nav">
 						<a href="/" class="nav-link active">Проверка</a>
 						<a href="/about" class="nav-link">О сервисе</a>
-						<a href="/api-docs" class="nav-link">API</a>
+						<a href="/api-docs" class="nav-link">Документация</a>
 						<a href="/examples" class="nav-link">Примеры</a>
 						<a href="/payment" class="nav-link">Тарифы</a>
 						<a href="/api/stats" class="nav-link" target="_blank">Статистика</a>
@@ -38,8 +38,8 @@
     <!-- Hero Section -->
     <section class="hero">
         <div class="container">
-            <h1 class="hero-title">Проверка текста на соответствие ФЗ №168</h1>
-            <p class="hero-subtitle">Профессиональная онлайн проверка текстов и веб-сайтов на соответствие<br>Федеральному закону о русском языке</p>
+            <h1 class="hero-title">Проверка текста на соответствие федеральному закону №168</h1>
+            <p class="hero-subtitle">Профессиональная онлайн проверка текстов и сайтов на соответствие<br>Федеральному закону о русском языке</p>
             
             <!-- Stats Cards -->
             <div class="stats-cards" id="statsCards">
@@ -100,7 +100,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h2>Введите текст для проверки</h2>
-                        <p class="text-muted">Вставьте текст или введите вручную. Поддерживается Ctrl+C/V</p>
+                        <p class="text-muted">Вставьте текст или введите вручную.</p>
                     </div>
                     <div class="card-body">
                         <textarea 
@@ -109,7 +109,7 @@
                             placeholder="Вставьте ваш текст сюда..."
                             rows="12"
                         ></textarea>
-                        <div class="field-meta" id="textInputMeta">0 chars | 0 words</div>
+                        <div class="field-meta" id="textInputMeta">0 символов | 0 слов</div>
                         
                         <div class="btn-group">
                             <button class="btn btn-primary" onclick="checkText()">
@@ -153,8 +153,8 @@
             <div class="tab-content" id="url-tab">
                 <div class="card">
                     <div class="card-header">
-                        <h2>Проверка веб-сайта</h2>
-                        <p class="text-muted">Введите URL сайта для проверки его содержимого</p>
+                        <h2>Проверка сайта</h2>
+                        <p class="text-muted">Введите адрес сайта для проверки его содержимого</p>
                     </div>
                     <div class="card-body">
                         <div class="url-input-group">
@@ -202,7 +202,7 @@
             <div class="tab-content" id="batch-tab">
                 <div class="card">
                     <div class="card-header">
-                        <h2>Пакетная проверка списка URL</h2>
+                        <h2>Пакетная проверка списка ссылок</h2>
                         <p class="text-muted">Проверьте несколько сайтов одновременно</p>
                     </div>
                     <div class="card-body">
@@ -211,7 +211,7 @@
                             <div>
                                 <strong>Как использовать:</strong>
                                 <ul>
-                                    <li>Введите список URL (по одному на строке)</li>
+                                    <li>Введите список ссылок (по одной на строке)</li>
                                     <li>Нажмите "Проверить все"</li>
                                     <li>Дождитесь завершения проверки</li>
                                 </ul>
@@ -224,7 +224,7 @@
                             placeholder="https://example1.com&#10;https://example2.com&#10;https://example3.com"
                             rows="10"
                         ></textarea>
-                        <div class="field-meta" id="batchInputMeta">0 URLs (0 unique)</div>
+                        <div class="field-meta" id="batchInputMeta">0 ссылок (0 уникальных)</div>
                         
                         <button class="btn btn-primary" onclick="checkBatch()">
                             <i class="fas fa-list-check"></i>
@@ -245,7 +245,7 @@
                         <div class="btn-group">
                             <button class="btn btn-info" onclick="deepCheckBatch()">
                                 <i class="fas fa-microscope"></i>
-                                Глубокая проверка всех URL
+                                Глубокая проверка всех ссылок
                             </button>
                             <button class="btn btn-sm btn-success" onclick="exportReport('batch')">
                                 <i class="fas fa-download"></i>
@@ -308,21 +308,21 @@
             <div class="tab-content" id="images-tab">
                 <div class="card">
                     <div class="card-header">
-                        <h2>Images OCR + text check</h2>
-                        <p class="text-muted">Choose provider, model preset, token, then URL or file.</p>
+                        <h2>Распознавание текста на изображении и проверка</h2>
+                        <p class="text-muted">Выберите провайдера, модель и токен, затем укажите ссылку на изображение или загрузите файл.</p>
                     </div>
                     <div class="card-body">
                         <div class="images-config-grid">
                             <div>
-                                <label class="text-muted" for="imagesProviderSelect">OCR provider</label>
+                                <label class="text-muted" for="imagesProviderSelect">Провайдер распознавания</label>
                                 <select id="imagesProviderSelect" class="form-input" onchange="onImagesProviderChange()">
-                                    <option value="openai">OpenAI</option>
-                                    <option value="google">Google Vision</option>
-                                    <option value="ocrspace">OCR.Space</option>
+                                    <option value="openai">ОпенАИ</option>
+                                    <option value="google">Гугл Вижн</option>
+                                    <option value="ocrspace">ОСР Спейс</option>
                                 </select>
                             </div>
                             <div>
-                                <label class="text-muted" for="imagesModelPresetSelect">Model preset</label>
+                                <label class="text-muted" for="imagesModelPresetSelect">Готовая модель</label>
                                 <select id="imagesModelPresetSelect" class="form-input" onchange="onImagesModelPresetChange()"></select>
                             </div>
                         </div>
@@ -330,72 +330,72 @@
                         <form id="imagesTokenForm" onsubmit="event.preventDefault(); saveImageApiToken();">
                             <div class="images-config-grid">
                                 <div>
-                                    <label class="text-muted" for="imagesModelInput">Custom model (optional)</label>
+                                    <label class="text-muted" for="imagesModelInput">Пользовательская модель (необязательно)</label>
                                     <input type="text" id="imagesModelInput" class="form-input" placeholder="Кастомная модель (опц.)">
                                 </div>
                                 <div>
-                                    <label class="text-muted" for="imagesTokenInput">API token</label>
-                                    <input type="password" id="imagesTokenInput" class="form-input" placeholder="API токен провайдера" autocomplete="new-password">
+                                    <label class="text-muted" for="imagesTokenInput">Токен доступа</label>
+                                    <input type="password" id="imagesTokenInput" class="form-input" placeholder="Токен провайдера" autocomplete="new-password">
                                 </div>
                             </div>
 
                             <div class="images-token-row">
                                 <button type="submit" class="btn btn-secondary">
                                     <i class="fas fa-key"></i>
-                                    Save token
+                                    Сохранить токен
                                 </button>
                                 <span id="imagesTokenStatus" class="images-token-status"></span>
                             </div>
                         </form>
 
-                        <label class="text-muted" for="imagesUrlInput">Image URL (optional)</label>
-                        <input type="url" id="imagesUrlInput" class="form-input" placeholder="URL изображения">
+                        <label class="text-muted" for="imagesUrlInput">Ссылка на изображение (необязательно)</label>
+                        <input type="url" id="imagesUrlInput" class="form-input" placeholder="Ссылка на изображение">
 
-                        <label class="text-muted" for="imagesFileInput">Or upload file (jpg/png/webp, max 8MB)</label>
+                        <label class="text-muted" for="imagesFileInput">Или загрузите файл изображения (до 8 МБ)</label>
                         <input type="file" id="imagesFileInput" class="form-input" accept="image/png,image/jpeg,image/webp">
 
-                        <textarea id="imagesInput" class="form-textarea" placeholder="Извлеченный OCR-текст" rows="10"></textarea>
-                        <div class="field-meta" id="imagesInputMeta">0 chars | 0 words</div>
+                        <textarea id="imagesInput" class="form-textarea" placeholder="Извлеченный текст" rows="10"></textarea>
+                        <div class="field-meta" id="imagesInputMeta">0 символов | 0 слов</div>
 
                         <div class="btn-group">
                             <button class="btn btn-primary" onclick="checkImagesByDatabase()">
                                 <i class="fas fa-database"></i>
-                                OCR + check
+                                Распознать и проверить
                             </button>
                             <button class="btn btn-secondary" onclick="scrapTextFromImageAndCheck()">
                                 <i class="fas fa-file-alt"></i>
-                                Scrap Text from IMG
+                                Извлечь текст с изображения
                             </button>
                             <button class="btn btn-info" onclick="checkExtractedImageText()">
                                 <i class="fas fa-spell-check"></i>
-                                Check extracted text
+                                Проверить извлеченный текст
                             </button>
                             <button class="btn btn-secondary" onclick="copyExtractedImageText()">
                                 <i class="fas fa-copy"></i>
-                                Copy extracted text
+                                Скопировать извлеченный текст
                             </button>
                             <button class="btn btn-secondary" onclick="clearImageInputs()">
                                 <i class="fas fa-eraser"></i>
-                                Clear image fields
+                                Очистить поля изображения
                             </button>
                         </div>
 
                         <div class="images-batch-section">
-                            <h3>Batch image URLs</h3>
-                            <p class="text-muted">One image URL per line. Images are processed in queue with delay.</p>
-                            <textarea id="imagesBatchInput" class="form-textarea" placeholder="URL картинок, по одной строке" rows="8"></textarea>
-                            <div class="field-meta" id="imagesBatchInputMeta">0 image URLs (0 unique)</div>
+                            <h3>Пакет изображений по ссылкам</h3>
+                            <p class="text-muted">Одна ссылка на изображение в строке. Обработка идет по очереди с задержкой.</p>
+                            <textarea id="imagesBatchInput" class="form-textarea" placeholder="Ссылки на изображения, по одной строке" rows="8"></textarea>
+                            <div class="field-meta" id="imagesBatchInputMeta">0 ссылок на изображения (0 уникальных)</div>
 
                             <div class="images-config-grid">
                                 <div>
-                                    <label class="text-muted" for="imagesBatchDelayMs">Delay between requests (ms)</label>
+                                    <label class="text-muted" for="imagesBatchDelayMs">Задержка между запросами (мс)</label>
                                     <input type="number" id="imagesBatchDelayMs" class="form-input" min="0" step="100" value="400">
                                 </div>
                             </div>
 
                             <button class="btn btn-primary" onclick="checkImagesBatchQueue()">
                                 <i class="fas fa-list-check"></i>
-                                Batch OCR + check
+                                Пакетное распознавание и проверка
                             </button>
 
                             <div class="progress" id="imagesBatchProgress" style="display: none;">
@@ -408,15 +408,15 @@
 
                 <div class="card results-card" id="imagesResults" style="display: none;">
                     <div class="card-header">
-                        <h2>Image check results</h2>
+                        <h2>Результаты проверки изображения</h2>
                         <div class="btn-group">
                             <button class="btn btn-info" onclick="deepCheck('images')">
                                 <i class="fas fa-microscope"></i>
-                                Deep check
+                                Глубокая проверка
                             </button>
                             <button class="btn btn-sm btn-success" onclick="exportReport('images')">
                                 <i class="fas fa-download"></i>
-                                Export
+                                Скачать отчет
                             </button>
                         </div>
                     </div>
@@ -427,7 +427,7 @@
 
                 <div class="card results-card" id="imagesBatchResults" style="display: none;">
                     <div class="card-header">
-                        <h2>Image batch results</h2>
+                        <h2>Результаты пакетной проверки изображений</h2>
                     </div>
                     <div class="card-body">
                         <div id="imagesBatchResultsContent"></div>
@@ -438,50 +438,50 @@
             <div class="tab-content" id="multiscan-tab">
                 <div class="card">
                     <div class="card-header">
-                        <h2>MultiScan Site</h2>
-                        <p class="text-muted">Scan pages, images, and PDFs from one site or URL list.</p>
+                        <h2>Мульти-скан сайта</h2>
+                        <p class="text-muted">Проверка страниц, изображений и документов с одного сайта или списка ссылок.</p>
                     </div>
                     <div class="card-body">
                         <div class="images-config-grid">
                             <div>
-                                <label class="text-muted" for="multiModeSelect">Mode</label>
+                                <label class="text-muted" for="multiModeSelect">Режим</label>
                                 <select id="multiModeSelect" class="form-input" onchange="onMultiModeChange()">
-                                    <option value="site">Scan site URL</option>
-                                    <option value="urls">Scan URL list</option>
+                                    <option value="site">Сканировать сайт по ссылке</option>
+                                    <option value="urls">Сканировать список ссылок</option>
                                 </select>
                             </div>
                             <div>
-                                <label class="text-muted" for="multiSiteUrlInput">Site URL</label>
-                                <input type="url" id="multiSiteUrlInput" class="form-input" placeholder="URL сайта">
+                                <label class="text-muted" for="multiSiteUrlInput">Ссылка на сайт</label>
+                                <input type="url" id="multiSiteUrlInput" class="form-input" placeholder="Ссылка на сайт">
                             </div>
                         </div>
 
-                        <label class="text-muted" for="multiUrlsInput">URL list (page/image/pdf), one per line</label>
-                        <textarea id="multiUrlsInput" class="form-textarea" placeholder="URL страниц/картинок/PDF, по одной строке" rows="8"></textarea>
-                        <div class="field-meta" id="multiUrlsInputMeta">0 URLs (0 unique)</div>
+                        <label class="text-muted" for="multiUrlsInput">Список ссылок (страница/изображение/документ), по одной на строке</label>
+                        <textarea id="multiUrlsInput" class="form-textarea" placeholder="Ссылки на страницы, изображения и документы, по одной строке" rows="8"></textarea>
+                        <div class="field-meta" id="multiUrlsInputMeta">0 ссылок (0 уникальных)</div>
 
                         <div class="images-config-grid">
                             <div>
-                                <label class="text-muted" for="multiUrlsFileInput">Load URLs from TXT/CSV</label>
+                                <label class="text-muted" for="multiUrlsFileInput">Загрузить ссылки из файла</label>
                                 <input type="file" id="multiUrlsFileInput" class="form-input" accept=".txt,.csv,text/plain,text/csv" onchange="loadMultiUrlsFromFile(event)">
                             </div>
                             <div>
-                                <label class="text-muted" for="multiDelayMsInput">Delay between requests (ms)</label>
+                                <label class="text-muted" for="multiDelayMsInput">Задержка между запросами (мс)</label>
                                 <input type="number" id="multiDelayMsInput" class="form-input" min="0" max="10000" step="50" value="150">
                             </div>
                         </div>
 
                         <div class="images-config-grid">
                             <div>
-                                <label class="text-muted" for="multiProviderSelect">OCR provider</label>
+                                <label class="text-muted" for="multiProviderSelect">Провайдер распознавания</label>
                                 <select id="multiProviderSelect" class="form-input" onchange="onMultiProviderChange()">
-                                    <option value="openai">OpenAI</option>
-                                    <option value="google">Google Vision</option>
-                                    <option value="ocrspace">OCR.Space</option>
+                                    <option value="openai">ОпенАИ</option>
+                                    <option value="google">Гугл Вижн</option>
+                                    <option value="ocrspace">ОСР Спейс</option>
                                 </select>
                             </div>
                             <div>
-                                <label class="text-muted" for="multiModelPresetSelect">Model preset</label>
+                                <label class="text-muted" for="multiModelPresetSelect">Готовая модель</label>
                                 <select id="multiModelPresetSelect" class="form-input" onchange="onMultiModelPresetChange()"></select>
                             </div>
                         </div>
@@ -489,18 +489,18 @@
                         <form id="multiTokenForm" onsubmit="event.preventDefault(); saveMultiApiToken();">
                             <div class="images-config-grid">
                                 <div>
-                                    <label class="text-muted" for="multiModelInput">Custom model (optional)</label>
+                                    <label class="text-muted" for="multiModelInput">Пользовательская модель (необязательно)</label>
                                     <input type="text" id="multiModelInput" class="form-input" placeholder="Кастомная модель (опц.)">
                                 </div>
                                 <div>
-                                    <label class="text-muted" for="multiTokenInput">API token</label>
-                                    <input type="password" id="multiTokenInput" class="form-input" placeholder="API токен провайдера" autocomplete="new-password">
+                                    <label class="text-muted" for="multiTokenInput">Токен доступа</label>
+                                    <input type="password" id="multiTokenInput" class="form-input" placeholder="Токен провайдера" autocomplete="new-password">
                                 </div>
                             </div>
                             <div class="images-token-row">
                                 <button type="submit" class="btn btn-secondary">
                                     <i class="fas fa-key"></i>
-                                    Save token
+                                    Сохранить токен
                                 </button>
                                 <span id="multiTokenStatus" class="images-token-status"></span>
                             </div>
@@ -508,25 +508,25 @@
 
                         <div class="images-config-grid">
                             <div>
-                                <label class="text-muted" for="multiMaxUrlsInput">Max URLs total (1-2000)</label>
+                                <label class="text-muted" for="multiMaxUrlsInput">Максимум ссылок всего (1-2000)</label>
                                 <input type="number" id="multiMaxUrlsInput" class="form-input" min="1" max="2000" step="50" value="500">
                             </div>
                             <div>
-                                <label class="text-muted" for="multiMaxPagesInput">Max pages crawl (site mode)</label>
+                                <label class="text-muted" for="multiMaxPagesInput">Максимум страниц обхода (режим сайта)</label>
                                 <input type="number" id="multiMaxPagesInput" class="form-input" min="1" max="2000" step="50" value="500">
                             </div>
                         </div>
 
                         <div class="images-config-grid">
                             <div>
-                                <label class="text-muted" for="multiMaxResourcesInput">Max discovered resources</label>
+                                <label class="text-muted" for="multiMaxResourcesInput">Максимум найденных ресурсов</label>
                                 <input type="number" id="multiMaxResourcesInput" class="form-input" min="1" max="8000" step="100" value="2500">
                             </div>
                             <div>
-                                <label class="text-muted" for="multiIncludeExternal">Include external domains</label>
+                                <label class="text-muted" for="multiIncludeExternal">Включать внешние домены</label>
                                 <select id="multiIncludeExternal" class="form-input">
-                                    <option value="false">No (same domain only)</option>
-                                    <option value="true">Yes</option>
+                                    <option value="false">Нет (только один домен)</option>
+                                    <option value="true">Да</option>
                                 </select>
                             </div>
                         </div>
@@ -534,32 +534,32 @@
                         <div class="btn-group">
                             <button class="btn btn-primary" onclick="runMultiScan()">
                                 <i class="fas fa-layer-group"></i>
-                                Run MultiScan
+                                Запустить мульти-скан
                             </button>
                             <button class="btn btn-secondary" onclick="clearMultiScanInputs()">
                                 <i class="fas fa-eraser"></i>
-                                Clear fields
+                                Очистить поля
                             </button>
                         </div>
 
                         <div class="progress" id="multiProgress" style="display: none;">
                             <div class="progress-bar" id="multiProgressBar"></div>
-                            <span class="progress-text" id="multiProgressText">Processing...</span>
+                            <span class="progress-text" id="multiProgressText">Обработка...</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="card results-card" id="multiResults" style="display: none;">
                     <div class="card-header">
-                        <h2>MultiScan results</h2>
+                        <h2>Результаты мульти-скана</h2>
                         <div class="btn-group">
                             <button class="btn btn-info" onclick="deepCheckMultiScan()">
                                 <i class="fas fa-microscope"></i>
-                                Deep check
+                                Глубокая проверка
                             </button>
                             <button class="btn btn-sm btn-success" onclick="exportReport('multi')">
                                 <i class="fas fa-download"></i>
-                                Export
+                                Скачать отчет
                             </button>
                         </div>
                     </div>
@@ -585,7 +585,7 @@
                             <ul class="feature-list">
                                 <li>Проверяйте тексты до публикации, а не после жалоб.</li>
                                 <li>Фиксируйте внутренние правила редактуры для команды.</li>
-                                <li>Проводите повторную проверку после правок и OCR.</li>
+                                <li>Проводите повторную проверку после правок и распознавания текста.</li>
                             </ul>
                         </article>
 
@@ -603,7 +603,7 @@
                                 </li>
                                 <li>
                                     <h4>Отчеты</h4>
-                                    <p>Экспорт обычного или deep-отчета для редактора и согласования.</p>
+                                    <p>Экспорт обычного или расширенного отчета для редактора и согласования.</p>
                                 </li>
                             </ol>
                         </article>
@@ -612,12 +612,12 @@
                             <h3>Практические примеры</h3>
                             <p>Где это полезно в реальной работе:</p>
                             <div class="chip-row">
-                                <span class="word-tag">Лендинги и промо-страницы</span>
-                                <span class="word-tag">Карточки товаров и маркетплейсы</span>
+                                <span class="word-tag">Посадочные и рекламные страницы</span>
+                                <span class="word-tag">Карточки товаров и торговые площадки</span>
                                 <span class="word-tag">Новостные и редакционные тексты</span>
                                 <span class="word-tag">Креативы и рекламные баннеры</span>
-                                <span class="word-tag">PDF-документы и презентации</span>
-                                <span class="word-tag">Изображения с текстом (OCR)</span>
+                                <span class="word-tag">Документы и презентации</span>
+                                <span class="word-tag">Изображения с текстом</span>
                             </div>
                             <div class="btn-group">
                                 <a class="btn btn-info" href="/examples">Открыть примеры</a>
@@ -629,16 +629,16 @@
                     <div class="faq-box">
                         <h3>Частые вопросы</h3>
                         <details>
-                            <summary>Почему после OCR нужен отдельный контроль текста?</summary>
-                            <p>OCR может вносить ошибки распознавания. Поэтому после извлечения текст всегда стоит прогонять через стандартную и глубокую проверку.</p>
+                            <summary>Почему после распознавания нужен отдельный контроль текста?</summary>
+                            <p>Распознавание может вносить ошибки. Поэтому после извлечения текст всегда стоит прогонять через стандартную и глубокую проверку.</p>
                         </details>
                         <details>
-                            <summary>Что выбрать: обычную проверку или MultiScan?</summary>
-                            <p>Если у вас один текст или один URL, быстрее обычная проверка. Для сайта целиком, списка URL, PDF и картинок используйте MultiScan.</p>
+                            <summary>Что выбрать: обычную проверку или мульти-скан?</summary>
+                            <p>Если у вас один текст или одна ссылка, быстрее обычная проверка. Для сайта целиком, списка ссылок, документов и картинок используйте мульти-скан.</p>
                         </details>
                         <details>
-                            <summary>Когда запускать deep-check?</summary>
-                            <p>Запускайте deep-check, когда есть найденные спорные слова и нужен уточненный отчет для правок и согласования внутри команды.</p>
+                            <summary>Когда запускать глубокую проверку?</summary>
+                            <p>Запускайте глубокую проверку, когда есть спорные слова и нужен уточненный отчет для правок и согласования в команде.</p>
                         </details>
                     </div>
                 </div>
@@ -653,18 +653,18 @@
                     <div class="audience-grid">
                         <article class="audience-card">
                             <h3>Маркетинг и реклама</h3>
-                            <p>Лендинги, баннеры, карточки товаров, объявления и тексты рассылок.</p>
+                            <p>Посадочные страницы, баннеры, карточки товаров, объявления и тексты рассылок.</p>
                         </article>
                         <article class="audience-card">
                             <h3>Редакция и контент</h3>
-                            <p>Статьи, новости, пресс-релизы, сценарии роликов и SMM-посты.</p>
+                            <p>Статьи, новости, официальные сообщения, сценарии роликов и публикации в соцсетях.</p>
                         </article>
                         <article class="audience-card">
-                            <h3>E-commerce и каталоги</h3>
-                            <p>Каталоги, фильтры, описания категорий, карточки товаров и PDF-материалы.</p>
+                            <h3>Интернет-торговля и каталоги</h3>
+                            <p>Каталоги, фильтры, описания категорий, карточки товаров и материалы в документах.</p>
                         </article>
                         <article class="audience-card">
-                            <h3>Агентства и аутсорс</h3>
+                            <h3>Агентства и внешние команды</h3>
                             <p>Пакетная проверка клиентских сайтов, изображений и документов перед сдачей.</p>
                         </article>
                     </div>
@@ -673,11 +673,11 @@
                         <h3>Поддерживаемые источники проверки</h3>
                         <div class="chip-row">
                             <span class="word-tag">Текстовый ввод</span>
-                            <span class="word-tag">URL страницы</span>
-                            <span class="word-tag">Список URL (batch)</span>
-                            <span class="word-tag">Изображения (OCR)</span>
-                            <span class="word-tag">PDF в MultiScan</span>
-                            <span class="word-tag">TXT/CSV для мульти-очереди</span>
+                            <span class="word-tag">Ссылка на страницу</span>
+                            <span class="word-tag">Список ссылок</span>
+                            <span class="word-tag">Изображения с текстом</span>
+                            <span class="word-tag">Документы в мульти-скане</span>
+                            <span class="word-tag">Загрузка ссылок из файла</span>
                         </div>
                     </div>
 
@@ -685,17 +685,17 @@
                         <article class="workflow-step">
                             <span class="workflow-num">1</span>
                             <h3>Проверка</h3>
-                            <p>Запустите текст, URL или MultiScan по сайту/списку ссылок.</p>
+                            <p>Запустите проверку текста, ссылки или мульти-скан по сайту/списку ссылок.</p>
                         </article>
                         <article class="workflow-step">
                             <span class="workflow-num">2</span>
                             <h3>Уточнение</h3>
-                            <p>Сделайте Deep check по спорным словам для точного отчета.</p>
+                            <p>Сделайте глубокую проверку по спорным словам для точного отчета.</p>
                         </article>
                         <article class="workflow-step">
                             <span class="workflow-num">3</span>
                             <h3>Исправление</h3>
-                            <p>Внесите правки в текст, подписи на изображениях и PDF.</p>
+                            <p>Внесите правки в текст, подписи на изображениях и документы.</p>
                         </article>
                         <article class="workflow-step">
                             <span class="workflow-num">4</span>
@@ -734,14 +734,14 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-section">
-                    <h3>LawChecker Online</h3>
-                    <p>Профессиональная проверка текстов на соответствие ФЗ №168 о русском языке</p>
+                    <h3>Сервис проверки текста</h3>
+                    <p>Профессиональная проверка текстов на соответствие федеральному закону №168 о русском языке</p>
                 </div>
                 <div class="footer-section">
                     <h3>Ссылки</h3>
                     <ul>
                         <li><a href="/">Проверка</a></li>
-                        <li><a href="/api-docs">API</a></li>
+                        <li><a href="/api-docs">Документация</a></li>
                         <li><a href="/examples">Примеры</a></li>
                         <li><a href="/payment">Тарифы</a></li>
                         <li><a href="/about">О сервисе</a></li>
@@ -749,7 +749,7 @@
                 </div>
                 <div class="footer-section">
                     <h3>Контакты</h3>
-                    <p>© 2026 LawChecker</p>
+                    <p>© 2026 Сервис проверки текста</p>
                     <p>Все права защищены</p>
                     <p><a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer">Поддержать проект</a></p>
                 </div>
