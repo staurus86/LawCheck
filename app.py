@@ -616,7 +616,7 @@ def check_text():
     """API: Проверка текста"""
     try:
         started_at = time.perf_counter()
-        data = request.json
+        data = request.get_json(silent=True) or {}
         text = data.get('text', '')
         save_history = data.get('save_history', True)
         
@@ -678,7 +678,7 @@ def check_url():
     """API: Проверка URL"""
     try:
         started_at = time.perf_counter()
-        data = request.json
+        data = request.get_json(silent=True) or {}
         url = data.get('url', '')
         
         if not url or not url.startswith('http'):
@@ -717,6 +717,20 @@ def check_url():
             items_total=1,
             items_error=0,
             violations_total=result.get('violations_count', 0)
+        )
+        insert_run_history(
+            check_type='url',
+            endpoint='/api/check-url',
+            success=True,
+            duration_ms=duration_ms,
+            source_type='url',
+            context_short=url[:255],
+            violations_count=result.get('violations_count', 0)
+        )
+        upsert_violation_words(
+            (result.get('latin_words') or [])
+            + (result.get('unknown_cyrillic') or [])
+            + (result.get('nenormative_words') or [])
         )
         
         return jsonify({
@@ -835,7 +849,7 @@ def batch_check():
 def deep_check():
     """API: Глубокая проверка слов с использованием морфологии и speller"""
     try:
-        data = request.json
+        data = request.get_json(silent=True) or {}
         words = data.get('words', [])
         
         if not words:
@@ -1062,7 +1076,7 @@ def get_run_history():
 def check_word():
     """API: Проверка одного слова"""
     try:
-        data = request.json
+        data = request.get_json(silent=True) or {}
         word = data.get('word', '').strip()
         
         if not word:
