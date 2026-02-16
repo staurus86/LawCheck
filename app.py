@@ -92,6 +92,12 @@ def api_docs():
 def examples():
     """Примеры использования"""
     return render_template('examples.html')
+
+@app.route('/payment')
+def payment():
+    """Страница тарифов/оплаты"""
+    tariff = (request.args.get('tariff') or 'symbols-20000').strip()
+    return render_template('payment.html', selected_tariff=tariff)
     
 @app.route('/robots.txt')
 def robots():

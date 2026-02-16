@@ -19,6 +19,7 @@
                     <a href="/about" class="nav-link">О сервисе</a>
                     <a href="/api-docs" class="nav-link active">API</a>
                     <a href="/examples" class="nav-link">Примеры</a>
+                    <a href="/payment" class="nav-link">Тарифы</a>
                     <a href="/api/stats" class="nav-link" target="_blank">Статистика</a>
                 </nav>
             </div>
@@ -45,6 +46,22 @@
                 <div class="card-body content-page">
                     <p class="text-muted">Базовый адрес: <code>https://lawcheck-production.up.railway.app</code></p>
 
+                    <h2>Quick Start (3 шага)</h2>
+                    <ol class="step-list">
+                        <li>
+                            <h2>Получите токен OCR</h2>
+                            <p>Во вкладке «Картинка» или «Мульти-скан» выберите провайдера и сохраните API token.</p>
+                        </li>
+                        <li>
+                            <h2>Сделайте запрос</h2>
+                            <p>Для текста используйте <code>POST /api/check</code>, для больших задач — <code>/api/multiscan/run</code>.</p>
+                        </li>
+                        <li>
+                            <h2>Сохраните отчёт</h2>
+                            <p>В UI доступны экспорт обычного и deep-отчёта. Через API — endpoints <code>/api/export/*</code>.</p>
+                        </li>
+                    </ol>
+
                     <h2>Основные методы</h2>
                     <ul class="feature-list">
                         <li><code>POST /api/check</code> — проверка текста.</li>
@@ -61,6 +78,15 @@
   -H "Content-Type: application/json" \
   -d "{\"text\":\"Пример текста для проверки\"}"</pre>
 
+                    <h2>JavaScript (fetch)</h2>
+                    <pre class="api-code">const resp = await fetch("https://lawcheck-production.up.railway.app/api/check", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ text: "Пример текста" })
+});
+const data = await resp.json();
+console.log(data);</pre>
+
                     <h2>Экспорт отчетов</h2>
                     <ul class="feature-list">
                         <li><code>POST /api/export/txt</code> — отчет по одиночной проверке.</li>
@@ -68,12 +94,58 @@
                         <li><code>POST /api/export/multiscan-txt</code> — отчет MultiScan.</li>
                     </ul>
 
+                    <h2>Лимиты и стабильность</h2>
+                    <ul class="feature-list">
+                        <li>Используйте задержку <code>delay_ms</code> для очередей URL.</li>
+                        <li>Для больших задач (100/500/2000 URL) задавайте адекватные <code>max_urls</code>, <code>max_pages</code>, <code>max_resources</code>.</li>
+                        <li>Пакетная обработка безопаснее, чем один большой запрос без лимитов.</li>
+                    </ul>
+
+                    <h2>Коды ответов</h2>
+                    <table class="simple-table">
+                        <thead>
+                            <tr>
+                                <th>Код</th>
+                                <th>Значение</th>
+                                <th>Что делать</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>200</td>
+                                <td>Успешно</td>
+                                <td>Обработать результат</td>
+                            </tr>
+                            <tr>
+                                <td>400</td>
+                                <td>Некорректный запрос</td>
+                                <td>Проверить поля/формат данных</td>
+                            </tr>
+                            <tr>
+                                <td>401</td>
+                                <td>Нет токена</td>
+                                <td>Сохранить token для OCR-провайдера</td>
+                            </tr>
+                            <tr>
+                                <td>429</td>
+                                <td>Слишком много запросов</td>
+                                <td>Увеличить delay и уменьшить параллельность</td>
+                            </tr>
+                            <tr>
+                                <td>500</td>
+                                <td>Ошибка сервера</td>
+                                <td>Повторить запрос и проверить входные данные</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
                     <div class="cta-box">
                         <h3>Сервис бесплатный</h3>
                         <p>Если сервис вам полезен, можно поддержать развитие проекта.</p>
-                        <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
-                            Поддержать проект
-                        </a>
+                        <div class="btn-group">
+                            <a href="/payment" class="btn btn-info">Тарифы и оплата</a>
+                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Поддержать проект</a>
+                        </div>
                     </div>
                 </div>
             </div>

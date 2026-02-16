@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тарифы и оплата - LawChecker Online</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo" aria-label="На главную LawChecker">
+                    <span class="logo-icon">🇷🇺</span>
+                    <span class="logo-text">LawChecker <span class="logo-badge">Online</span></span>
+                </a>
+                <nav class="nav">
+                    <a href="/" class="nav-link">Проверка</a>
+                    <a href="/about" class="nav-link">О сервисе</a>
+                    <a href="/api-docs" class="nav-link">API</a>
+                    <a href="/examples" class="nav-link">Примеры</a>
+                    <a href="/payment" class="nav-link active">Тарифы</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <section class="page-hero">
+        <div class="container">
+            <h1 class="page-hero-title">Тарифы и оплата</h1>
+            <p class="page-hero-subtitle">Простой запуск без кабинета: выберите пакет и начните проверку.</p>
+            <div class="quick-links">
+                <a class="btn btn-primary" href="/">Открыть проверку</a>
+                <a class="btn btn-info" href="/api-docs">Открыть API</a>
+            </div>
+        </div>
+    </section>
+
+    <main class="main">
+        <div class="container">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Выберите подходящий пакет</h2>
+                    <p class="text-muted">Подходит для текста, URL, OCR и MultiScan</p>
+                </div>
+                <div class="card-body">
+                    <div class="pricing-grid">
+                        <article class="pricing-card {% if selected_tariff == 'symbols-20000' %}active{% endif %}">
+                            <h3>Start 20 000</h3>
+                            <p class="pricing-meta">Для разовых задач и теста интеграции</p>
+                            <ul class="feature-list">
+                                <li>Проверка текста и URL</li>
+                                <li>OCR + базовый deep-check</li>
+                                <li>Экспорт отчётов</li>
+                            </ul>
+                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Оплатить</a>
+                        </article>
+
+                        <article class="pricing-card {% if selected_tariff == 'symbols-100000' %}active{% endif %}">
+                            <h3>Team 100 000</h3>
+                            <p class="pricing-meta">Для команды контента и маркетинга</p>
+                            <ul class="feature-list">
+                                <li>Batch и MultiScan</li>
+                                <li>TXT/CSV загрузка URL</li>
+                                <li>Deep-отчёты</li>
+                            </ul>
+                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Оплатить</a>
+                        </article>
+
+                        <article class="pricing-card {% if selected_tariff == 'symbols-500000' %}active{% endif %}">
+                            <h3>Pro 500 000</h3>
+                            <p class="pricing-meta">Для агентств и потоковой проверки</p>
+                            <ul class="feature-list">
+                                <li>Большие очереди URL</li>
+                                <li>Параллельные процессы команды</li>
+                                <li>Расширенные лимиты</li>
+                            </ul>
+                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Оплатить</a>
+                        </article>
+
+                        <article class="pricing-card {% if selected_tariff == 'api' %}active{% endif %}">
+                            <h3>API</h3>
+                            <p class="pricing-meta">Для интеграции в ваши продукты</p>
+                            <ul class="feature-list">
+                                <li>REST endpoint-ы</li>
+                                <li>JSON ответы и отчёты</li>
+                                <li>Quick Start примеры</li>
+                            </ul>
+                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Оплатить</a>
+                        </article>
+                    </div>
+
+                    <div class="legal-note" style="margin-top: 1rem;">
+                        После оплаты сохраните подтверждение и напишите в поддержку проекта. Сервис остаётся бесплатным
+                        для базового использования, а оплата помогает поддерживать инфраструктуру и развитие функций.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>LawChecker Online</h3>
+                    <p>Проверка текста и сайтов на соответствие требованиям языка.</p>
+                </div>
+                <div class="footer-section">
+                    <h3>Навигация</h3>
+                    <ul>
+                        <li><a href="/">Проверка</a></li>
+                        <li><a href="/api-docs">API</a></li>
+                        <li><a href="/examples">Примеры</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>Поддержка</h3>
+                    <p><a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer">Поддержать проект</a></p>
+                    <p>&copy; 2026 LawChecker Online</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

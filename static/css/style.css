@@ -480,6 +480,73 @@ body {
     color: #28405B;
 }
 
+.api-quickstart {
+    border: 1px solid #DCE6F5;
+    background: linear-gradient(180deg, #FFFFFF 0%, #F9FCFF 100%);
+}
+
+.simple-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.6rem;
+    border: 1px solid #DDE8F8;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.simple-table th,
+.simple-table td {
+    border-bottom: 1px solid #E6EEF9;
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    font-size: 0.93rem;
+}
+
+.simple-table th {
+    background: #EEF4FF;
+    color: #0D47A1;
+    font-weight: 700;
+}
+
+.simple-table tr:last-child td {
+    border-bottom: none;
+}
+
+.pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.9rem;
+}
+
+.pricing-card {
+    border: 1px solid #DCE6F5;
+    border-radius: 12px;
+    padding: 1rem;
+    background: #FAFCFF;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.pricing-card.active {
+    border-color: #1976D2;
+    box-shadow: 0 6px 16px rgba(25, 118, 210, 0.16);
+}
+
+.pricing-card h3 {
+    color: #0D47A1;
+    font-size: 1.15rem;
+}
+
+.pricing-meta {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.pricing-card .btn {
+    margin-top: auto;
+}
+
 /* Form Elements */
 .form-textarea,
 .form-input {
@@ -1372,6 +1439,15 @@ body {
 
     .workflow-grid {
         grid-template-columns: 1fr;
+    }
+
+    .pricing-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .simple-table {
+        display: block;
+        overflow-x: auto;
     }
 
     .form-textarea,
