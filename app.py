@@ -124,7 +124,7 @@ def _ocr_openai(api_key, model, image_url=None, image_data_url=None):
         'input': [{
             'role': 'user',
             'content': [
-                {'type': 'input_text', 'text': 'Extract all text from this image. Return only recognized text.'},
+                {'type': 'input_text', 'text': 'Extract all text from this image and return plain raw OCR text only. Do not edit, normalize, translate, summarize, censor, or correct anything. Preserve original wording, casing, punctuation, numbers, and line breaks exactly as recognized.'},
                 {'type': 'input_image', 'image_url': input_image}
             ]
         }]
