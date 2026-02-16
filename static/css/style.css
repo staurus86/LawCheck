@@ -2016,3 +2016,136 @@ h1, h2, h3, h4 {
         align-items: stretch;
     }
 }
+
+/* Premium UI pass */
+.header {
+    background: linear-gradient(135deg, #0B1220 0%, #0F172A 100%);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+    backdrop-filter: blur(8px);
+}
+
+.hero {
+    position: relative;
+    overflow: hidden;
+    padding: 4.2rem 0 3.3rem;
+}
+
+.hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(740px 320px at 18% 20%, rgba(96, 165, 250, 0.23), transparent 68%),
+        radial-gradient(680px 320px at 90% 10%, rgba(59, 130, 246, 0.20), transparent 70%);
+    pointer-events: none;
+}
+
+.hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.14) 0%, rgba(15, 23, 42, 0.36) 100%);
+    pointer-events: none;
+}
+
+.hero .container {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-title {
+    display: inline-block;
+    max-width: 980px;
+    padding: 0.35rem 0.9rem;
+    border-radius: 14px;
+    color: #FFFFFF;
+    text-shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.26), rgba(15, 23, 42, 0.06));
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    font-size: clamp(1.72rem, 3.8vw, 2.9rem);
+    line-height: 1.12;
+}
+
+.hero-subtitle {
+    color: #DBEAFE;
+    max-width: 840px;
+    margin-left: auto;
+    margin-right: auto;
+    text-wrap: balance;
+}
+
+.stats-cards {
+    gap: 1rem;
+}
+
+.stat-card {
+    border-radius: 16px;
+    box-shadow: 0 16px 30px -16px rgba(15, 23, 42, 0.65);
+}
+
+.tabs {
+    padding-top: 0.35rem;
+    padding-bottom: 0.7rem;
+}
+
+.tab-btn {
+    border-color: #DBEAFE;
+    background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+}
+
+.tab-btn.active {
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+    border-color: #2563EB;
+}
+
+.card-header {
+    background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+}
+
+.knowledge-card p,
+.audience-card p,
+.workflow-step p,
+.faq-box p,
+.legal-note {
+    color: #334155;
+}
+
+.knowledge-card h3,
+.audience-card h3,
+.workflow-step h3,
+.faq-box h3,
+.formats-box h3 {
+    color: #0F172A;
+}
+
+.word-tag {
+    border: 1px solid #D1DDF0;
+    background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+}
+
+.result-status.warning,
+.violation-section.critical,
+.legal-note {
+    border-color: #EF4444 !important;
+}
+
+@media (max-width: 768px) {
+    .hero {
+        padding: 2.5rem 0 2rem;
+    }
+
+    .hero-title {
+        padding: 0.26rem 0.62rem;
+        border-radius: 12px;
+        max-width: 100%;
+    }
+
+    .hero-subtitle {
+        font-size: 0.94rem;
+        line-height: 1.45;
+    }
+
+    .stat-card {
+        padding: 1rem;
+    }
+}
