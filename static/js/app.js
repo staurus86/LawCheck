@@ -1,6 +1,6 @@
 // API Configuration
 const API_BASE = window.API_BASE_URL || 'http://localhost:5000';
-console.log('🔗 Using API:', API_BASE);
+console.log('Using API:', API_BASE);
 
 // Global variables
 let currentResults = {
@@ -23,6 +23,7 @@ const ACTIVE_TAB_KEY = 'lawchecker.activeTab';
 // App bootstrap
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
+    initSectionMotion();
     initFieldMetrics();
     loadStats();
     loadRunHistory();
@@ -32,6 +33,33 @@ document.addEventListener('DOMContentLoaded', () => {
     onMultiModeChange();
     console.log('App loaded');
 });
+
+function initSectionMotion() {
+    const items = document.querySelectorAll(
+        '.main .card, .knowledge-card, .workflow-step, .audience-card, .faq-box details, .run-history-item'
+    );
+    if (!items.length) return;
+    items.forEach((el, idx) => {
+        el.classList.add('reveal-item');
+        el.style.transitionDelay = `${Math.min(idx * 0.04, 0.28)}s`;
+    });
+
+    if (!('IntersectionObserver' in window)) {
+        items.forEach(el => el.classList.add('is-visible'));
+        return;
+    }
+
+    const observer = new IntersectionObserver((entries, obs) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('is-visible');
+                obs.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.08, rootMargin: '0px 0px -8% 0px' });
+
+    items.forEach(el => observer.observe(el));
+}
 
 function initTabs() {
     const tabBtns = document.querySelectorAll('.tab-btn');
