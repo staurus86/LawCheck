@@ -5,7 +5,7 @@ Flask API для проверки текста на соответствие з�
 УЛУЧШЕННАЯ ВЕРСИЯ с максимальным функционалом
 """
 
-from flask import Flask, render_template, request, jsonify, send_file, session
+from flask import Flask, render_template, request, jsonify, send_file, session, Response
 from flask_cors import CORS
 import os
 from datetime import datetime
@@ -104,10 +104,39 @@ def robots():
     """Robots.txt"""
     return send_file('static/robots.txt', mimetype='text/plain')
 
+@app.route('/sitemap.xml')
+def sitemap():
+    """Sitemap.xml"""
+    base = request.url_root.rstrip('/')
+    urls = ['/', '/about', '/api-docs', '/examples', '/payment']
+    lastmod = datetime.utcnow().strftime('%Y-%m-%d')
+    items = []
+    for path in urls:
+        items.append(
+            f"<url><loc>{base}{path}</loc><lastmod>{lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>"
+        )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        + ''.join(items) +
+        '</urlset>'
+    )
+    return Response(xml, mimetype='application/xml')
+
 @app.route('/favicon.ico')
 def favicon():
     """Favicon"""
     return '', 204  # No content - используем data URI в HTML
+
+
+@app.errorhandler(404)
+def not_found(_error):
+    return render_template('404.html'), 404
+
+
+@app.errorhandler(500)
+def server_error(_error):
+    return render_template('500.html'), 500
 
 def _mask_token(token):
     if not token:

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Внутренняя ошибка - LawChecker Online</title>
+    <meta name="description" content="Внутренняя ошибка сервиса. Попробуйте повторить запрос позже.">
+    <meta property="og:title" content="Внутренняя ошибка - LawChecker Online">
+    <meta property="og:description" content="Временная ошибка сервиса.">
+    <meta property="og:type" content="website">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo" aria-label="На главную LawChecker">
+                    <span class="logo-icon">🇷🇺</span>
+                    <span class="logo-text">LawChecker <span class="logo-badge">Online</span></span>
+                </a>
+                <nav class="nav">
+                    <a href="/" class="nav-link active">Проверка</a>
+                    <a href="/about" class="nav-link">О сервисе</a>
+                    <a href="/api-docs" class="nav-link">API</a>
+                    <a href="/examples" class="nav-link">Примеры</a>
+                    <a href="/payment" class="nav-link">Тарифы</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <div class="card">
+                <div class="card-header">
+                    <h1>500 — внутренняя ошибка</h1>
+                </div>
+                <div class="card-body content-page">
+                    <p>Сервис временно недоступен. Попробуйте повторить запрос через 1-2 минуты.</p>
+                    <div class="btn-group">
+                        <a href="/" class="btn btn-primary">← Назад к проверке</a>
+                        <a href="/examples" class="btn btn-secondary">Открыть примеры</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
