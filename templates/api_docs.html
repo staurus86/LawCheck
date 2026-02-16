@@ -10,19 +10,31 @@
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <div class="logo">
+                <a href="/" class="logo" aria-label="На главную LawChecker">
                     <span class="logo-icon">🇷🇺</span>
                     <span class="logo-text">LawChecker <span class="logo-badge">Online</span></span>
-                </div>
+                </a>
                 <nav class="nav">
                     <a href="/" class="nav-link">Проверка</a>
                     <a href="/about" class="nav-link">О сервисе</a>
                     <a href="/api-docs" class="nav-link active">API</a>
                     <a href="/examples" class="nav-link">Примеры</a>
+                    <a href="/api/stats" class="nav-link" target="_blank">Статистика</a>
                 </nav>
             </div>
         </div>
     </header>
+
+    <section class="page-hero">
+        <div class="container">
+            <h1 class="page-hero-title">API документация</h1>
+            <p class="page-hero-subtitle">Готовые endpoint-ы для интеграции проверки в ваш сервис.</p>
+            <div class="quick-links">
+                <a class="btn btn-primary" href="/">Открыть интерфейс</a>
+                <a class="btn btn-info" href="/examples">Примеры сценариев</a>
+            </div>
+        </div>
+    </section>
 
     <main class="main">
         <div class="container">
@@ -45,7 +57,7 @@
                     </ul>
 
                     <h2>Пример запроса</h2>
-                    <pre class="form-textarea" style="white-space: pre-wrap;">curl -X POST "https://lawcheck-production.up.railway.app/api/check" \
+                    <pre class="api-code">curl -X POST "https://lawcheck-production.up.railway.app/api/check" \
   -H "Content-Type: application/json" \
   -d "{\"text\":\"Пример текста для проверки\"}"</pre>
 
@@ -70,8 +82,25 @@
 
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2026 LawChecker Online. Все права защищены.</p>
-            <p><a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer">Поддержать проект</a></p>
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>LawChecker Online</h3>
+                    <p>API для интеграции проверки языка в ваши процессы.</p>
+                </div>
+                <div class="footer-section">
+                    <h3>Навигация</h3>
+                    <ul>
+                        <li><a href="/">Проверка</a></li>
+                        <li><a href="/about">О сервисе</a></li>
+                        <li><a href="/examples">Примеры</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>Поддержка</h3>
+                    <p><a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer">Поддержать проект</a></p>
+                    <p>&copy; 2026 LawChecker Online</p>
+                </div>
+            </div>
         </div>
     </footer>
 </body>

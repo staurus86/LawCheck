@@ -10,25 +10,37 @@
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <div class="logo">
+                <a href="/" class="logo" aria-label="На главную LawChecker">
                     <span class="logo-icon">🇷🇺</span>
                     <span class="logo-text">LawChecker <span class="logo-badge">Online</span></span>
-                </div>
+                </a>
                 <nav class="nav">
                     <a href="/" class="nav-link">Проверка</a>
                     <a href="/about" class="nav-link active">О сервисе</a>
                     <a href="/api-docs" class="nav-link">API</a>
                     <a href="/examples" class="nav-link">Примеры</a>
+                    <a href="/api/stats" class="nav-link" target="_blank">Статистика</a>
                 </nav>
             </div>
         </div>
     </header>
 
+    <section class="page-hero">
+        <div class="container">
+            <h1 class="page-hero-title">О сервисе LawChecker</h1>
+            <p class="page-hero-subtitle">Проверка текстов, сайтов, изображений и PDF в одном интерфейсе.</p>
+            <div class="quick-links">
+                <a class="btn btn-primary" href="/">Открыть проверку</a>
+                <a class="btn btn-info" href="/api-docs">Открыть API</a>
+            </div>
+        </div>
+    </section>
+
     <main class="main">
         <div class="container">
             <div class="card">
                 <div class="card-header">
-                    <h1>О LawChecker Online</h1>
+                    <h1>Зачем нужен сервис</h1>
                 </div>
                 <div class="card-body content-page">
                     <h2>Что делает сервис</h2>
@@ -95,7 +107,10 @@
                     <div class="cta-box">
                         <h3>Запустить проверку</h3>
                         <p>Перейдите на главную страницу и проверьте текст, URL или мультиресурсный скан.</p>
-                        <a href="/" class="btn btn-primary">Открыть проверку</a>
+                        <div class="btn-group">
+                            <a href="/" class="btn btn-primary">Открыть проверку</a>
+                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-success">Поддержать проект</a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -104,8 +119,25 @@
 
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2026 LawChecker Online. Все права защищены.</p>
-            <p><a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer">Поддержать проект</a></p>
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>LawChecker Online</h3>
+                    <p>Бесплатный сервис проверки текста, сайтов и медиа.</p>
+                </div>
+                <div class="footer-section">
+                    <h3>Навигация</h3>
+                    <ul>
+                        <li><a href="/">Проверка</a></li>
+                        <li><a href="/api-docs">API</a></li>
+                        <li><a href="/examples">Примеры</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>Поддержка</h3>
+                    <p><a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer">Поддержать проект</a></p>
+                    <p>&copy; 2026 LawChecker Online</p>
+                </div>
+            </div>
         </div>
     </footer>
 </body>
