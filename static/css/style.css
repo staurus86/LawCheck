@@ -547,6 +547,58 @@ body {
     margin-top: auto;
 }
 
+.run-history-list {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.run-history-item {
+    border: 1px solid #DDE8F8;
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+    background: #FAFCFF;
+}
+
+.run-history-item.ok {
+    border-left: 4px solid #2E7D32;
+}
+
+.run-history-item.fail {
+    border-left: 4px solid #C62828;
+}
+
+.run-main {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-bottom: 0.3rem;
+}
+
+.run-type {
+    font-weight: 700;
+    color: #0D47A1;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+}
+
+.run-endpoint {
+    font-family: Consolas, monospace;
+    font-size: 0.85rem;
+}
+
+.run-context {
+    color: #516173;
+    font-size: 0.85rem;
+}
+
+.run-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    font-size: 0.8rem;
+    color: #596C82;
+}
+
 /* Form Elements */
 .form-textarea,
 .form-input {

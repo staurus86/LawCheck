@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initFieldMetrics();
     loadStats();
+    loadRunHistory();
     onImagesProviderChange();
     loadImageTokenStatus();
     onMultiProviderChange();
@@ -186,6 +187,49 @@ async function loadStats() {
         if (foreignEl) foreignEl.textContent = '0';
         if (nenormativeEl) nenormativeEl.textContent = '0';
         if (abbrEl) abbrEl.textContent = '0';
+    }
+}
+
+function renderRunHistory(items) {
+    const container = document.getElementById('runHistoryContent');
+    if (!container) return;
+    if (!items || !items.length) {
+        container.innerHTML = '<div class="text-muted">История пока пуста.</div>';
+        return;
+    }
+    container.innerHTML = `
+        <div class="run-history-list">
+            ${items.map(item => `
+                <div class="run-history-item ${item.success ? 'ok' : 'fail'}">
+                    <div class="run-main">
+                        <span class="run-type">${item.check_type || '-'}</span>
+                        <span class="run-endpoint">${item.endpoint || '-'}</span>
+                        <span class="run-context">${item.context_short || ''}</span>
+                    </div>
+                    <div class="run-meta">
+                        <span>${item.success ? 'ok' : 'error'}</span>
+                        <span>violations: ${item.violations_count ?? 0}</span>
+                        <span>${item.duration_ms ?? 0} ms</span>
+                        <span>${item.created_at ? new Date(item.created_at).toLocaleString() : ''}</span>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+async function loadRunHistory() {
+    const container = document.getElementById('runHistoryContent');
+    if (!container) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/run-history?limit=20`);
+        const data = await response.json();
+        if (!response.ok || !data.enabled) {
+            throw new Error(data.error || 'History unavailable');
+        }
+        renderRunHistory(data.items || []);
+    } catch (_e) {
+        container.innerHTML = '<div class="text-muted">История недоступна (БД не подключена или пуста).</div>';
     }
 }
 

@@ -42,6 +42,8 @@ MULTISCAN_MAX_RESOURCES_HARD = int(os.getenv('MULTISCAN_MAX_RESOURCES_HARD', '80
 MULTISCAN_MAX_TEXT_CHARS = int(os.getenv('MULTISCAN_MAX_TEXT_CHARS', '200000'))
 MULTISCAN_MAX_DOWNLOAD_BYTES = int(os.getenv('MULTISCAN_MAX_DOWNLOAD_BYTES', str(8 * 1024 * 1024)))
 MULTISCAN_USER_AGENT = os.getenv('MULTISCAN_USER_AGENT', 'LawChecker-MultiScan/1.0')
+METRICS_RETENTION_DAYS = int(os.getenv('METRICS_RETENTION_DAYS', '60'))
+METRICS_CLEANUP_INTERVAL_SEC = int(os.getenv('METRICS_CLEANUP_INTERVAL_SEC', '3600'))
 
 # Database (Railway PostgreSQL)
 RAW_DATABASE_URL = (os.getenv('DATABASE_URL') or os.getenv('database_URL') or '').strip()
@@ -55,6 +57,8 @@ if RAW_DATABASE_URL:
     except Exception as _db_init_error:
         print(f"[WARN] Database init failed: {_db_init_error}")
         db_engine = None
+
+_last_metrics_cleanup_ts = 0.0
 # CORS - разрешаем все домены
 CORS(app, resources={
     r"/api/*": {
@@ -116,6 +120,26 @@ def init_analytics_db():
                     message_short TEXT NOT NULL
                 )
             """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS run_history (
+                    id BIGSERIAL PRIMARY KEY,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    check_type VARCHAR(32) NOT NULL,
+                    endpoint VARCHAR(128) NOT NULL,
+                    source_type VARCHAR(32),
+                    context_short VARCHAR(255),
+                    success BOOLEAN NOT NULL,
+                    duration_ms DOUBLE PRECISION,
+                    violations_count INTEGER NOT NULL DEFAULT 0
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS violation_words (
+                    word VARCHAR(255) PRIMARY KEY,
+                    count BIGINT NOT NULL DEFAULT 0,
+                    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """))
     except Exception as e:
         print(f"[WARN] DB schema init failed: {e}")
 
@@ -143,6 +167,7 @@ def log_event(event_type, endpoint, success, duration_ms=None, source_type=None,
             })
     except Exception:
         pass
+    cleanup_analytics_db()
 
 
 def log_error(endpoint, status_code, message):
@@ -163,9 +188,88 @@ def log_error(endpoint, status_code, message):
             })
     except Exception:
         pass
+    cleanup_analytics_db()
+
+
+def insert_run_history(check_type, endpoint, success, duration_ms=None, source_type=None, context_short=None, violations_count=0):
+    if db_engine is None:
+        return
+    try:
+        with db_engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO run_history (
+                    check_type, endpoint, source_type, context_short, success, duration_ms, violations_count
+                ) VALUES (
+                    :check_type, :endpoint, :source_type, :context_short, :success, :duration_ms, :violations_count
+                )
+            """), {
+                'check_type': (check_type or 'unknown')[:32],
+                'endpoint': (endpoint or '')[:128],
+                'source_type': (source_type or '')[:32] or None,
+                'context_short': ((context_short or '').strip()[:255] or None),
+                'success': bool(success),
+                'duration_ms': float(duration_ms) if duration_ms is not None else None,
+                'violations_count': int(violations_count or 0)
+            })
+    except Exception:
+        pass
+
+
+def upsert_violation_words(words):
+    if db_engine is None:
+        return
+    clean_words = []
+    for raw in (words or []):
+        word = (raw or '').strip()
+        if word:
+            clean_words.append(word[:255])
+    if not clean_words:
+        return
+    try:
+        with db_engine.begin() as conn:
+            for word in clean_words:
+                conn.execute(text("""
+                    INSERT INTO violation_words (word, count, last_seen_at)
+                    VALUES (:word, 1, NOW())
+                    ON CONFLICT (word)
+                    DO UPDATE SET count = violation_words.count + 1, last_seen_at = NOW()
+                """), {'word': word})
+    except Exception:
+        pass
+
+
+def cleanup_analytics_db(force=False):
+    global _last_metrics_cleanup_ts
+    if db_engine is None:
+        return
+    now_ts = time.time()
+    if not force and (now_ts - _last_metrics_cleanup_ts) < METRICS_CLEANUP_INTERVAL_SEC:
+        return
+    _last_metrics_cleanup_ts = now_ts
+    try:
+        with db_engine.begin() as conn:
+            conn.execute(text("""
+                DELETE FROM events
+                WHERE created_at < NOW() - make_interval(days => :days)
+            """), {'days': METRICS_RETENTION_DAYS})
+            conn.execute(text("""
+                DELETE FROM errors
+                WHERE created_at < NOW() - make_interval(days => :days)
+            """), {'days': METRICS_RETENTION_DAYS})
+            conn.execute(text("""
+                DELETE FROM run_history
+                WHERE created_at < NOW() - make_interval(days => :days)
+            """), {'days': METRICS_RETENTION_DAYS})
+            conn.execute(text("""
+                DELETE FROM violation_words
+                WHERE last_seen_at < NOW() - make_interval(days => :days)
+            """), {'days': METRICS_RETENTION_DAYS})
+    except Exception:
+        pass
 
 
 init_analytics_db()
+cleanup_analytics_db(force=True)
 
 @app.route('/')
 def index():
@@ -536,6 +640,34 @@ def check_text():
             items_error=0,
             violations_total=result.get('violations_count', 0)
         )
+        insert_run_history(
+            check_type='url',
+            endpoint='/api/check-url',
+            success=True,
+            duration_ms=duration_ms,
+            source_type='url',
+            context_short=url[:255],
+            violations_count=result.get('violations_count', 0)
+        )
+        upsert_violation_words(
+            (result.get('latin_words') or [])
+            + (result.get('unknown_cyrillic') or [])
+            + (result.get('nenormative_words') or [])
+        )
+        insert_run_history(
+            check_type='text',
+            endpoint='/api/check',
+            success=True,
+            duration_ms=duration_ms,
+            source_type='text',
+            context_short='text input',
+            violations_count=result.get('violations_count', 0)
+        )
+        upsert_violation_words(
+            (result.get('latin_words') or [])
+            + (result.get('unknown_cyrillic') or [])
+            + (result.get('nenormative_words') or [])
+        )
         
         return jsonify({
             'success': True,
@@ -547,6 +679,7 @@ def check_text():
     except Exception as e:
         log_error('/api/check', 500, str(e))
         log_event(event_type='check', endpoint='/api/check', success=False, source_type='text', items_total=1, items_error=1)
+        insert_run_history(check_type='text', endpoint='/api/check', success=False, source_type='text', context_short='text input')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/check-url', methods=['POST'])
@@ -605,6 +738,7 @@ def check_url():
     except Exception as e:
         log_error('/api/check-url', 500, str(e))
         log_event(event_type='check', endpoint='/api/check-url', success=False, source_type='url', items_total=1, items_error=1)
+        insert_run_history(check_type='url', endpoint='/api/check-url', success=False, source_type='url')
         return jsonify({'error': f'Ошибка загрузки: {str(e)}'}), 500
 
 @app.route('/api/batch-check', methods=['POST'])
@@ -675,6 +809,22 @@ def batch_check():
             items_error=len(error_items),
             violations_total=violations_total
         )
+        insert_run_history(
+            check_type='batch',
+            endpoint='/api/batch-check',
+            success=True,
+            duration_ms=duration_ms,
+            source_type='url',
+            context_short=f'urls={len(clean_urls)} ok={len(success_items)} err={len(error_items)}',
+            violations_count=violations_total
+        )
+        all_words = []
+        for item in success_items:
+            r = item.get('result') or {}
+            all_words.extend(r.get('latin_words') or [])
+            all_words.extend(r.get('unknown_cyrillic') or [])
+            all_words.extend(r.get('nenormative_words') or [])
+        upsert_violation_words(all_words)
         
         return jsonify({
             'success': True,
@@ -687,6 +837,7 @@ def batch_check():
     except Exception as e:
         log_error('/api/batch-check', 500, str(e))
         log_event(event_type='batch', endpoint='/api/batch-check', success=False, source_type='url', items_error=1)
+        insert_run_history(check_type='batch', endpoint='/api/batch-check', success=False, source_type='url')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/deep-check', methods=['POST'])
@@ -779,6 +930,12 @@ def get_metrics():
                 ORDER BY created_at DESC
                 LIMIT 20
             """)).mappings().all()
+            top_words = conn.execute(text("""
+                SELECT word, count, last_seen_at
+                FROM violation_words
+                ORDER BY count DESC, last_seen_at DESC
+                LIMIT 20
+            """)).mappings().all()
 
         events_24h = int(totals_row['events_24h'] or 0)
         events_7d = int(totals_row['events_7d'] or 0)
@@ -800,6 +957,14 @@ def get_metrics():
                 'violations_7d': int(totals_row['violations_7d'] or 0)
             },
             'top_endpoints_7d': [{'endpoint': row['endpoint'], 'total': int(row['total'])} for row in by_endpoint],
+            'top_violation_words': [
+                {
+                    'word': row['word'],
+                    'count': int(row['count']),
+                    'last_seen_at': row['last_seen_at'].isoformat() if row.get('last_seen_at') else None
+                }
+                for row in top_words
+            ],
             'recent_errors': [
                 {
                     'created_at': row['created_at'].isoformat() if row.get('created_at') else None,
@@ -813,6 +978,44 @@ def get_metrics():
         })
     except Exception as e:
         log_error('/api/metrics', 500, str(e))
+        return jsonify({'enabled': True, 'error': str(e)}), 500
+
+
+@app.route('/api/run-history', methods=['GET'])
+def get_run_history():
+    """Последние запуски проверок из БД (минимальная агрегированная история)"""
+    if db_engine is None:
+        return jsonify({'enabled': False, 'error': 'Database is not configured'}), 503
+    limit = _safe_int(request.args.get('limit', 20), 20, 1, 100)
+    try:
+        with db_engine.begin() as conn:
+            rows = conn.execute(text("""
+                SELECT created_at, check_type, endpoint, source_type, context_short, success, duration_ms, violations_count
+                FROM run_history
+                ORDER BY created_at DESC
+                LIMIT :limit
+            """), {'limit': limit}).mappings().all()
+
+        return jsonify({
+            'enabled': True,
+            'limit': limit,
+            'items': [
+                {
+                    'created_at': row['created_at'].isoformat() if row.get('created_at') else None,
+                    'check_type': row.get('check_type'),
+                    'endpoint': row.get('endpoint'),
+                    'source_type': row.get('source_type'),
+                    'context_short': row.get('context_short'),
+                    'success': bool(row.get('success')),
+                    'duration_ms': round(float(row.get('duration_ms') or 0), 2),
+                    'violations_count': int(row.get('violations_count') or 0)
+                }
+                for row in rows
+            ],
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        log_error('/api/run-history', 500, str(e))
         return jsonify({'enabled': True, 'error': str(e)}), 500
 
 @app.route('/api/check-word', methods=['POST'])
@@ -1040,11 +1243,26 @@ def check_images():
             items_error=0,
             violations_total=result.get('violations_count', 0)
         )
+        insert_run_history(
+            check_type='image',
+            endpoint='/api/images/check',
+            success=True,
+            duration_ms=total_ms,
+            source_type='image',
+            context_short=(image_url or 'uploaded_file')[:255],
+            violations_count=result.get('violations_count', 0)
+        )
+        upsert_violation_words(
+            (result.get('latin_words') or [])
+            + (result.get('unknown_cyrillic') or [])
+            + (result.get('nenormative_words') or [])
+        )
 
         return jsonify({'success': True, 'provider': provider, 'result': result, 'timestamp': datetime.now().isoformat()})
     except Exception as e:
         log_error('/api/images/check', 500, str(e))
         log_event(event_type='ocr_check', endpoint='/api/images/check', success=False, source_type='image', items_total=1, items_error=1)
+        insert_run_history(check_type='image', endpoint='/api/images/check', success=False, source_type='image')
         return jsonify({'error': str(e)}), 500
 
 
@@ -1314,6 +1532,19 @@ def multiscan_run():
             items_error=len(error_items),
             violations_total=violations_total
         )
+        insert_run_history(
+            check_type='multiscan',
+            endpoint='/api/multiscan/run',
+            success=True,
+            duration_ms=duration_ms,
+            source_type='mixed',
+            context_short=f'mode={mode} total={len(results)} err={len(error_items)}',
+            violations_count=violations_total
+        )
+        all_words = []
+        for item in success_items:
+            all_words.extend(item.get('forbidden_words') or [])
+        upsert_violation_words(all_words)
 
         return jsonify({
             'success': True,
@@ -1341,10 +1572,12 @@ def multiscan_run():
     except RuntimeError as e:
         log_error('/api/multiscan/run', 400, str(e))
         log_event(event_type='multiscan', endpoint='/api/multiscan/run', success=False, source_type='mixed', items_error=1)
+        insert_run_history(check_type='multiscan', endpoint='/api/multiscan/run', success=False, source_type='mixed')
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         log_error('/api/multiscan/run', 500, str(e))
         log_event(event_type='multiscan', endpoint='/api/multiscan/run', success=False, source_type='mixed', items_error=1)
+        insert_run_history(check_type='multiscan', endpoint='/api/multiscan/run', success=False, source_type='mixed')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/history', methods=['GET'])
