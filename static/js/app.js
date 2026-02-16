@@ -1,22 +1,25 @@
 // API Configuration
 const API_BASE = window.API_BASE_URL || 'http://localhost:5000';
-console.log('🔗 Using API:', API_BASE);
+console.log('рџ”— Using API:', API_BASE);
 
 // Global variables
 let currentResults = {
     text: null,
     url: null,
-    batch: null
+    batch: null,
+    images: null
 };
 
-// Инициализация при загрузке страницы
+// РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РїСЂРё Р·Р°РіСЂСѓР·РєРµ СЃС‚СЂР°РЅРёС†С‹
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     loadStats();
-    console.log('✅ LawChecker Online загружен');
+    onImagesProviderChange();
+    loadImageTokenStatus();
+    console.log('вњ… LawChecker Online Р·Р°РіСЂСѓР¶РµРЅ');
 });
 
-// Переключение вкладок
+// РџРµСЂРµРєР»СЋС‡РµРЅРёРµ РІРєР»Р°РґРѕРє
 function initTabs() {
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
@@ -25,18 +28,18 @@ function initTabs() {
         btn.addEventListener('click', () => {
             const tabName = btn.dataset.tab;
             
-            // Удаляем активные классы
+            // РЈРґР°Р»СЏРµРј Р°РєС‚РёРІРЅС‹Рµ РєР»Р°СЃСЃС‹
             tabBtns.forEach(b => b.classList.remove('active'));
             tabContents.forEach(c => c.classList.remove('active'));
             
-            // Добавляем активные классы
+            // Р”РѕР±Р°РІР»СЏРµРј Р°РєС‚РёРІРЅС‹Рµ РєР»Р°СЃСЃС‹
             btn.classList.add('active');
             document.getElementById(`${tabName}-tab`).classList.add('active');
         });
     });
 }
 
-// Загрузка статистики словарей
+// Р—Р°РіСЂСѓР·РєР° СЃС‚Р°С‚РёСЃС‚РёРєРё СЃР»РѕРІР°СЂРµР№
 async function loadStats() {
     try {
         const response = await fetch(`${API_BASE}/api/stats`);
@@ -47,7 +50,7 @@ async function loadStats() {
         
         const data = await response.json();
         
-        // Безопасное обновление с проверками
+        // Р‘РµР·РѕРїР°СЃРЅРѕРµ РѕР±РЅРѕРІР»РµРЅРёРµ СЃ РїСЂРѕРІРµСЂРєР°РјРё
         const normativeEl = document.getElementById('statNormative');
         const foreignEl = document.getElementById('statForeign');
         const nenormativeEl = document.getElementById('statNenormative');
@@ -70,7 +73,7 @@ async function loadStats() {
         }
         
     } catch (error) {
-        // Показываем "0" вместо ошибки
+        // РџРѕРєР°Р·С‹РІР°РµРј "0" РІРјРµСЃС‚Рѕ РѕС€РёР±РєРё
         const normativeEl = document.getElementById('statNormative');
         const foreignEl = document.getElementById('statForeign');
         const nenormativeEl = document.getElementById('statNenormative');
@@ -83,12 +86,12 @@ async function loadStats() {
     }
 }
 
-// Проверка текста
+// РџСЂРѕРІРµСЂРєР° С‚РµРєСЃС‚Р°
 async function checkText() {
     const text = document.getElementById('textInput').value.trim();
     
     if (!text) {
-        alert('Введите текст для проверки!');
+        alert('Р’РІРµРґРёС‚Рµ С‚РµРєСЃС‚ РґР»СЏ РїСЂРѕРІРµСЂРєРё!');
         return;
     }
     
@@ -108,23 +111,23 @@ async function checkText() {
         if (data.success) {
             currentResults.text = data.result;
             displayResults('text', data.result);
-            console.log('✅ Текст проверен:', data.result);
+            console.log('вњ… РўРµРєСЃС‚ РїСЂРѕРІРµСЂРµРЅ:', data.result);
         } else {
-            alert('Ошибка: ' + data.error);
+            alert('РћС€РёР±РєР°: ' + data.error);
         }
     } catch (error) {
-        alert('Ошибка проверки: ' + error.message);
+        alert('РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё: ' + error.message);
     } finally {
         hideLoading();
     }
 }
 
-// Проверка URL
+// РџСЂРѕРІРµСЂРєР° URL
 async function checkUrl() {
     const url = document.getElementById('urlInput').value.trim();
     
     if (!url || !url.startsWith('http')) {
-        alert('Введите корректный URL!');
+        alert('Р’РІРµРґРёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Р№ URL!');
         return;
     }
     
@@ -145,25 +148,25 @@ async function checkUrl() {
         if (data.success) {
             currentResults.url = data.result;
             displayResults('url', data.result, url);
-            console.log('✅ URL проверен:', data.result);
+            console.log('вњ… URL РїСЂРѕРІРµСЂРµРЅ:', data.result);
         } else {
-            alert('Ошибка: ' + data.error);
+            alert('РћС€РёР±РєР°: ' + data.error);
         }
     } catch (error) {
-        alert('Ошибка загрузки: ' + error.message);
+        alert('РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё: ' + error.message);
     } finally {
         hideLoading();
         document.getElementById('urlProgress').style.display = 'none';
     }
 }
 
-// Пакетная проверка
+// РџР°РєРµС‚РЅР°СЏ РїСЂРѕРІРµСЂРєР°
 async function checkBatch() {
     const input = document.getElementById('batchInput').value.trim();
     const urls = input.split('\n').filter(u => u.trim() && u.startsWith('http'));
     
     if (urls.length === 0) {
-        alert('Введите хотя бы один URL!');
+        alert('Р’РІРµРґРёС‚Рµ С…РѕС‚СЏ Р±С‹ РѕРґРёРЅ URL!');
         return;
     }
     
@@ -212,20 +215,163 @@ async function checkBatch() {
     progressText.textContent = `${completed} / ${urls.length}`;
     currentResults.batch = results;
     displayBatchResults(results);
-    console.log('✅ Пакетная проверка завершена:', results);
+    console.log('вњ… РџР°РєРµС‚РЅР°СЏ РїСЂРѕРІРµСЂРєР° Р·Р°РІРµСЂС€РµРЅР°:', results);
 }
 
-// Проверка одного слова
+// РџСЂРѕРІРµСЂРєР° РѕРґРЅРѕРіРѕ СЃР»РѕРІР°
+function getImagesProvider() {
+    const el = document.getElementById('imagesProviderSelect');
+    return el ? el.value : 'openai';
+}
+
+function getDefaultModelByProvider(provider) {
+    if (provider === 'google') return 'DOCUMENT_TEXT_DETECTION';
+    if (provider === 'ocrspace') return 'rus';
+    return 'gpt-4.1-mini';
+}
+
+function onImagesProviderChange() {
+    const provider = getImagesProvider();
+    const modelInput = document.getElementById('imagesModelInput');
+    if (modelInput && !modelInput.value.trim()) {
+        modelInput.value = getDefaultModelByProvider(provider);
+    }
+    loadImageTokenStatus();
+}
+
+async function loadImageTokenStatus() {
+    const statusEl = document.getElementById('imagesTokenStatus');
+    if (!statusEl) return;
+
+    const provider = getImagesProvider();
+    try {
+        const response = await fetch(`${API_BASE}/api/images/token?provider=${encodeURIComponent(provider)}`, {
+            credentials: 'same-origin'
+        });
+        const data = await response.json();
+        if (data.success && data.has_token) {
+            statusEl.textContent = `Ключ для ${provider}: ${data.token_masked || 'сохранен'}`;
+            statusEl.className = 'images-token-status success';
+        } else {
+            statusEl.textContent = `Ключ для ${provider} не задан`;
+            statusEl.className = 'images-token-status';
+        }
+    } catch (error) {
+        statusEl.textContent = 'Не удалось проверить статус ключа';
+        statusEl.className = 'images-token-status error';
+    }
+}
+
+async function saveImageApiToken() {
+    const input = document.getElementById('imagesTokenInput');
+    const statusEl = document.getElementById('imagesTokenStatus');
+    if (!input || !statusEl) return;
+
+    const provider = getImagesProvider();
+    const token = input.value.trim();
+    if (!token) {
+        alert('Введите API ключ');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/images/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ provider, token })
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Не удалось сохранить ключ');
+
+        statusEl.textContent = `Ключ для ${provider} сохранен: ${data.token_masked || ''}`;
+        statusEl.className = 'images-token-status success';
+        input.value = '';
+    } catch (error) {
+        statusEl.textContent = `Ошибка: ${error.message}`;
+        statusEl.className = 'images-token-status error';
+    }
+}
+
+function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Ошибка чтения файла'));
+        reader.readAsDataURL(file);
+    });
+}
+
+async function checkImagesByDatabase() {
+    const provider = getImagesProvider();
+    const modelInput = document.getElementById('imagesModelInput');
+    const imageUrlInput = document.getElementById('imagesUrlInput');
+    const imageFileInput = document.getElementById('imagesFileInput');
+    const extractedTextArea = document.getElementById('imagesInput');
+
+    const model = modelInput && modelInput.value.trim()
+        ? modelInput.value.trim()
+        : getDefaultModelByProvider(provider);
+    const imageUrl = imageUrlInput ? imageUrlInput.value.trim() : '';
+    const imageFile = imageFileInput && imageFileInput.files ? imageFileInput.files[0] : null;
+
+    if (!imageUrl && !imageFile) {
+        alert('Укажите URL картинки или загрузите файл');
+        return;
+    }
+
+    let imageDataUrl = '';
+    if (imageFile) {
+        imageDataUrl = await fileToDataUrl(imageFile);
+    }
+
+    showLoading();
+    try {
+        const response = await fetch(`${API_BASE}/api/images/check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                provider,
+                model,
+                image_url: imageUrl || null,
+                image_data_url: imageDataUrl || null
+            })
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Ошибка OCR');
+
+        currentResults.images = data.result;
+        if (extractedTextArea) extractedTextArea.value = data.result.extracted_text || '';
+
+        displayResults('images', data.result, data.result.source_url || '');
+
+        const resultsContent = document.getElementById('imagesResultsContent');
+        if (resultsContent && data.result.ocr) {
+            const ocr = data.result.ocr;
+            resultsContent.innerHTML += `
+                <div class="image-db-summary">
+                    <h4>OCR провайдер: ${ocr.provider}</h4>
+                    <p>Модель: ${ocr.model || '-'} | Длина текста: ${ocr.text_length || 0} символов</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        alert('Ошибка проверки картинки: ' + error.message);
+    } finally {
+        hideLoading();
+    }
+}
 async function checkWord() {
     const word = document.getElementById('wordInput').value.trim();
     
     if (!word) {
-        alert('Введите слово для проверки!');
+        alert('Р’РІРµРґРёС‚Рµ СЃР»РѕРІРѕ РґР»СЏ РїСЂРѕРІРµСЂРєРё!');
         return;
     }
     
     if (word.length < 2) {
-        alert('Слово должно содержать минимум 2 символа!');
+        alert('РЎР»РѕРІРѕ РґРѕР»Р¶РЅРѕ СЃРѕРґРµСЂР¶Р°С‚СЊ РјРёРЅРёРјСѓРј 2 СЃРёРјРІРѕР»Р°!');
         return;
     }
     
@@ -247,17 +393,17 @@ async function checkWord() {
         if (data.success) {
             currentResults.word = data.result;
             displayWordResult(data.result);
-            console.log('✅ Слово проверено:', data.result);
+            console.log('вњ… РЎР»РѕРІРѕ РїСЂРѕРІРµСЂРµРЅРѕ:', data.result);
         } else {
-            alert('Ошибка: ' + data.error);
+            alert('РћС€РёР±РєР°: ' + data.error);
         }
     } catch (error) {
         hideLoading();
-        alert('Ошибка проверки: ' + error.message);
+        alert('РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё: ' + error.message);
     }
 }
 
-// Отображение результата проверки слова
+// РћС‚РѕР±СЂР°Р¶РµРЅРёРµ СЂРµР·СѓР»СЊС‚Р°С‚Р° РїСЂРѕРІРµСЂРєРё СЃР»РѕРІР°
 function displayWordResult(result) {
     const resultsCard = document.getElementById('wordResults');
     const resultsContent = document.getElementById('wordResultsContent');
@@ -267,50 +413,50 @@ function displayWordResult(result) {
     if (result.is_nenormative) {
         html += `
             <div class="result-status error">
-                <div class="status-icon">🚫</div>
+                <div class="status-icon">рџљ«</div>
                 <div class="status-text">
-                    <h3>ОПАСНОЕ СЛОВО - НЕНОРМАТИВНАЯ ЛЕКСИКА</h3>
-                    <p>Данное слово запрещено к использованию. Это критическое нарушение закона.</p>
+                    <h3>РћРџРђРЎРќРћР• РЎР›РћР’Рћ - РќР•РќРћР РњРђРўРР’РќРђРЇ Р›Р•РљРЎРРљРђ</h3>
+                    <p>Р”Р°РЅРЅРѕРµ СЃР»РѕРІРѕ Р·Р°РїСЂРµС‰РµРЅРѕ Рє РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЋ. Р­С‚Рѕ РєСЂРёС‚РёС‡РµСЃРєРѕРµ РЅР°СЂСѓС€РµРЅРёРµ Р·Р°РєРѕРЅР°.</p>
                 </div>
             </div>
         `;
     } else if (result.is_potential_fine) {
         html += `
             <div class="result-status warning">
-                <div class="status-icon">⚠️</div>
+                <div class="status-icon">вљ пёЏ</div>
                 <div class="status-text">
-                    <h3>ПОТЕНЦИАЛЬНАЯ УГРОЗА ШТРАФА</h3>
-                    <p>Слово не найдено в базе нормативных слов. Использование может повлечь штраф до 500 000 рублей.</p>
+                    <h3>РџРћРўР•РќР¦РРђР›Р¬РќРђРЇ РЈР“Р РћР—Рђ РЁРўР РђР¤Рђ</h3>
+                    <p>РЎР»РѕРІРѕ РЅРµ РЅР°Р№РґРµРЅРѕ РІ Р±Р°Р·Рµ РЅРѕСЂРјР°С‚РёРІРЅС‹С… СЃР»РѕРІ. РСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ РјРѕР¶РµС‚ РїРѕРІР»РµС‡СЊ С€С‚СЂР°С„ РґРѕ 500 000 СЂСѓР±Р»РµР№.</p>
                 </div>
             </div>
         `;
     } else if (result.is_foreign) {
         html += `
             <div class="result-status warning">
-                <div class="status-icon">🌍</div>
+                <div class="status-icon">рџЊЌ</div>
                 <div class="status-text">
-                    <h3>ИНОСТРАННОЕ СЛОВО</h3>
-                    <p>Слово разрешено к использованию в определённых контекстах.</p>
+                    <h3>РРќРћРЎРўР РђРќРќРћР• РЎР›РћР’Рћ</h3>
+                    <p>РЎР»РѕРІРѕ СЂР°Р·СЂРµС€РµРЅРѕ Рє РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЋ РІ РѕРїСЂРµРґРµР»С‘РЅРЅС‹С… РєРѕРЅС‚РµРєСЃС‚Р°С….</p>
                 </div>
             </div>
         `;
     } else if (result.is_abbreviation) {
         html += `
             <div class="result-status success">
-                <div class="status-icon">📚</div>
+                <div class="status-icon">рџ“љ</div>
                 <div class="status-text">
-                    <h3>АББРЕВИАТУРА</h3>
-                    <p>Расшифровка: ${result.abbreviation_translation.join(', ')}</p>
+                    <h3>РђР‘Р‘Р Р•Р’РРђРўРЈР Рђ</h3>
+                    <p>Р Р°СЃС€РёС„СЂРѕРІРєР°: ${result.abbreviation_translation.join(', ')}</p>
                 </div>
             </div>
         `;
     } else {
         html += `
             <div class="result-status success">
-                <div class="status-icon">✅</div>
+                <div class="status-icon">вњ…</div>
                 <div class="status-text">
-                    <h3>НОРМАТИВНОЕ СЛОВО</h3>
-                    <p>Слово соответствует требованиям закона.</p>
+                    <h3>РќРћР РњРђРўРР’РќРћР• РЎР›РћР’Рћ</h3>
+                    <p>РЎР»РѕРІРѕ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚ С‚СЂРµР±РѕРІР°РЅРёСЏРј Р·Р°РєРѕРЅР°.</p>
                 </div>
             </div>
         `;
@@ -318,7 +464,7 @@ function displayWordResult(result) {
     
     html += `
         <div class="word-detail">
-            <div class="word-label">Проверяемое слово:</div>
+            <div class="word-label">РџСЂРѕРІРµСЂСЏРµРјРѕРµ СЃР»РѕРІРѕ:</div>
             <div class="word-value">"${result.word}"</div>
         </div>
     `;
@@ -326,29 +472,29 @@ function displayWordResult(result) {
     if (result.has_latin) {
         html += `
             <div class="word-detail">
-                <div class="word-label">Содержит латиницу:</div>
-                <div class="word-value">Да</div>
+                <div class="word-label">РЎРѕРґРµСЂР¶РёС‚ Р»Р°С‚РёРЅРёС†Сѓ:</div>
+                <div class="word-value">Р”Р°</div>
             </div>
         `;
     }
     
     html += `
         <div class="word-detail">
-            <div class="word-label">В базе нормативных:</div>
+            <div class="word-label">Р’ Р±Р°Р·Рµ РЅРѕСЂРјР°С‚РёРІРЅС‹С…:</div>
             <div class="word-value ${result.is_normative ? 'text-success' : 'text-danger'}">
-                ${result.is_normative ? '✅ Да' : '❌ Нет'}
+                ${result.is_normative ? 'вњ… Р”Р°' : 'вќЊ РќРµС‚'}
             </div>
         </div>
         <div class="word-detail">
-            <div class="word-label">В базе иностранных:</div>
+            <div class="word-label">Р’ Р±Р°Р·Рµ РёРЅРѕСЃС‚СЂР°РЅРЅС‹С…:</div>
             <div class="word-value ${result.is_foreign ? 'text-warning' : ''}">
-                ${result.is_foreign ? '✅ Да' : '❌ Нет'}
+                ${result.is_foreign ? 'вњ… Р”Р°' : 'вќЊ РќРµС‚'}
             </div>
         </div>
         <div class="word-detail">
-            <div class="word-label">В базе ненормативных:</div>
+            <div class="word-label">Р’ Р±Р°Р·Рµ РЅРµРЅРѕСЂРјР°С‚РёРІРЅС‹С…:</div>
             <div class="word-value ${result.is_nenormative ? 'text-danger' : 'text-success'}">
-                ${result.is_nenormative ? '🚫 Да (ЗАПРЕЩЕНО)' : '✅ Нет'}
+                ${result.is_nenormative ? 'рџљ« Р”Р° (Р—РђРџР Р•Р©Р•РќРћ)' : 'вњ… РќРµС‚'}
             </div>
         </div>
     `;
@@ -358,45 +504,45 @@ function displayWordResult(result) {
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// Отображение результатов проверки
+// РћС‚РѕР±СЂР°Р¶РµРЅРёРµ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РїСЂРѕРІРµСЂРєРё
 function displayResults(type, result, url = '') {
     const resultsCard = document.getElementById(`${type}Results`);
     const resultsContent = document.getElementById(`${type}ResultsContent`);
     
     let html = '';
     
-    // Статус проверки
+    // РЎС‚Р°С‚СѓСЃ РїСЂРѕРІРµСЂРєРё
     if (result.law_compliant) {
         html += `
             <div class="result-status success">
-                <div class="status-icon">✅</div>
+                <div class="status-icon">вњ…</div>
                 <div class="status-text">
-                    <h3>ТЕКСТ СООТВЕТСТВУЕТ ТРЕБОВАНИЯМ ЗАКОНА</h3>
-                    <p>Нарушений не обнаружено. Текст можно публиковать.</p>
+                    <h3>РўР•РљРЎРў РЎРћРћРўР’Р•РўРЎРўР’РЈР•Рў РўР Р•Р‘РћР’РђРќРРЇРњ Р—РђРљРћРќРђ</h3>
+                    <p>РќР°СЂСѓС€РµРЅРёР№ РЅРµ РѕР±РЅР°СЂСѓР¶РµРЅРѕ. РўРµРєСЃС‚ РјРѕР¶РЅРѕ РїСѓР±Р»РёРєРѕРІР°С‚СЊ.</p>
                 </div>
             </div>
         `;
     } else {
         html += `
             <div class="result-status error">
-                <div class="status-icon">⚠️</div>
+                <div class="status-icon">вљ пёЏ</div>
                 <div class="status-text">
-                    <h3>ОБНАРУЖЕНО НАРУШЕНИЙ: ${result.violations_count}</h3>
-                    <p>Требуется исправление перед публикацией</p>
+                    <h3>РћР‘РќРђР РЈР–Р•РќРћ РќРђР РЈРЁР•РќРР™: ${result.violations_count}</h3>
+                    <p>РўСЂРµР±СѓРµС‚СЃСЏ РёСЃРїСЂР°РІР»РµРЅРёРµ РїРµСЂРµРґ РїСѓР±Р»РёРєР°С†РёРµР№</p>
                 </div>
             </div>
         `;
         
-        // Блок нарушений
+        // Р‘Р»РѕРє РЅР°СЂСѓС€РµРЅРёР№
         html += '<div class="violations-list">';
         
-        // Ненормативная лексика
+        // РќРµРЅРѕСЂРјР°С‚РёРІРЅР°СЏ Р»РµРєСЃРёРєР°
         if (result.nenormative_count > 0) {
             html += `
                 <div class="violation-section critical">
                     <div class="violation-header">
-                        <span class="violation-icon">🚫</span>
-                        <h3>Ненормативная лексика: ${result.nenormative_count}</h3>
+                        <span class="violation-icon">рџљ«</span>
+                        <h3>РќРµРЅРѕСЂРјР°С‚РёРІРЅР°СЏ Р»РµРєСЃРёРєР°: ${result.nenormative_count}</h3>
                     </div>
                     <div class="word-list">
                         ${result.nenormative_words.slice(0, 20).map(w => {
@@ -404,43 +550,43 @@ function displayResults(type, result, url = '') {
                             return `<span class="word-tag critical">${censored}</span>`;
                         }).join('')}
                     </div>
-                    ${result.nenormative_words.length > 20 ? `<p class="more-words">... и ещё ${result.nenormative_words.length - 20} слов</p>` : ''}
+                    ${result.nenormative_words.length > 20 ? `<p class="more-words">... Рё РµС‰С‘ ${result.nenormative_words.length - 20} СЃР»РѕРІ</p>` : ''}
                 </div>
             `;
         }
         
-        // Слова на латинице
+        // РЎР»РѕРІР° РЅР° Р»Р°С‚РёРЅРёС†Рµ
         if (result.latin_count > 0) {
             html += `
                 <div class="violation-section">
                     <div class="violation-header">
-                        <span class="violation-icon">🌍</span>
-                        <h3>Слова на латинице: ${result.latin_count}</h3>
+                        <span class="violation-icon">рџЊЌ</span>
+                        <h3>РЎР»РѕРІР° РЅР° Р»Р°С‚РёРЅРёС†Рµ: ${result.latin_count}</h3>
                     </div>
                     <div class="word-list">
                         ${result.latin_words.slice(0, 30).map(w => 
                             `<span class="word-tag">${w}</span>`
                         ).join('')}
                     </div>
-                    ${result.latin_words.length > 30 ? `<p class="more-words">... и ещё ${result.latin_words.length - 30} слов</p>` : ''}
+                    ${result.latin_words.length > 30 ? `<p class="more-words">... Рё РµС‰С‘ ${result.latin_words.length - 30} СЃР»РѕРІ</p>` : ''}
                 </div>
             `;
         }
         
-        // Неизвестные слова/англицизмы
+        // РќРµРёР·РІРµСЃС‚РЅС‹Рµ СЃР»РѕРІР°/Р°РЅРіР»РёС†РёР·РјС‹
         if (result.unknown_count > 0) {
             html += `
                 <div class="violation-section">
                     <div class="violation-header">
-                        <span class="violation-icon">❓</span>
-                        <h3>Англицизмы / Неизвестные слова: ${result.unknown_count}</h3>
+                        <span class="violation-icon">вќ“</span>
+                        <h3>РђРЅРіР»РёС†РёР·РјС‹ / РќРµРёР·РІРµСЃС‚РЅС‹Рµ СЃР»РѕРІР°: ${result.unknown_count}</h3>
                     </div>
                     <div class="word-list">
                         ${result.unknown_cyrillic.slice(0, 30).map(w => 
                             `<span class="word-tag">${w}</span>`
                         ).join('')}
                     </div>
-                    ${result.unknown_cyrillic.length > 30 ? `<p class="more-words">... и ещё ${result.unknown_cyrillic.length - 30} слов</p>` : ''}
+                    ${result.unknown_cyrillic.length > 30 ? `<p class="more-words">... Рё РµС‰С‘ ${result.unknown_cyrillic.length - 30} СЃР»РѕРІ</p>` : ''}
                 </div>
             `;
         }
@@ -448,37 +594,37 @@ function displayResults(type, result, url = '') {
         html += '</div>';
     }
     
-    // Статистика
+    // РЎС‚Р°С‚РёСЃС‚РёРєР°
     html += `
         <div class="stats-summary">
-            <h4>📊 Статистика проверки</h4>
+            <h4>рџ“Љ РЎС‚Р°С‚РёСЃС‚РёРєР° РїСЂРѕРІРµСЂРєРё</h4>
             <div class="stats-grid">
                 <div class="stat-item">
                     <span class="stat-number">${result.total_words.toLocaleString('ru-RU')}</span>
-                    <span class="stat-label">Всего слов</span>
+                    <span class="stat-label">Р’СЃРµРіРѕ СЃР»РѕРІ</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-number">${result.unique_words.toLocaleString('ru-RU')}</span>
-                    <span class="stat-label">Уникальных</span>
+                    <span class="stat-label">РЈРЅРёРєР°Р»СЊРЅС‹С…</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-number">${result.violations_count}</span>
-                    <span class="stat-label">Нарушений</span>
+                    <span class="stat-label">РќР°СЂСѓС€РµРЅРёР№</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-number">${result.law_compliant ? '100%' : Math.round(((result.total_words - result.violations_count) / result.total_words) * 100) + '%'}</span>
-                    <span class="stat-label">Соответствие</span>
+                    <span class="stat-label">РЎРѕРѕС‚РІРµС‚СЃС‚РІРёРµ</span>
                 </div>
             </div>
             ${url ? `<p class="url-info"><strong>URL:</strong> <a href="${url}" target="_blank">${url}</a></p>` : ''}
         </div>
     `;
     
-    // Рекомендации
+    // Р РµРєРѕРјРµРЅРґР°С†РёРё
     if (result.recommendations && result.recommendations.length > 0) {
         html += `
             <div class="recommendations">
-                <h4>💡 Рекомендации</h4>
+                <h4>рџ’Ў Р РµРєРѕРјРµРЅРґР°С†РёРё</h4>
                 <div class="recommendations-list">
                     ${result.recommendations.map(rec => `
                         <div class="recommendation ${rec.level}">
@@ -486,7 +632,7 @@ function displayResults(type, result, url = '') {
                             <div class="rec-content">
                                 <h5>${rec.title}</h5>
                                 <p>${rec.message}</p>
-                                ${rec.action ? `<p class="rec-action">→ ${rec.action}</p>` : ''}
+                                ${rec.action ? `<p class="rec-action">в†’ ${rec.action}</p>` : ''}
                             </div>
                         </div>
                     `).join('')}
@@ -500,7 +646,7 @@ function displayResults(type, result, url = '') {
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// Отображение пакетных результатов с детализацией нарушений
+// РћС‚РѕР±СЂР°Р¶РµРЅРёРµ РїР°РєРµС‚РЅС‹С… СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ СЃ РґРµС‚Р°Р»РёР·Р°С†РёРµР№ РЅР°СЂСѓС€РµРЅРёР№
 function displayBatchResults(results) {
     const resultsCard = document.getElementById('batchResults');
     const resultsContent = document.getElementById('batchResultsContent');
@@ -509,7 +655,7 @@ function displayBatchResults(results) {
     let critical = 0;
     let successful = 0;
     
-    // Собираем уникальные слова по всем сайтам
+    // РЎРѕР±РёСЂР°РµРј СѓРЅРёРєР°Р»СЊРЅС‹Рµ СЃР»РѕРІР° РїРѕ РІСЃРµРј СЃР°Р№С‚Р°Рј
     const allLatinWords = new Set();
     const allUnknownWords = new Set();
     const allNenormativeWords = new Set();
@@ -521,7 +667,7 @@ function displayBatchResults(results) {
             if (hasViolations) {
                 totalViolations++;
                 if (item.result.nenormative_count > 0) critical++;
-                // Собираем слова
+                // РЎРѕР±РёСЂР°РµРј СЃР»РѕРІР°
                 (item.result.latin_words || []).forEach(w => allLatinWords.add(w));
                 (item.result.unknown_cyrillic || []).forEach(w => allUnknownWords.add(w));
                 (item.result.nenormative_words || []).forEach(w => allNenormativeWords.add(w));
@@ -532,65 +678,65 @@ function displayBatchResults(results) {
     let html = `
         <div class="batch-summary">
             <div class="summary-header">
-                <h3>📊 Результаты пакетной проверки</h3>
-                <p>Проверено сайтов: ${results.length}</p>
+                <h3>рџ“Љ Р РµР·СѓР»СЊС‚Р°С‚С‹ РїР°РєРµС‚РЅРѕР№ РїСЂРѕРІРµСЂРєРё</h3>
+                <p>РџСЂРѕРІРµСЂРµРЅРѕ СЃР°Р№С‚РѕРІ: ${results.length}</p>
             </div>
             <div class="summary-stats">
                 <div class="summary-item success">
                     <span class="summary-number">${successful - totalViolations}</span>
-                    <span class="summary-label">Без нарушений</span>
+                    <span class="summary-label">Р‘РµР· РЅР°СЂСѓС€РµРЅРёР№</span>
                 </div>
                 <div class="summary-item warning">
                     <span class="summary-number">${totalViolations}</span>
-                    <span class="summary-label">С нарушениями</span>
+                    <span class="summary-label">РЎ РЅР°СЂСѓС€РµРЅРёСЏРјРё</span>
                 </div>
                 ${critical > 0 ? `
                     <div class="summary-item critical">
                         <span class="summary-number">${critical}</span>
-                        <span class="summary-label">Критических</span>
+                        <span class="summary-label">РљСЂРёС‚РёС‡РµСЃРєРёС…</span>
                     </div>
                 ` : ''}
             </div>
         </div>
     `;
     
-    // Сводка уникальных нарушений по всем сайтам
+    // РЎРІРѕРґРєР° СѓРЅРёРєР°Р»СЊРЅС‹С… РЅР°СЂСѓС€РµРЅРёР№ РїРѕ РІСЃРµРј СЃР°Р№С‚Р°Рј
     if (allLatinWords.size > 0 || allUnknownWords.size > 0 || allNenormativeWords.size > 0) {
         html += `
             <div class="batch-global-violations">
-                <h4>🌍 Уникальные нарушения по всем сайтам</h4>
+                <h4>рџЊЌ РЈРЅРёРєР°Р»СЊРЅС‹Рµ РЅР°СЂСѓС€РµРЅРёСЏ РїРѕ РІСЃРµРј СЃР°Р№С‚Р°Рј</h4>
                 <div class="batch-violations-summary">
                     ${allNenormativeWords.size > 0 ? `
                         <div class="batch-violation-category critical">
-                            <h5>🚫 Ненормативная лексика (${allNenormativeWords.size})</h5>
+                            <h5>рџљ« РќРµРЅРѕСЂРјР°С‚РёРІРЅР°СЏ Р»РµРєСЃРёРєР° (${allNenormativeWords.size})</h5>
                             <div class="word-list">
                                 ${Array.from(allNenormativeWords).slice(0, 20).map(w => {
                                     const censored = w[0] + '*'.repeat(Math.max(0, w.length - 2)) + w.slice(-1);
                                     return `<span class="word-tag critical">${censored}</span>`;
                                 }).join('')}
-                                ${allNenormativeWords.size > 20 ? `<span class="more-words">... и ещё ${allNenormativeWords.size - 20}</span>` : ''}
+                                ${allNenormativeWords.size > 20 ? `<span class="more-words">... Рё РµС‰С‘ ${allNenormativeWords.size - 20}</span>` : ''}
                             </div>
                         </div>
                     ` : ''}
                     ${allLatinWords.size > 0 ? `
                         <div class="batch-violation-category">
-                            <h5>🌍 Латиница (${allLatinWords.size})</h5>
+                            <h5>рџЊЌ Р›Р°С‚РёРЅРёС†Р° (${allLatinWords.size})</h5>
                             <div class="word-list">
                                 ${Array.from(allLatinWords).slice(0, 30).map(w => 
                                     `<span class="word-tag">${w}</span>`
                                 ).join('')}
-                                ${allLatinWords.size > 30 ? `<span class="more-words">... и ещё ${allLatinWords.size - 30}</span>` : ''}
+                                ${allLatinWords.size > 30 ? `<span class="more-words">... Рё РµС‰С‘ ${allLatinWords.size - 30}</span>` : ''}
                             </div>
                         </div>
                     ` : ''}
                     ${allUnknownWords.size > 0 ? `
                         <div class="batch-violation-category">
-                            <h5>❓ Англицизмы / Неизвестные (${allUnknownWords.size})</h5>
+                            <h5>вќ“ РђРЅРіР»РёС†РёР·РјС‹ / РќРµРёР·РІРµСЃС‚РЅС‹Рµ (${allUnknownWords.size})</h5>
                             <div class="word-list">
                                 ${Array.from(allUnknownWords).slice(0, 30).map(w => 
                                     `<span class="word-tag">${w}</span>`
                                 ).join('')}
-                                ${allUnknownWords.size > 30 ? `<span class="more-words">... и ещё ${allUnknownWords.size - 30}</span>` : ''}
+                                ${allUnknownWords.size > 30 ? `<span class="more-words">... Рё РµС‰С‘ ${allUnknownWords.size - 30}</span>` : ''}
                             </div>
                         </div>
                     ` : ''}
@@ -602,9 +748,9 @@ function displayBatchResults(results) {
     html += '<div class="batch-results-list">';
     
     results.forEach((item, index) => {
-        const statusIcon = !item.success ? '❌' : 
-                          item.result.law_compliant ? '✅' : 
-                          item.result.nenormative_count > 0 ? '🚫' : '⚠️';
+        const statusIcon = !item.success ? 'вќЊ' : 
+                          item.result.law_compliant ? 'вњ…' : 
+                          item.result.nenormative_count > 0 ? 'рџљ«' : 'вљ пёЏ';
         
         const statusClass = !item.success ? 'error' : 
                            item.result.law_compliant ? 'success' : 
@@ -623,53 +769,53 @@ function displayBatchResults(results) {
                     <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
                     ${hasDetails ? `
                         <button class="batch-details-btn" id="batch-btn-${index}" onclick="toggleBatchDetails(${index})">
-                            Показать детали
+                            РџРѕРєР°Р·Р°С‚СЊ РґРµС‚Р°Р»Рё
                         </button>
                     ` : ''}
                 </div>
                 ${item.success ? `
                     <div class="batch-item-stats">
-                        <span>Нарушений: ${item.result.violations_count}</span>
-                        <span>Латиница: ${item.result.latin_count}</span>
-                        <span>Англицизмы: ${item.result.unknown_count}</span>
-                        ${item.result.nenormative_count > 0 ? `<span class="critical-badge">Ненорматив: ${item.result.nenormative_count}</span>` : ''}
-                        <span class="batch-words-count">Всего слов: ${item.result.total_words || 0}</span>
+                        <span>РќР°СЂСѓС€РµРЅРёР№: ${item.result.violations_count}</span>
+                        <span>Р›Р°С‚РёРЅРёС†Р°: ${item.result.latin_count}</span>
+                        <span>РђРЅРіР»РёС†РёР·РјС‹: ${item.result.unknown_count}</span>
+                        ${item.result.nenormative_count > 0 ? `<span class="critical-badge">РќРµРЅРѕСЂРјР°С‚РёРІ: ${item.result.nenormative_count}</span>` : ''}
+                        <span class="batch-words-count">Р’СЃРµРіРѕ СЃР»РѕРІ: ${item.result.total_words || 0}</span>
                     </div>
-                ` : `<div class="batch-item-error">Ошибка: ${item.error}</div>`}
+                ` : `<div class="batch-item-error">РћС€РёР±РєР°: ${item.error}</div>`}
                 
                 ${hasDetails ? `
                     <div class="batch-details" id="batch-details-${index}" style="display: none;">
                         ${item.result.nenormative_words?.length > 0 ? `
                             <div class="batch-detail-section critical">
-                                <h6>🚫 Ненормативная лексика:</h6>
+                                <h6>рџљ« РќРµРЅРѕСЂРјР°С‚РёРІРЅР°СЏ Р»РµРєСЃРёРєР°:</h6>
                                 <div class="word-list">
                                     ${item.result.nenormative_words.slice(0, 15).map(w => {
                                         const censored = w[0] + '*'.repeat(Math.max(0, w.length - 2)) + w.slice(-1);
                                         return `<span class="word-tag critical">${censored}</span>`;
                                     }).join('')}
-                                    ${item.result.nenormative_words.length > 15 ? `<span class="more-words">... и ещё ${item.result.nenormative_words.length - 15}</span>` : ''}
+                                    ${item.result.nenormative_words.length > 15 ? `<span class="more-words">... Рё РµС‰С‘ ${item.result.nenormative_words.length - 15}</span>` : ''}
                                 </div>
                             </div>
                         ` : ''}
                         ${item.result.latin_words?.length > 0 ? `
                             <div class="batch-detail-section">
-                                <h6>🌍 Латиница:</h6>
+                                <h6>рџЊЌ Р›Р°С‚РёРЅРёС†Р°:</h6>
                                 <div class="word-list">
                                     ${item.result.latin_words.slice(0, 20).map(w => 
                                         `<span class="word-tag">${w}</span>`
                                     ).join('')}
-                                    ${item.result.latin_words.length > 20 ? `<span class="more-words">... и ещё ${item.result.latin_words.length - 20}</span>` : ''}
+                                    ${item.result.latin_words.length > 20 ? `<span class="more-words">... Рё РµС‰С‘ ${item.result.latin_words.length - 20}</span>` : ''}
                                 </div>
                             </div>
                         ` : ''}
                         ${item.result.unknown_cyrillic?.length > 0 ? `
                             <div class="batch-detail-section">
-                                <h6>❓ Англицизмы / Неизвестные:</h6>
+                                <h6>вќ“ РђРЅРіР»РёС†РёР·РјС‹ / РќРµРёР·РІРµСЃС‚РЅС‹Рµ:</h6>
                                 <div class="word-list">
                                     ${item.result.unknown_cyrillic.slice(0, 20).map(w => 
                                         `<span class="word-tag">${w}</span>`
                                     ).join('')}
-                                    ${item.result.unknown_cyrillic.length > 20 ? `<span class="more-words">... и ещё ${item.result.unknown_cyrillic.length - 20}</span>` : ''}
+                                    ${item.result.unknown_cyrillic.length > 20 ? `<span class="more-words">... Рё РµС‰С‘ ${item.result.unknown_cyrillic.length - 20}</span>` : ''}
                                 </div>
                             </div>
                         ` : ''}
@@ -686,19 +832,19 @@ function displayBatchResults(results) {
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// Экспорт отчета
+// Р­РєСЃРїРѕСЂС‚ РѕС‚С‡РµС‚Р°
 async function exportReport(type) {
     const result = currentResults[type];
     if (!result) {
-        alert('Нет данных для экспорта! Сначала выполните проверку.');
+        alert('РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ СЌРєСЃРїРѕСЂС‚Р°! РЎРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ РїСЂРѕРІРµСЂРєСѓ.');
         return;
     }
     
     try {
         showLoading();
-        console.log('📥 Экспорт отчета:', type, result);
+        console.log('рџ“Ґ Р­РєСЃРїРѕСЂС‚ РѕС‚С‡РµС‚Р°:', type, result);
         
-        // Для пакетной проверки используем специальный endpoint
+        // Р”Р»СЏ РїР°РєРµС‚РЅРѕР№ РїСЂРѕРІРµСЂРєРё РёСЃРїРѕР»СЊР·СѓРµРј СЃРїРµС†РёР°Р»СЊРЅС‹Р№ endpoint
         const isBatch = type === 'batch';
         const endpoint = isBatch ? '/api/export/batch-txt' : '/api/export/txt';
         const payload = isBatch ? { results: result } : { result };
@@ -726,21 +872,21 @@ async function exportReport(type) {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
         
-        console.log('✅ Отчет скачан');
+        console.log('вњ… РћС‚С‡РµС‚ СЃРєР°С‡Р°РЅ');
         
     } catch (error) {
-        console.error('❌ Ошибка экспорта:', error);
-        alert('Ошибка экспорта: ' + error.message);
+        console.error('вќЊ РћС€РёР±РєР° СЌРєСЃРїРѕСЂС‚Р°:', error);
+        alert('РћС€РёР±РєР° СЌРєСЃРїРѕСЂС‚Р°: ' + error.message);
     } finally {
         hideLoading();
     }
 }
 
-// Глубокая проверка слов
+// Р“Р»СѓР±РѕРєР°СЏ РїСЂРѕРІРµСЂРєР° СЃР»РѕРІ
 async function deepCheck(type) {
     const result = currentResults[type];
     if (!result) {
-        alert('Нет данных для проверки! Сначала выполните проверку.');
+        alert('РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ РїСЂРѕРІРµСЂРєРё! РЎРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ РїСЂРѕРІРµСЂРєСѓ.');
         return;
     }
 
@@ -750,17 +896,17 @@ async function deepCheck(type) {
     ];
 
     if (wordsToCheck.length === 0) {
-        alert('Нет слов для глубокой проверки!');
+        alert('РќРµС‚ СЃР»РѕРІ РґР»СЏ РіР»СѓР±РѕРєРѕР№ РїСЂРѕРІРµСЂРєРё!');
         return;
     }
 
-    // Ограничиваем количество слов для одного запроса
+    // РћРіСЂР°РЅРёС‡РёРІР°РµРј РєРѕР»РёС‡РµСЃС‚РІРѕ СЃР»РѕРІ РґР»СЏ РѕРґРЅРѕРіРѕ Р·Р°РїСЂРѕСЃР°
     const maxWords = 200;
     const wordsToProcess = wordsToCheck.slice(0, maxWords);
     const skippedCount = wordsToCheck.length - maxWords;
 
     showLoading();
-    console.log('🔬 Глубокая проверка:', wordsToProcess.length, 'слов из', wordsToCheck.length);
+    console.log('рџ”¬ Р“Р»СѓР±РѕРєР°СЏ РїСЂРѕРІРµСЂРєР°:', wordsToProcess.length, 'СЃР»РѕРІ РёР·', wordsToCheck.length);
 
     try {
         const response = await fetch(`${API_BASE}/api/deep-check`, {
@@ -778,27 +924,27 @@ async function deepCheck(type) {
         if (data.success) {
             displayDeepResults(type, data.results);
             if (skippedCount > 0) {
-                alert(`Показаны результаты для первых ${maxWords} слов. Ещё ${skippedCount} слов пропущено.`);
+                alert(`РџРѕРєР°Р·Р°РЅС‹ СЂРµР·СѓР»СЊС‚Р°С‚С‹ РґР»СЏ РїРµСЂРІС‹С… ${maxWords} СЃР»РѕРІ. Р•С‰С‘ ${skippedCount} СЃР»РѕРІ РїСЂРѕРїСѓС‰РµРЅРѕ.`);
             }
-            console.log('✅ Глубокая проверка завершена:', data.results.length, 'слов');
+            console.log('вњ… Р“Р»СѓР±РѕРєР°СЏ РїСЂРѕРІРµСЂРєР° Р·Р°РІРµСЂС€РµРЅР°:', data.results.length, 'СЃР»РѕРІ');
         } else {
-            alert('Ошибка: ' + data.error);
+            alert('РћС€РёР±РєР°: ' + data.error);
         }
     } catch (error) {
         hideLoading();
-        alert('Ошибка глубокой проверки: ' + error.message);
+        alert('РћС€РёР±РєР° РіР»СѓР±РѕРєРѕР№ РїСЂРѕРІРµСЂРєРё: ' + error.message);
     }
 }
 
-// Глубокая проверка для пакетного режима
+// Р“Р»СѓР±РѕРєР°СЏ РїСЂРѕРІРµСЂРєР° РґР»СЏ РїР°РєРµС‚РЅРѕРіРѕ СЂРµР¶РёРјР°
 async function deepCheckBatch() {
     const results = currentResults.batch;
     if (!results || !Array.isArray(results)) {
-        alert('Нет данных для проверки! Сначала выполните пакетную проверку.');
+        alert('РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ РїСЂРѕРІРµСЂРєРё! РЎРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ РїР°РєРµС‚РЅСѓСЋ РїСЂРѕРІРµСЂРєСѓ.');
         return;
     }
 
-    // Собираем все уникальные слова со всех URL
+    // РЎРѕР±РёСЂР°РµРј РІСЃРµ СѓРЅРёРєР°Р»СЊРЅС‹Рµ СЃР»РѕРІР° СЃРѕ РІСЃРµС… URL
     const allWords = new Set();
     const urlMap = [];
 
@@ -819,16 +965,16 @@ async function deepCheckBatch() {
     });
 
     if (allWords.size === 0) {
-        alert('Нет слов для глубокой проверки!');
+        alert('РќРµС‚ СЃР»РѕРІ РґР»СЏ РіР»СѓР±РѕРєРѕР№ РїСЂРѕРІРµСЂРєРё!');
         return;
     }
 
     const wordArray = Array.from(allWords);
-    const batchSize = 100; // Обрабатываем по 100 слов за раз
+    const batchSize = 100; // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РїРѕ 100 СЃР»РѕРІ Р·Р° СЂР°Р·
     const totalBatches = Math.ceil(wordArray.length / batchSize);
 
     showLoading();
-    console.log('🔬 Глубокая проверка batch:', wordArray.length, 'слов,', totalBatches, 'батчей');
+    console.log('рџ”¬ Р“Р»СѓР±РѕРєР°СЏ РїСЂРѕРІРµСЂРєР° batch:', wordArray.length, 'СЃР»РѕРІ,', totalBatches, 'Р±Р°С‚С‡РµР№');
 
     try {
         const allDeepResults = [];
@@ -839,8 +985,8 @@ async function deepCheckBatch() {
             const end = start + batchSize;
             const batchWords = wordArray.slice(start, end);
 
-            // Показываем прогресс
-            updateLoadingText(`Проверка батча ${currentBatch + 1}/${totalBatches} (${batchWords.length} слов)...`);
+            // РџРѕРєР°Р·С‹РІР°РµРј РїСЂРѕРіСЂРµСЃСЃ
+            updateLoadingText(`РџСЂРѕРІРµСЂРєР° Р±Р°С‚С‡Р° ${currentBatch + 1}/${totalBatches} (${batchWords.length} СЃР»РѕРІ)...`);
 
             const response = await fetch(`${API_BASE}/api/deep-check`, {
                 method: 'POST',
@@ -862,20 +1008,20 @@ async function deepCheckBatch() {
             currentBatch++;
         }
 
-        // Скрываем лоадер перед показом результатов
+        // РЎРєСЂС‹РІР°РµРј Р»РѕР°РґРµСЂ РїРµСЂРµРґ РїРѕРєР°Р·РѕРј СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ
         hideLoading();
 
         if (allDeepResults.length > 0) {
             displayBatchDeepResults(results, allDeepResults, urlMap);
-            console.log('✅ Глубокая проверка batch завершена:', allDeepResults.length, 'слов');
+            console.log('вњ… Р“Р»СѓР±РѕРєР°СЏ РїСЂРѕРІРµСЂРєР° batch Р·Р°РІРµСЂС€РµРЅР°:', allDeepResults.length, 'СЃР»РѕРІ');
         } else {
-            alert('Не удалось получить результаты глубокой проверки');
+            alert('РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЂРµР·СѓР»СЊС‚Р°С‚С‹ РіР»СѓР±РѕРєРѕР№ РїСЂРѕРІРµСЂРєРё');
         }
 
     } catch (error) {
         hideLoading();
-        console.error('❌ Ошибка глубокой проверки:', error);
-        alert('Ошибка глубокой проверки: ' + error.message);
+        console.error('вќЊ РћС€РёР±РєР° РіР»СѓР±РѕРєРѕР№ РїСЂРѕРІРµСЂРєРё:', error);
+        alert('РћС€РёР±РєР° РіР»СѓР±РѕРєРѕР№ РїСЂРѕРІРµСЂРєРё: ' + error.message);
     }
 }
 
@@ -887,17 +1033,17 @@ function updateLoadingText(text) {
     }
 }
 
-// Отображение результатов глубокой проверки для batch
+// РћС‚РѕР±СЂР°Р¶РµРЅРёРµ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РіР»СѓР±РѕРєРѕР№ РїСЂРѕРІРµСЂРєРё РґР»СЏ batch
 function displayBatchDeepResults(results, deepResults, urlMap) {
     const resultsContent = document.getElementById('batchResultsContent');
 
-    // Создаем словарь результатов
+    // РЎРѕР·РґР°РµРј СЃР»РѕРІР°СЂСЊ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ
     const resultMap = {};
     deepResults.forEach(r => {
         resultMap[r.word.toLowerCase()] = r;
     });
 
-    // Группируем по URL
+    // Р“СЂСѓРїРїРёСЂСѓРµРј РїРѕ URL
     const urlResults = results.map((item, index) => {
         if (!item.success || !item.result) return null;
 
@@ -931,18 +1077,18 @@ function displayBatchDeepResults(results, deepResults, urlMap) {
         };
     }).filter(r => r !== null && (r.validated.length > 0 || r.abbreviations.length > 0 || r.invalid.length > 0));
 
-    // Считаем общую статистику
+    // РЎС‡РёС‚Р°РµРј РѕР±С‰СѓСЋ СЃС‚Р°С‚РёСЃС‚РёРєСѓ
     const totalAbbr = urlResults.reduce((sum, r) => sum + r.abbreviations.length, 0);
     const totalValid = urlResults.reduce((sum, r) => sum + r.validated.length, 0);
     const totalInvalid = urlResults.reduce((sum, r) => sum + r.invalid.length, 0);
 
     let html = `
         <div class="deep-check-results">
-            <h3>🔬 Глубокая проверка всех URL</h3>
+            <h3>рџ”¬ Р“Р»СѓР±РѕРєР°СЏ РїСЂРѕРІРµСЂРєР° РІСЃРµС… URL</h3>
             <div class="deep-summary">
-                <span class="deep-valid">✅ Подтверждено: ${totalValid}</span>
-                <span class="deep-abbr">📚 Аббревиатуры: ${totalAbbr}</span>
-                <span class="deep-invalid">❌ Требуют замены: ${totalInvalid}</span>
+                <span class="deep-valid">вњ… РџРѕРґС‚РІРµСЂР¶РґРµРЅРѕ: ${totalValid}</span>
+                <span class="deep-abbr">рџ“љ РђР±Р±СЂРµРІРёР°С‚СѓСЂС‹: ${totalAbbr}</span>
+                <span class="deep-invalid">вќЊ РўСЂРµР±СѓСЋС‚ Р·Р°РјРµРЅС‹: ${totalInvalid}</span>
             </div>
     `;
 
@@ -955,12 +1101,12 @@ function displayBatchDeepResults(results, deepResults, urlMap) {
         if (r.abbreviations.length > 0) {
             html += `
                 <div class="deep-subsection">
-                    <span class="deep-label">📚 Аббревиатуры:</span>
+                    <span class="deep-label">рџ“љ РђР±Р±СЂРµРІРёР°С‚СѓСЂС‹:</span>
                     <div class="word-list">
                         ${r.abbreviations.map(dr => `
                             <span class="word-tag abbr">
                                 ${dr.word}
-                                <span class="word-translation">→ ${dr.suggestions?.join(', ') || 'перевод неизвестен'}</span>
+                                <span class="word-translation">в†’ ${dr.suggestions?.join(', ') || 'РїРµСЂРµРІРѕРґ РЅРµРёР·РІРµСЃС‚РµРЅ'}</span>
                             </span>
                         `).join('')}
                     </div>
@@ -971,7 +1117,7 @@ function displayBatchDeepResults(results, deepResults, urlMap) {
         if (r.validated.length > 0) {
             html += `
                 <div class="deep-subsection">
-                    <span class="deep-label">✅ Подтверждено:</span>
+                    <span class="deep-label">вњ… РџРѕРґС‚РІРµСЂР¶РґРµРЅРѕ:</span>
                     <div class="word-list">
                         ${r.validated.map(dr => `
                             <span class="word-tag valid">
@@ -987,12 +1133,12 @@ function displayBatchDeepResults(results, deepResults, urlMap) {
         if (r.invalid.length > 0) {
             html += `
                 <div class="deep-subsection">
-                    <span class="deep-label">❌ Требуют замены:</span>
+                    <span class="deep-label">вќЊ РўСЂРµР±СѓСЋС‚ Р·Р°РјРµРЅС‹:</span>
                     <div class="word-list">
                         ${r.invalid.map(dr => `
                             <span class="word-tag invalid">
                                 ${dr.word}
-                                ${dr.suggestions?.length > 0 ? `<span class="word-suggestions">→ ${dr.suggestions.join(', ')}</span>` : ''}
+                                ${dr.suggestions?.length > 0 ? `<span class="word-suggestions">в†’ ${dr.suggestions.join(', ')}</span>` : ''}
                             </span>
                         `).join('')}
                     </div>
@@ -1009,7 +1155,7 @@ function displayBatchDeepResults(results, deepResults, urlMap) {
     resultsContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// Отображение результатов глубокой проверки
+// РћС‚РѕР±СЂР°Р¶РµРЅРёРµ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РіР»СѓР±РѕРєРѕР№ РїСЂРѕРІРµСЂРєРё
 function displayDeepResults(type, results) {
     const resultsContent = document.getElementById(`${type}ResultsContent`);
 
@@ -1019,24 +1165,24 @@ function displayDeepResults(type, results) {
 
     let html = `
         <div class="deep-check-results">
-            <h3>🔬 Результаты глубокой проверки</h3>
+            <h3>рџ”¬ Р РµР·СѓР»СЊС‚Р°С‚С‹ РіР»СѓР±РѕРєРѕР№ РїСЂРѕРІРµСЂРєРё</h3>
             <div class="deep-summary">
-                <span class="deep-valid">✅ Подтверждено: ${otherValid.length}</span>
-                <span class="deep-abbr">📚 ABBR: ${abbreviations.length}</span>
-                <span class="deep-invalid">❌ Неизвестно: ${invalidWords.length}</span>
+                <span class="deep-valid">вњ… РџРѕРґС‚РІРµСЂР¶РґРµРЅРѕ: ${otherValid.length}</span>
+                <span class="deep-abbr">рџ“љ ABBR: ${abbreviations.length}</span>
+                <span class="deep-invalid">вќЊ РќРµРёР·РІРµСЃС‚РЅРѕ: ${invalidWords.length}</span>
             </div>
     `;
 
     if (abbreviations.length > 0) {
         html += `
             <div class="deep-section abbreviation">
-                <h4>📚 Аббревиатуры (требуется перевод)</h4>
+                <h4>рџ“љ РђР±Р±СЂРµРІРёР°С‚СѓСЂС‹ (С‚СЂРµР±СѓРµС‚СЃСЏ РїРµСЂРµРІРѕРґ)</h4>
                 <div class="word-list">
                     ${abbreviations.map(r => `
                         <span class="word-tag abbr">
                             ${r.word}
                             <span class="word-translation" title="${r.reasons.join(', ')}">
-                                → ${r.suggestions?.join(', ') || 'перевод неизвестен'}
+                                в†’ ${r.suggestions?.join(', ') || 'РїРµСЂРµРІРѕРґ РЅРµРёР·РІРµСЃС‚РµРЅ'}
                             </span>
                         </span>
                     `).join('')}
@@ -1048,7 +1194,7 @@ function displayDeepResults(type, results) {
     if (otherValid.length > 0) {
         html += `
             <div class="deep-section valid">
-                <h4>✅ Слова, подтверждённые при глубокой проверке</h4>
+                <h4>вњ… РЎР»РѕРІР°, РїРѕРґС‚РІРµСЂР¶РґС‘РЅРЅС‹Рµ РїСЂРё РіР»СѓР±РѕРєРѕР№ РїСЂРѕРІРµСЂРєРµ</h4>
                 <div class="word-list">
                     ${otherValid.map(r => `
                         <span class="word-tag valid">
@@ -1066,13 +1212,13 @@ function displayDeepResults(type, results) {
     if (invalidWords.length > 0) {
         html += `
             <div class="deep-section invalid">
-                <h4>❓ Слова, не подтверждённые (требуют замены)</h4>
+                <h4>вќ“ РЎР»РѕРІР°, РЅРµ РїРѕРґС‚РІРµСЂР¶РґС‘РЅРЅС‹Рµ (С‚СЂРµР±СѓСЋС‚ Р·Р°РјРµРЅС‹)</h4>
                 <div class="word-list">
                     ${invalidWords.map(r => `
                         <span class="word-tag invalid">
                             ${r.word}
                             ${r.suggestions?.length > 0 ?
-                                `<span class="word-suggestions">→ ${r.suggestions.join(', ')}</span>` : ''}
+                                `<span class="word-suggestions">в†’ ${r.suggestions.join(', ')}</span>` : ''}
                         </span>
                     `).join('')}
                 </div>
@@ -1086,22 +1232,22 @@ function displayDeepResults(type, results) {
     resultsContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// Переключение отображения деталей пакетной проверки
+// РџРµСЂРµРєР»СЋС‡РµРЅРёРµ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РґРµС‚Р°Р»РµР№ РїР°РєРµС‚РЅРѕР№ РїСЂРѕРІРµСЂРєРё
 function toggleBatchDetails(index) {
     const detailsEl = document.getElementById(`batch-details-${index}`);
     if (detailsEl) {
         const isVisible = detailsEl.style.display !== 'none';
         detailsEl.style.display = isVisible ? 'none' : 'block';
         
-        // Обновляем текст кнопки
+        // РћР±РЅРѕРІР»СЏРµРј С‚РµРєСЃС‚ РєРЅРѕРїРєРё
         const btnEl = document.getElementById(`batch-btn-${index}`);
         if (btnEl) {
-            btnEl.textContent = isVisible ? 'Показать детали' : 'Скрыть детали';
+            btnEl.textContent = isVisible ? 'РџРѕРєР°Р·Р°С‚СЊ РґРµС‚Р°Р»Рё' : 'РЎРєСЂС‹С‚СЊ РґРµС‚Р°Р»Рё';
         }
     }
 }
 
-// Вспомогательные функции
+// Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅС‹Рµ С„СѓРЅРєС†РёРё
 function clearText() {
     document.getElementById('textInput').value = '';
     document.getElementById('textResults').style.display = 'none';
@@ -1109,12 +1255,12 @@ function clearText() {
 }
 
 function loadSample() {
-    document.getElementById('textInput').value = `Пример текста для проверки закона о русском языке.
+    document.getElementById('textInput').value = `РџСЂРёРјРµСЂ С‚РµРєСЃС‚Р° РґР»СЏ РїСЂРѕРІРµСЂРєРё Р·Р°РєРѕРЅР° Рѕ СЂСѓСЃСЃРєРѕРј СЏР·С‹РєРµ.
 
-Этот сервис проверяет тексты на соответствие федеральному закону №168-ФЗ. 
-Он находит слова на латинице, англицизмы и ненормативную лексику.
+Р­С‚РѕС‚ СЃРµСЂРІРёСЃ РїСЂРѕРІРµСЂСЏРµС‚ С‚РµРєСЃС‚С‹ РЅР° СЃРѕРѕС‚РІРµС‚СЃС‚РІРёРµ С„РµРґРµСЂР°Р»СЊРЅРѕРјСѓ Р·Р°РєРѕРЅСѓ в„–168-Р¤Р—. 
+РћРЅ РЅР°С…РѕРґРёС‚ СЃР»РѕРІР° РЅР° Р»Р°С‚РёРЅРёС†Рµ, Р°РЅРіР»РёС†РёР·РјС‹ Рё РЅРµРЅРѕСЂРјР°С‚РёРІРЅСѓСЋ Р»РµРєСЃРёРєСѓ.
 
-Попробуйте добавить english words или специальные термины для проверки!`;
+РџРѕРїСЂРѕР±СѓР№С‚Рµ РґРѕР±Р°РІРёС‚СЊ english words РёР»Рё СЃРїРµС†РёР°Р»СЊРЅС‹Рµ С‚РµСЂРјРёРЅС‹ РґР»СЏ РїСЂРѕРІРµСЂРєРё!`;
 }
 
 function showLoading() {
@@ -1131,9 +1277,9 @@ function hideLoading() {
     }
 }
 
-// Горячие клавиши
+// Р“РѕСЂСЏС‡РёРµ РєР»Р°РІРёС€Рё
 document.addEventListener('keydown', (e) => {
-    // Ctrl+Enter для проверки текста
+    // Ctrl+Enter РґР»СЏ РїСЂРѕРІРµСЂРєРё С‚РµРєСЃС‚Р°
     if (e.ctrlKey && e.key === 'Enter') {
         const textTab = document.getElementById('text-tab');
         if (textTab && textTab.classList.contains('active')) {
@@ -1141,3 +1287,4 @@ document.addEventListener('keydown', (e) => {
         }
     }
 });
+

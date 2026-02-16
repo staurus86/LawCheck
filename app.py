@@ -15,10 +15,17 @@ from bs4 import BeautifulSoup
 import io
 import json
 import uuid
+import base64
 from collections import defaultdict
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max request size
+app.secret_key = os.getenv('FLASK_SECRET_KEY', os.getenv('SECRET_KEY', 'change-this-secret-key'))
+
+OCR_TIMEOUT = int(os.getenv('OCR_TIMEOUT', '30'))
+OPENAI_OCR_BASE_URL = os.getenv('OPENAI_OCR_BASE_URL', 'https://api.openai.com/v1').strip()
+GOOGLE_VISION_BASE_URL = os.getenv('GOOGLE_VISION_BASE_URL', 'https://vision.googleapis.com/v1').strip()
+OCRSPACE_BASE_URL = os.getenv('OCRSPACE_BASE_URL', 'https://api.ocr.space').strip()
 # CORS - разрешаем все домены
 CORS(app, resources={
     r"/api/*": {
@@ -27,6 +34,133 @@ CORS(app, resources={
         "allow_headers": ["Content-Type"]
     }
 })
+
+
+def _mask_token(token):
+    if not token:
+        return ''
+    if len(token) <= 8:
+        return '*' * len(token)
+    return f"{token[:4]}...{token[-4:]}"
+
+
+def _extract_data_url_payload(image_data_url):
+    if not image_data_url or ';base64,' not in image_data_url:
+        raise ValueError('Некорректный data URL изображения')
+    return image_data_url.split(';base64,', 1)[1]
+
+
+def _extract_openai_text(response_json):
+    if isinstance(response_json.get('output_text'), str) and response_json.get('output_text').strip():
+        return response_json['output_text'].strip()
+
+    chunks = []
+    for output_item in response_json.get('output', []):
+        for content_item in output_item.get('content', []):
+            if content_item.get('type') in ('output_text', 'text'):
+                text_value = content_item.get('text', '')
+                if text_value:
+                    chunks.append(text_value)
+    return '\n'.join(chunks).strip()
+
+
+def _ocr_openai(api_key, model, image_url=None, image_data_url=None):
+    input_image = image_url or image_data_url
+    if not input_image:
+        raise ValueError('Передайте image_url или загруженный файл')
+
+    payload = {
+        'model': model or 'gpt-4.1-mini',
+        'input': [{
+            'role': 'user',
+            'content': [
+                {'type': 'input_text', 'text': 'Extract all text from this image. Return only recognized text.'},
+                {'type': 'input_image', 'image_url': input_image}
+            ]
+        }]
+    }
+
+    response = requests.post(
+        f"{OPENAI_OCR_BASE_URL.rstrip('/')}/responses",
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        },
+        json=payload,
+        timeout=OCR_TIMEOUT
+    )
+    response.raise_for_status()
+    data = response.json()
+    return _extract_openai_text(data), data
+
+
+def _ocr_google(api_key, model, image_url=None, image_data_url=None):
+    feature_type = model or 'DOCUMENT_TEXT_DETECTION'
+    image_block = {}
+
+    if image_data_url:
+        image_block['content'] = _extract_data_url_payload(image_data_url)
+    elif image_url:
+        image_block['source'] = {'imageUri': image_url}
+    else:
+        raise ValueError('Передайте image_url или загруженный файл')
+
+    payload = {
+        'requests': [{
+            'image': image_block,
+            'features': [{'type': feature_type}]
+        }]
+    }
+
+    response = requests.post(
+        f"{GOOGLE_VISION_BASE_URL.rstrip('/')}/images:annotate?key={api_key}",
+        headers={'Content-Type': 'application/json'},
+        json=payload,
+        timeout=OCR_TIMEOUT
+    )
+    response.raise_for_status()
+    data = response.json()
+    first = (data.get('responses') or [{}])[0]
+    text = (
+        (first.get('fullTextAnnotation') or {}).get('text')
+        or ((first.get('textAnnotations') or [{}])[0].get('description') if first.get('textAnnotations') else '')
+        or ''
+    )
+    return text.strip(), data
+
+
+def _ocr_ocrspace(api_key, model, image_url=None, image_data_url=None):
+    data = {
+        'language': model or 'rus',
+        'isOverlayRequired': 'false',
+        'OCREngine': '2'
+    }
+    files = None
+
+    if image_data_url:
+        file_bytes = base64.b64decode(_extract_data_url_payload(image_data_url))
+        files = {'file': ('image.png', file_bytes)}
+    elif image_url:
+        data['url'] = image_url
+    else:
+        raise ValueError('Передайте image_url или загруженный файл')
+
+    response = requests.post(
+        f"{OCRSPACE_BASE_URL.rstrip('/')}/parse/image",
+        headers={'apikey': api_key},
+        data=data,
+        files=files,
+        timeout=OCR_TIMEOUT
+    )
+    response.raise_for_status()
+    payload = response.json()
+
+    if payload.get('IsErroredOnProcessing'):
+        raise ValueError('; '.join(payload.get('ErrorMessage') or ['OCR.Space вернул ошибку']))
+
+    parsed = payload.get('ParsedResults') or []
+    text_parts = [item.get('ParsedText', '') for item in parsed if item.get('ParsedText')]
+    return '\n'.join(text_parts).strip(), payload
 
 # Lazy initialization - checker будет создан при первом запросе
 checker = None
@@ -325,6 +459,103 @@ def check_word():
             'timestamp': datetime.now().isoformat()
         })
     
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/images/token', methods=['GET', 'POST'])
+def image_api_token():
+    """API: Токен OCR провайдера для текущей сессии"""
+    try:
+        provider = (request.args.get('provider') or '').strip()
+        if request.method == 'GET':
+            provider = provider or (session.get('images_provider') or 'openai')
+            tokens = session.get('image_api_tokens', {})
+            token = tokens.get(provider, '')
+            return jsonify({
+                'success': True,
+                'provider': provider,
+                'has_token': bool(token),
+                'token_masked': _mask_token(token) if token else None
+            })
+
+        data = request.get_json(silent=True) or {}
+        provider = (data.get('provider') or provider or 'openai').strip().lower()
+        token = (data.get('token') or '').strip()
+
+        if provider not in ('openai', 'google', 'ocrspace'):
+            return jsonify({'error': 'Неподдерживаемый provider'}), 400
+
+        if not token:
+            return jsonify({'error': 'Токен не передан'}), 400
+
+        tokens = session.get('image_api_tokens', {})
+        tokens[provider] = token
+        session['image_api_tokens'] = tokens
+        session['images_provider'] = provider
+        session.modified = True
+
+        return jsonify({
+            'success': True,
+            'message': 'Токен сохранен в текущей сессии',
+            'provider': provider,
+            'token_masked': _mask_token(token)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/images/check', methods=['POST'])
+def check_images():
+    """API: OCR изображения + стандартная проверка текста"""
+    try:
+        data = request.get_json(silent=True) or {}
+        provider = (data.get('provider') or session.get('images_provider') or 'openai').strip().lower()
+        model = (data.get('model') or '').strip()
+        image_url = (data.get('image_url') or '').strip()
+        image_data_url = (data.get('image_data_url') or '').strip()
+
+        if provider not in ('openai', 'google', 'ocrspace'):
+            return jsonify({'error': 'Неподдерживаемый provider'}), 400
+
+        tokens = session.get('image_api_tokens', {})
+        token = (tokens.get(provider) or '').strip()
+        if not token:
+            return jsonify({'error': f'Сначала задайте API токен для provider={provider}'}), 401
+
+        if not image_url and not image_data_url:
+            return jsonify({'error': 'Передайте image_url или image_data_url'}), 400
+
+        if provider == 'openai':
+            extracted_text, raw_response = _ocr_openai(token, model, image_url=image_url, image_data_url=image_data_url)
+        elif provider == 'google':
+            extracted_text, raw_response = _ocr_google(token, model, image_url=image_url, image_data_url=image_data_url)
+        else:
+            extracted_text, raw_response = _ocr_ocrspace(token, model, image_url=image_url, image_data_url=image_data_url)
+
+        if not extracted_text.strip():
+            return jsonify({'error': 'OCR не извлек текст из изображения'}), 422
+
+        check_result = get_checker().check_text(extracted_text)
+        check_result['recommendations'] = generate_recommendations(check_result)
+        check_result['ocr'] = {
+            'provider': provider,
+            'model': model,
+            'source': image_url if image_url else 'uploaded_file',
+            'text_length': len(extracted_text),
+            'raw_preview': str(raw_response)[:1500]
+        }
+        check_result['source_url'] = image_url
+        check_result['source_type'] = 'image'
+        check_result['extracted_text'] = extracted_text
+
+        update_statistics(check_result)
+        save_to_history('image', check_result, image_url or 'uploaded_file')
+
+        return jsonify({
+            'success': True,
+            'provider': provider,
+            'result': check_result,
+            'timestamp': datetime.now().isoformat()
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
