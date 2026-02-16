@@ -402,6 +402,84 @@ body {
     margin-top: 0.55rem;
 }
 
+.product-sections {
+    border: 1px solid #DCE6F5;
+    background: #FFFFFF;
+}
+
+.audience-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+}
+
+.audience-card {
+    border: 1px solid #DFE8F8;
+    border-radius: 12px;
+    padding: 0.95rem 1rem;
+    background: #FAFCFF;
+}
+
+.audience-card h3 {
+    margin-bottom: 0.35rem;
+    font-size: 1.05rem;
+    color: #0D47A1;
+}
+
+.formats-box {
+    margin-top: 1rem;
+    padding: 0.9rem 1rem;
+    border-radius: 12px;
+    border: 1px solid #E1EAF7;
+    background: #FFFFFF;
+}
+
+.formats-box h3 {
+    margin-bottom: 0.45rem;
+    color: #0D47A1;
+}
+
+.workflow-grid {
+    margin-top: 1rem;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.8rem;
+}
+
+.workflow-step {
+    border: 1px solid #DFE8F8;
+    border-radius: 12px;
+    padding: 0.85rem 0.9rem;
+    background: #F7FAFF;
+}
+
+.workflow-num {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #1976D2;
+    color: white;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+}
+
+.workflow-step h3 {
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+}
+
+.legal-note {
+    margin-top: 1rem;
+    padding: 0.9rem 1rem;
+    border-radius: 10px;
+    border-left: 4px solid #1976D2;
+    background: #EDF5FF;
+    color: #28405B;
+}
+
 /* Form Elements */
 .form-textarea,
 .form-input {
@@ -1286,6 +1364,14 @@ body {
 
     .faq-box {
         padding: 0.85rem;
+    }
+
+    .audience-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .workflow-grid {
+        grid-template-columns: 1fr;
     }
 
     .form-textarea,
