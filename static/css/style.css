@@ -1336,6 +1336,17 @@ body {
     border: 1px solid #DDE5FF;
 }
 
+#multiscan-tab .form-textarea:disabled,
+#multiscan-tab .form-input:disabled {
+    background: #F3F5F9;
+    color: #7C8794;
+    cursor: not-allowed;
+}
+
+#multiscan-tab .batch-item .word-tag {
+    margin-top: 0.4rem;
+}
+
 @media (max-width: 768px) {
     .images-config-grid {
         grid-template-columns: 1fr;

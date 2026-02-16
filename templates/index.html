@@ -86,6 +86,10 @@
                     <i class="fas fa-image"></i>
                     <span>Images OCR</span>
                 </button>
+                <button class="tab-btn" data-tab="multiscan">
+                    <i class="fas fa-layer-group"></i>
+                    <span>MultiScan Site</span>
+                </button>
             </div>
 
             <!-- Tab Content: Text Check -->
@@ -414,6 +418,130 @@
                     </div>
                     <div class="card-body">
                         <div id="imagesBatchResultsContent"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="multiscan-tab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>MultiScan Site</h2>
+                        <p class="text-muted">Scan pages, images, and PDFs from one site or URL list.</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="images-config-grid">
+                            <div>
+                                <label class="text-muted" for="multiModeSelect">Mode</label>
+                                <select id="multiModeSelect" class="form-input" onchange="onMultiModeChange()">
+                                    <option value="site">Scan site URL</option>
+                                    <option value="urls">Scan URL list</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-muted" for="multiSiteUrlInput">Site URL</label>
+                                <input type="url" id="multiSiteUrlInput" class="form-input" placeholder="https://example.com">
+                            </div>
+                        </div>
+
+                        <label class="text-muted" for="multiUrlsInput">URL list (page/image/pdf), one per line</label>
+                        <textarea id="multiUrlsInput" class="form-textarea" placeholder="https://example.com/page&#10;https://example.com/image.jpg&#10;https://example.com/doc.pdf" rows="8"></textarea>
+                        <div class="field-meta" id="multiUrlsInputMeta">0 URLs (0 unique)</div>
+
+                        <div class="images-config-grid">
+                            <div>
+                                <label class="text-muted" for="multiUrlsFileInput">Load URLs from TXT/CSV</label>
+                                <input type="file" id="multiUrlsFileInput" class="form-input" accept=".txt,.csv,text/plain,text/csv" onchange="loadMultiUrlsFromFile(event)">
+                            </div>
+                            <div>
+                                <label class="text-muted" for="multiDelayMsInput">Delay between requests (ms)</label>
+                                <input type="number" id="multiDelayMsInput" class="form-input" min="0" max="10000" step="50" value="150">
+                            </div>
+                        </div>
+
+                        <div class="images-config-grid">
+                            <div>
+                                <label class="text-muted" for="multiProviderSelect">OCR provider</label>
+                                <select id="multiProviderSelect" class="form-input" onchange="onMultiProviderChange()">
+                                    <option value="openai">OpenAI</option>
+                                    <option value="google">Google Vision</option>
+                                    <option value="ocrspace">OCR.Space</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-muted" for="multiModelPresetSelect">Model preset</label>
+                                <select id="multiModelPresetSelect" class="form-input" onchange="onMultiModelPresetChange()"></select>
+                            </div>
+                        </div>
+
+                        <form id="multiTokenForm" onsubmit="event.preventDefault(); saveMultiApiToken();">
+                            <div class="images-config-grid">
+                                <div>
+                                    <label class="text-muted" for="multiModelInput">Custom model (optional)</label>
+                                    <input type="text" id="multiModelInput" class="form-input" placeholder="custom model or mode">
+                                </div>
+                                <div>
+                                    <label class="text-muted" for="multiTokenInput">API token</label>
+                                    <input type="password" id="multiTokenInput" class="form-input" placeholder="provider API token" autocomplete="new-password">
+                                </div>
+                            </div>
+                            <div class="images-token-row">
+                                <button type="submit" class="btn btn-secondary">
+                                    <i class="fas fa-key"></i>
+                                    Save token
+                                </button>
+                                <span id="multiTokenStatus" class="images-token-status"></span>
+                            </div>
+                        </form>
+
+                        <div class="images-config-grid">
+                            <div>
+                                <label class="text-muted" for="multiMaxUrlsInput">Max URLs total (1-2000)</label>
+                                <input type="number" id="multiMaxUrlsInput" class="form-input" min="1" max="2000" step="50" value="500">
+                            </div>
+                            <div>
+                                <label class="text-muted" for="multiMaxPagesInput">Max pages crawl (site mode)</label>
+                                <input type="number" id="multiMaxPagesInput" class="form-input" min="1" max="2000" step="50" value="500">
+                            </div>
+                        </div>
+
+                        <div class="images-config-grid">
+                            <div>
+                                <label class="text-muted" for="multiMaxResourcesInput">Max discovered resources</label>
+                                <input type="number" id="multiMaxResourcesInput" class="form-input" min="1" max="8000" step="100" value="2500">
+                            </div>
+                            <div>
+                                <label class="text-muted" for="multiIncludeExternal">Include external domains</label>
+                                <select id="multiIncludeExternal" class="form-input">
+                                    <option value="false">No (same domain only)</option>
+                                    <option value="true">Yes</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="runMultiScan()">
+                                <i class="fas fa-layer-group"></i>
+                                Run MultiScan
+                            </button>
+                            <button class="btn btn-secondary" onclick="clearMultiScanInputs()">
+                                <i class="fas fa-eraser"></i>
+                                Clear fields
+                            </button>
+                        </div>
+
+                        <div class="progress" id="multiProgress" style="display: none;">
+                            <div class="progress-bar" id="multiProgressBar"></div>
+                            <span class="progress-text" id="multiProgressText">Processing...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card results-card" id="multiResults" style="display: none;">
+                    <div class="card-header">
+                        <h2>MultiScan results</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="multiResultsContent"></div>
                     </div>
                 </div>
             </div>

@@ -17,7 +17,16 @@ import json
 import uuid
 import base64
 import time
+import re
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+from collections import deque
+from urllib.parse import urljoin, urldefrag, urlparse
+
+try:
+    from pypdf import PdfReader
+except Exception:
+    PdfReader = None
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max request size
@@ -26,6 +35,12 @@ OCR_TIMEOUT = int(os.getenv('OCR_TIMEOUT', '30'))
 OPENAI_OCR_BASE_URL = os.getenv('OPENAI_OCR_BASE_URL', 'https://api.openai.com/v1').strip()
 GOOGLE_VISION_BASE_URL = os.getenv('GOOGLE_VISION_BASE_URL', 'https://vision.googleapis.com/v1').strip()
 OCRSPACE_BASE_URL = os.getenv('OCRSPACE_BASE_URL', 'https://api.ocr.space').strip()
+MULTISCAN_MAX_URLS_HARD = int(os.getenv('MULTISCAN_MAX_URLS_HARD', '2000'))
+MULTISCAN_MAX_PAGES_HARD = int(os.getenv('MULTISCAN_MAX_PAGES_HARD', '2000'))
+MULTISCAN_MAX_RESOURCES_HARD = int(os.getenv('MULTISCAN_MAX_RESOURCES_HARD', '8000'))
+MULTISCAN_MAX_TEXT_CHARS = int(os.getenv('MULTISCAN_MAX_TEXT_CHARS', '200000'))
+MULTISCAN_MAX_DOWNLOAD_BYTES = int(os.getenv('MULTISCAN_MAX_DOWNLOAD_BYTES', str(8 * 1024 * 1024)))
+MULTISCAN_USER_AGENT = os.getenv('MULTISCAN_USER_AGENT', 'LawChecker-MultiScan/1.0')
 # CORS - разрешаем все домены
 CORS(app, resources={
     r"/api/*": {
@@ -220,6 +235,142 @@ def _extract_ocr_usage(provider, raw_response):
         return {'parsed_results': len(parsed), 'processing_ms': processing_ms}
     return {}
 
+
+def _normalize_http_url(raw_url):
+    url = (raw_url or '').strip()
+    if not url:
+        return ''
+    if not url.startswith('http://') and not url.startswith('https://'):
+        return ''
+    return urldefrag(url)[0]
+
+
+def _safe_int(value, default_value, min_value, max_value):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default_value
+    return max(min_value, min(parsed, max_value))
+
+
+def _safe_bool(value, default_value=False):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default_value
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'y', 'on')
+
+
+def _is_image_url(url):
+    lower = (url or '').lower()
+    return bool(re.search(r'\.(png|jpe?g|webp|bmp|gif|tiff|svg)(\?.*)?$', lower))
+
+
+def _is_pdf_url(url):
+    lower = (url or '').lower()
+    return bool(re.search(r'\.pdf(\?.*)?$', lower))
+
+
+def _same_domain(url_a, url_b):
+    try:
+        return (urlparse(url_a).netloc or '').lower() == (urlparse(url_b).netloc or '').lower()
+    except Exception:
+        return False
+
+
+def _fetch_url_bytes(url, timeout_sec=15, max_bytes=MULTISCAN_MAX_DOWNLOAD_BYTES):
+    response = requests.get(
+        url,
+        timeout=timeout_sec,
+        stream=True,
+        headers={'User-Agent': MULTISCAN_USER_AGENT}
+    )
+    response.raise_for_status()
+    chunks = []
+    total = 0
+    for chunk in response.iter_content(chunk_size=65536):
+        if not chunk:
+            continue
+        total += len(chunk)
+        if total > max_bytes:
+            raise ValueError(f'Resource too large: {total} bytes > {max_bytes} bytes')
+        chunks.append(chunk)
+    raw = b''.join(chunks)
+    content_type = (response.headers.get('Content-Type') or '').lower()
+    return raw, content_type
+
+
+def _extract_visible_text_from_html(html_text):
+    soup = BeautifulSoup(html_text, 'html.parser')
+    for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'noscript']):
+        tag.decompose()
+    title = soup.find('title')
+    title_text = title.get_text(' ', strip=True) if title else ''
+    text = soup.get_text(separator=' ', strip=True)
+    return text, title_text, soup
+
+
+def _extract_links_from_soup(soup, base_url):
+    page_links = set()
+    image_links = set()
+    pdf_links = set()
+
+    for img in soup.select('img[src]'):
+        src = _normalize_http_url(urljoin(base_url, img.get('src', '')))
+        if src:
+            image_links.add(src)
+
+    for source_tag in soup.select('source[src]'):
+        src = _normalize_http_url(urljoin(base_url, source_tag.get('src', '')))
+        if not src:
+            continue
+        if _is_image_url(src):
+            image_links.add(src)
+
+    for anchor in soup.select('a[href]'):
+        href = _normalize_http_url(urljoin(base_url, anchor.get('href', '')))
+        if not href:
+            continue
+        if _is_pdf_url(href):
+            pdf_links.add(href)
+        else:
+            page_links.add(href)
+
+    return page_links, image_links, pdf_links
+
+
+def _extract_pdf_text(raw_bytes):
+    if PdfReader is None:
+        raise RuntimeError('PDF parser is unavailable. Install pypdf.')
+    reader = PdfReader(io.BytesIO(raw_bytes))
+    text_parts = []
+    for page in reader.pages:
+        page_text = page.extract_text() or ''
+        if page_text:
+            text_parts.append(page_text)
+        if sum(len(part) for part in text_parts) >= MULTISCAN_MAX_TEXT_CHARS:
+            break
+    return '\n'.join(text_parts).strip()
+
+
+def _build_resource_result(url, resource_type, check_result, source_meta=None):
+    source_meta = source_meta or {}
+    forbidden_words = sorted(set(
+        (check_result.get('nenormative_words') or [])
+        + (check_result.get('latin_words') or [])
+        + (check_result.get('unknown_cyrillic') or [])
+    ))
+    return {
+        'url': url,
+        'resource_type': resource_type,
+        'success': True,
+        'violations_count': check_result.get('violations_count', 0),
+        'law_compliant': bool(check_result.get('law_compliant', True)),
+        'forbidden_words': forbidden_words,
+        'result': check_result,
+        'meta': source_meta
+    }
+
 # ==================== API ENDPOINTS ====================
 
 @app.route('/api/check', methods=['POST'])
@@ -303,41 +454,61 @@ def check_url():
 def batch_check():
     """API: Пакетная проверка"""
     try:
-        data = request.json
+        data = request.get_json(silent=True) or {}
         urls = data.get('urls', [])
         
         if not urls:
             return jsonify({'error': 'Список URL пуст'}), 400
-        
-        results = []
-        for url in urls[:50]:  # Лимит 50 URL за раз
+
+        max_urls = int(os.getenv('BATCH_MAX_URLS', '100'))
+        max_workers = int(os.getenv('BATCH_MAX_WORKERS', '8'))
+        max_workers = max(1, min(max_workers, 32))
+
+        # Нормализуем и ограничиваем список URL
+        clean_urls = []
+        for raw in urls:
+            url = (raw or '').strip()
+            if url and url.startswith('http'):
+                clean_urls.append(url)
+            if len(clean_urls) >= max_urls:
+                break
+
+        if not clean_urls:
+            return jsonify({'error': 'Нет корректных URL'}), 400
+
+        checker_instance = get_checker()
+
+        def process_single_url(url):
             try:
-                response = requests.get(url, timeout=10, headers={
+                response = requests.get(url, timeout=12, headers={
                     'User-Agent': 'Mozilla/5.0'
                 })
+                response.raise_for_status()
                 soup = BeautifulSoup(response.text, 'html.parser')
-                for tag in soup(['script', 'style']):
+                for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
                     tag.decompose()
                 text = soup.get_text(separator=' ', strip=True)
-                result = get_checker().check_text(text)
-                
-                results.append({
+                result = checker_instance.check_text(text)
+                return {
                     'url': url,
                     'success': True,
                     'result': result
-                })
-                
+                }
             except Exception as e:
-                results.append({
+                return {
                     'url': url,
                     'success': False,
                     'error': str(e)
-                })
+                }
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(process_single_url, clean_urls))
         
         return jsonify({
             'success': True,
-            'total': len(urls),
+            'total': len(clean_urls),
             'results': results,
+            'workers': max_workers,
             'timestamp': datetime.now().isoformat()
         })
     
@@ -611,6 +782,290 @@ def check_images():
         save_to_history('image', result, image_url or 'uploaded_file')
 
         return jsonify({'success': True, 'provider': provider, 'result': result, 'timestamp': datetime.now().isoformat()})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/multiscan/run', methods=['POST'])
+def multiscan_run():
+    try:
+        started_at = time.perf_counter()
+        data = request.get_json(silent=True) or {}
+
+        mode = (data.get('mode') or 'site').strip().lower()
+        provider = (data.get('provider') or session.get('images_provider') or 'openai').strip().lower()
+        model = (data.get('model') or '').strip()
+        incoming_token = (data.get('token') or '').strip()
+
+        if provider not in ('openai', 'google', 'ocrspace'):
+            return jsonify({'error': 'Unsupported provider'}), 400
+
+        if incoming_token:
+            tokens = session.get('image_api_tokens', {})
+            tokens[provider] = incoming_token
+            session['image_api_tokens'] = tokens
+            session['images_provider'] = provider
+            session.modified = True
+
+        token = (session.get('image_api_tokens', {}).get(provider) or '').strip()
+        delay_ms = _safe_int(data.get('delay_ms', 150), 150, 0, 10000)
+        timeout_sec = _safe_int(data.get('timeout_sec', 18), 18, 5, 60)
+        max_urls = _safe_int(data.get('max_urls', 500), 500, 1, MULTISCAN_MAX_URLS_HARD)
+        max_pages = _safe_int(data.get('max_pages', 500), 500, 1, MULTISCAN_MAX_PAGES_HARD)
+        max_resources = _safe_int(data.get('max_resources', 2500), 2500, 1, MULTISCAN_MAX_RESOURCES_HARD)
+        include_external = _safe_bool(data.get('include_external'), False)
+        max_text_chars = _safe_int(data.get('max_text_chars', MULTISCAN_MAX_TEXT_CHARS), MULTISCAN_MAX_TEXT_CHARS, 2000, MULTISCAN_MAX_TEXT_CHARS)
+
+        checker_instance = get_checker()
+        results = []
+        seen = set()
+        crawl_stats = {
+            'pages_scanned': 0,
+            'images_discovered': 0,
+            'pdf_discovered': 0,
+            'queue_dropped_by_limits': 0
+        }
+
+        def add_result(item):
+            results.append(item)
+            if len(results) > max_urls:
+                raise RuntimeError(f'Max URLs limit reached ({max_urls})')
+
+        def process_text_resource(url, text, resource_type, source_meta=None):
+            checked_text = (text or '')[:max_text_chars]
+            checked = checker_instance.check_text(checked_text)
+            checked['recommendations'] = generate_recommendations(checked)
+            add_result(_build_resource_result(url, resource_type, checked, source_meta=source_meta))
+
+        def process_image_resource(image_url):
+            if not token:
+                add_result({
+                    'url': image_url,
+                    'resource_type': 'image',
+                    'success': False,
+                    'error': f'Set API token first for provider={provider}'
+                })
+                return
+            if provider == 'openai':
+                extracted_text, raw_response = _ocr_openai(token, model, image_url=image_url)
+            elif provider == 'google':
+                extracted_text, raw_response = _ocr_google(token, model, image_url=image_url)
+            else:
+                extracted_text, raw_response = _ocr_ocrspace(token, model, image_url=image_url)
+
+            if not extracted_text.strip():
+                add_result({
+                    'url': image_url,
+                    'resource_type': 'image',
+                    'success': False,
+                    'error': 'OCR returned empty text'
+                })
+                return
+            checked = checker_instance.check_text(extracted_text[:max_text_chars])
+            checked['recommendations'] = generate_recommendations(checked)
+            checked['ocr'] = {
+                'provider': provider,
+                'model': model or ('gpt-4.1-mini' if provider == 'openai' else 'DOCUMENT_TEXT_DETECTION' if provider == 'google' else 'rus'),
+                'source': image_url,
+                'text_length': len(extracted_text),
+                'usage': _extract_ocr_usage(provider, raw_response)
+            }
+            checked['source_type'] = 'image'
+            checked['source_url'] = image_url
+            checked['extracted_text'] = extracted_text
+            add_result(_build_resource_result(image_url, 'image', checked))
+
+        def process_pdf_resource(pdf_url):
+            raw, _content_type = _fetch_url_bytes(pdf_url, timeout_sec=timeout_sec)
+            pdf_text = _extract_pdf_text(raw)
+            process_text_resource(
+                pdf_url,
+                pdf_text,
+                'pdf',
+                source_meta={'text_length': len(pdf_text)}
+            )
+
+        def process_page_resource(page_url):
+            raw, content_type = _fetch_url_bytes(page_url, timeout_sec=timeout_sec)
+            html_text = raw.decode('utf-8', errors='replace')
+            page_text, page_title, soup = _extract_visible_text_from_html(html_text)
+            process_text_resource(
+                page_url,
+                page_text,
+                'page',
+                source_meta={'title': page_title, 'content_type': content_type, 'text_length': len(page_text)}
+            )
+            return soup
+
+        if mode == 'site':
+            site_url = _normalize_http_url(data.get('site_url') or '')
+            if not site_url:
+                return jsonify({'error': 'Provide valid site_url'}), 400
+
+            page_queue = deque([site_url])
+            discovered_images = deque()
+            discovered_pdfs = deque()
+
+            while page_queue and crawl_stats['pages_scanned'] < max_pages and len(results) < max_urls:
+                current_url = page_queue.popleft()
+                if current_url in seen:
+                    continue
+                seen.add(current_url)
+                try:
+                    soup = process_page_resource(current_url)
+                    crawl_stats['pages_scanned'] += 1
+                    page_links, image_links, pdf_links = _extract_links_from_soup(soup, current_url)
+
+                    for page_link in page_links:
+                        if page_link in seen:
+                            continue
+                        if not include_external and not _same_domain(site_url, page_link):
+                            continue
+                        if len(page_queue) + crawl_stats['pages_scanned'] >= max_pages:
+                            crawl_stats['queue_dropped_by_limits'] += 1
+                            continue
+                        page_queue.append(page_link)
+
+                    for image_link in image_links:
+                        if image_link in seen:
+                            continue
+                        if not include_external and not _same_domain(site_url, image_link):
+                            continue
+                        if len(discovered_images) + len(discovered_pdfs) >= max_resources:
+                            crawl_stats['queue_dropped_by_limits'] += 1
+                            continue
+                        discovered_images.append(image_link)
+                        seen.add(image_link)
+                        crawl_stats['images_discovered'] += 1
+
+                    for pdf_link in pdf_links:
+                        if pdf_link in seen:
+                            continue
+                        if not include_external and not _same_domain(site_url, pdf_link):
+                            continue
+                        if len(discovered_images) + len(discovered_pdfs) >= max_resources:
+                            crawl_stats['queue_dropped_by_limits'] += 1
+                            continue
+                        discovered_pdfs.append(pdf_link)
+                        seen.add(pdf_link)
+                        crawl_stats['pdf_discovered'] += 1
+
+                except Exception as e:
+                    add_result({
+                        'url': current_url,
+                        'resource_type': 'page',
+                        'success': False,
+                        'error': str(e)
+                    })
+
+                if delay_ms > 0:
+                    time.sleep(delay_ms / 1000.0)
+
+            while discovered_images and len(results) < max_urls:
+                image_url = discovered_images.popleft()
+                try:
+                    process_image_resource(image_url)
+                except Exception as e:
+                    add_result({
+                        'url': image_url,
+                        'resource_type': 'image',
+                        'success': False,
+                        'error': str(e)
+                    })
+                if delay_ms > 0:
+                    time.sleep(delay_ms / 1000.0)
+
+            while discovered_pdfs and len(results) < max_urls:
+                pdf_url = discovered_pdfs.popleft()
+                try:
+                    process_pdf_resource(pdf_url)
+                except Exception as e:
+                    add_result({
+                        'url': pdf_url,
+                        'resource_type': 'pdf',
+                        'success': False,
+                        'error': str(e)
+                    })
+                if delay_ms > 0:
+                    time.sleep(delay_ms / 1000.0)
+
+        elif mode == 'urls':
+            incoming_urls = data.get('urls') or []
+            if isinstance(incoming_urls, str):
+                incoming_urls = [u.strip() for u in incoming_urls.splitlines() if u.strip()]
+
+            normalized_urls = []
+            for raw_url in incoming_urls:
+                normalized = _normalize_http_url(raw_url)
+                if not normalized:
+                    continue
+                if normalized in seen:
+                    continue
+                seen.add(normalized)
+                normalized_urls.append(normalized)
+                if len(normalized_urls) >= max_urls:
+                    break
+
+            if not normalized_urls:
+                return jsonify({'error': 'No valid URLs provided'}), 400
+
+            for item_url in normalized_urls:
+                try:
+                    if _is_image_url(item_url):
+                        process_image_resource(item_url)
+                    elif _is_pdf_url(item_url):
+                        process_pdf_resource(item_url)
+                    else:
+                        raw, content_type = _fetch_url_bytes(item_url, timeout_sec=timeout_sec)
+                        if 'pdf' in content_type:
+                            pdf_text = _extract_pdf_text(raw)
+                            process_text_resource(item_url, pdf_text, 'pdf', source_meta={'content_type': content_type, 'text_length': len(pdf_text)})
+                        elif any(x in content_type for x in ('image/', 'octet-stream')) and _is_image_url(item_url):
+                            process_image_resource(item_url)
+                        else:
+                            html_text = raw.decode('utf-8', errors='replace')
+                            page_text, page_title, _soup = _extract_visible_text_from_html(html_text)
+                            process_text_resource(item_url, page_text, 'page', source_meta={'title': page_title, 'content_type': content_type, 'text_length': len(page_text)})
+                except Exception as e:
+                    guessed_type = 'image' if _is_image_url(item_url) else 'pdf' if _is_pdf_url(item_url) else 'page'
+                    add_result({'url': item_url, 'resource_type': guessed_type, 'success': False, 'error': str(e)})
+                if delay_ms > 0:
+                    time.sleep(delay_ms / 1000.0)
+        else:
+            return jsonify({'error': 'Unsupported mode. Use "site" or "urls".'}), 400
+
+        success_items = [r for r in results if r.get('success')]
+        error_items = [r for r in results if not r.get('success')]
+        with_violations = [r for r in success_items if not r.get('law_compliant', True)]
+        totals_by_type = defaultdict(int)
+        for item in results:
+            totals_by_type[item.get('resource_type', 'unknown')] += 1
+
+        return jsonify({
+            'success': True,
+            'mode': mode,
+            'provider': provider,
+            'model': model or None,
+            'limits': {
+                'max_urls': max_urls,
+                'max_pages': max_pages,
+                'max_resources': max_resources,
+                'max_text_chars': max_text_chars
+            },
+            'crawl_stats': crawl_stats,
+            'total': len(results),
+            'processed_success': len(success_items),
+            'processed_error': len(error_items),
+            'with_violations': len(with_violations),
+            'totals_by_type': dict(totals_by_type),
+            'results': results,
+            'timings_ms': {
+                'total': round((time.perf_counter() - started_at) * 1000, 2)
+            },
+            'timestamp': datetime.now().isoformat()
+        })
+    except RuntimeError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

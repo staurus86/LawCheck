@@ -8,7 +8,8 @@ let currentResults = {
     url: null,
     batch: null,
     images: null,
-    imagesBatch: null
+    imagesBatch: null,
+    multi: null
 };
 const ACTIVE_TAB_KEY = 'lawchecker.activeTab';
 
@@ -19,6 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadStats();
     onImagesProviderChange();
     loadImageTokenStatus();
+    onMultiProviderChange();
+    onMultiModeChange();
     console.log('App loaded');
 });
 
@@ -53,6 +56,13 @@ function switchTab(tabName) {
 function getActiveTabName() {
     const activeBtn = document.querySelector('.tab-btn.active');
     return activeBtn ? activeBtn.dataset.tab : 'text';
+}
+
+function extractHttpUrls(inputText) {
+    return (inputText || '')
+        .split(/\r?\n|,|;|\t|\s+/g)
+        .map(v => v.trim())
+        .filter(v => /^https?:\/\//i.test(v));
 }
 
 function updateTextInputMeta() {
@@ -99,19 +109,31 @@ function updateImagesBatchInputMeta() {
     meta.textContent = `${urls.length} image URLs (${unique.size} unique)`;
 }
 
+function updateMultiUrlsInputMeta() {
+    const input = document.getElementById('multiUrlsInput');
+    const meta = document.getElementById('multiUrlsInputMeta');
+    if (!input || !meta) return;
+    const urls = extractHttpUrls(input.value || '');
+    const unique = new Set(urls);
+    meta.textContent = `${urls.length} URLs (${unique.size} unique)`;
+}
+
 function initFieldMetrics() {
     const textInput = document.getElementById('textInput');
     const batchInput = document.getElementById('batchInput');
     const imagesInput = document.getElementById('imagesInput');
     const imagesBatchInput = document.getElementById('imagesBatchInput');
+    const multiUrlsInput = document.getElementById('multiUrlsInput');
     if (textInput) textInput.addEventListener('input', updateTextInputMeta);
     if (batchInput) batchInput.addEventListener('input', updateBatchInputMeta);
     if (imagesInput) imagesInput.addEventListener('input', updateImagesInputMeta);
     if (imagesBatchInput) imagesBatchInput.addEventListener('input', updateImagesBatchInputMeta);
+    if (multiUrlsInput) multiUrlsInput.addEventListener('input', updateMultiUrlsInputMeta);
     updateTextInputMeta();
     updateBatchInputMeta();
     updateImagesInputMeta();
     updateImagesBatchInputMeta();
+    updateMultiUrlsInputMeta();
 }
 
 async function loadStats() {
@@ -693,6 +715,317 @@ async function checkImagesBatchQueue() {
 
     currentResults.imagesBatch = results;
     displayImagesBatchResults(results);
+}
+
+function getMultiProvider() {
+    const el = document.getElementById('multiProviderSelect');
+    return el ? el.value : 'openai';
+}
+
+function onMultiModeChange() {
+    const modeEl = document.getElementById('multiModeSelect');
+    const siteInput = document.getElementById('multiSiteUrlInput');
+    const urlsInput = document.getElementById('multiUrlsInput');
+    if (!modeEl || !siteInput || !urlsInput) return;
+    const mode = modeEl.value;
+    siteInput.disabled = mode !== 'site';
+    urlsInput.disabled = mode !== 'urls';
+}
+
+function onMultiProviderChange() {
+    const provider = getMultiProvider();
+    const presetEl = document.getElementById('multiModelPresetSelect');
+    const modelInput = document.getElementById('multiModelInput');
+    if (!presetEl) return;
+
+    presetEl.innerHTML = '';
+    (IMAGE_MODEL_PRESETS[provider] || []).forEach(model => {
+        const option = document.createElement('option');
+        option.value = model;
+        option.textContent = model;
+        presetEl.appendChild(option);
+    });
+    const customOption = document.createElement('option');
+    customOption.value = '__custom__';
+    customOption.textContent = 'custom';
+    presetEl.appendChild(customOption);
+
+    if (modelInput && !modelInput.value.trim()) {
+        modelInput.value = getDefaultModelByProvider(provider);
+    }
+    onMultiModelPresetChange();
+    loadMultiTokenStatus();
+}
+
+function onMultiModelPresetChange() {
+    const presetEl = document.getElementById('multiModelPresetSelect');
+    const modelInput = document.getElementById('multiModelInput');
+    if (!presetEl || !modelInput) return;
+    if (presetEl.value !== '__custom__') {
+        modelInput.value = presetEl.value;
+    }
+}
+
+async function loadMultiTokenStatus() {
+    const statusEl = document.getElementById('multiTokenStatus');
+    if (!statusEl) return;
+    const provider = getMultiProvider();
+    try {
+        const response = await fetch(`${API_BASE}/api/images/token?provider=${encodeURIComponent(provider)}`, {
+            credentials: 'same-origin'
+        });
+        const data = await response.json();
+        if (data.success && data.has_token) {
+            statusEl.textContent = `token: ${data.token_masked || 'saved'}`;
+            statusEl.className = 'images-token-status success';
+        } else {
+            statusEl.textContent = 'token not set';
+            statusEl.className = 'images-token-status';
+        }
+    } catch (_e) {
+        statusEl.textContent = 'token status error';
+        statusEl.className = 'images-token-status error';
+    }
+}
+
+async function saveMultiApiToken() {
+    const provider = getMultiProvider();
+    const input = document.getElementById('multiTokenInput');
+    const statusEl = document.getElementById('multiTokenStatus');
+    if (!input || !statusEl) return;
+    const token = input.value.trim();
+    if (!token) {
+        alert('Enter API token');
+        return;
+    }
+    try {
+        const response = await fetch(`${API_BASE}/api/images/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ provider, token })
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Token save failed');
+        statusEl.textContent = `token saved: ${data.token_masked || ''}`;
+        statusEl.className = 'images-token-status success';
+        input.value = '';
+    } catch (e) {
+        statusEl.textContent = `error: ${e.message}`;
+        statusEl.className = 'images-token-status error';
+    }
+}
+
+function parseUrlsFromCsvText(csvText) {
+    const lines = (csvText || '').split(/\r?\n/);
+    const urls = [];
+    lines.forEach(line => {
+        line.split(/[;,]/).forEach(cell => {
+            const value = cell.trim().replace(/^"|"$/g, '');
+            if (/^https?:\/\//i.test(value)) urls.push(value);
+        });
+    });
+    return urls;
+}
+
+async function loadMultiUrlsFromFile(event) {
+    const file = event && event.target && event.target.files ? event.target.files[0] : null;
+    if (!file) return;
+    const input = document.getElementById('multiUrlsInput');
+    if (!input) return;
+    try {
+        const text = await file.text();
+        let urls = [];
+        if (file.name.toLowerCase().endsWith('.csv')) {
+            urls = parseUrlsFromCsvText(text);
+        } else {
+            urls = extractHttpUrls(text);
+        }
+        const merged = [...extractHttpUrls(input.value || ''), ...urls];
+        const unique = Array.from(new Set(merged));
+        input.value = unique.join('\n');
+        updateMultiUrlsInputMeta();
+    } catch (e) {
+        alert('Failed to read file: ' + e.message);
+    }
+}
+
+function renderMultiItem(item, index) {
+    if (!item.success) {
+        return `
+            <div class="batch-item error">
+                <div class="batch-item-header">
+                    <span class="batch-number">[${index + 1}]</span>
+                    <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
+                    <span class="word-tag invalid">${item.resource_type || 'unknown'}</span>
+                </div>
+                <div class="batch-item-error">Error: ${item.error || 'Unknown error'}</div>
+            </div>
+        `;
+    }
+
+    const statusClass = item.law_compliant ? 'success' : 'warning';
+    const forbiddenPreview = (item.forbidden_words || []).slice(0, 20);
+    return `
+        <div class="batch-item ${statusClass}">
+            <div class="batch-item-header">
+                <span class="batch-number">[${index + 1}]</span>
+                <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
+                <span class="word-tag">${item.resource_type || 'unknown'}</span>
+            </div>
+            <div class="batch-item-stats">
+                <span class="batch-violations-count">${item.law_compliant ? 'compliant' : `violations: ${item.violations_count || 0}`}</span>
+                <span class="batch-words-count">words: ${(item.result && item.result.total_words) || 0}</span>
+            </div>
+            ${forbiddenPreview.length ? `
+                <div class="word-list">
+                    ${forbiddenPreview.map(w => `<span class="word-tag">${w}</span>`).join('')}
+                    ${(item.forbidden_words || []).length > forbiddenPreview.length ? `<span class="more-words">... +${(item.forbidden_words || []).length - forbiddenPreview.length}</span>` : ''}
+                </div>
+            ` : '<div class="text-muted">No forbidden words found.</div>'}
+        </div>
+    `;
+}
+
+function displayMultiResults(payload) {
+    const card = document.getElementById('multiResults');
+    const content = document.getElementById('multiResultsContent');
+    if (!card || !content) return;
+
+    const results = payload.results || [];
+    const byType = payload.totals_by_type || {};
+    const summary = `
+        <div class="batch-summary">
+            <div class="summary-stats">
+                <div class="summary-stat">
+                    <span class="summary-value">${payload.total || 0}</span>
+                    <span class="summary-label">Total</span>
+                </div>
+                <div class="summary-stat success">
+                    <span class="summary-value">${payload.processed_success || 0}</span>
+                    <span class="summary-label">Success</span>
+                </div>
+                <div class="summary-stat error">
+                    <span class="summary-value">${payload.processed_error || 0}</span>
+                    <span class="summary-label">Errors</span>
+                </div>
+                <div class="summary-stat warning">
+                    <span class="summary-value">${payload.with_violations || 0}</span>
+                    <span class="summary-label">With violations</span>
+                </div>
+            </div>
+            <p class="text-muted">Types: pages=${byType.page || 0}, images=${byType.image || 0}, pdf=${byType.pdf || 0}</p>
+            <p class="text-muted">Total time: ${(payload.timings_ms && payload.timings_ms.total) || '-'} ms</p>
+        </div>
+    `;
+
+    content.innerHTML = `
+        ${summary}
+        <div class="batch-results-list">
+            ${results.map((item, idx) => renderMultiItem(item, idx)).join('')}
+        </div>
+    `;
+    card.style.display = 'block';
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function buildMultiPayload() {
+    const mode = (document.getElementById('multiModeSelect') || {}).value || 'site';
+    const siteUrl = (document.getElementById('multiSiteUrlInput') || {}).value || '';
+    const urlListText = (document.getElementById('multiUrlsInput') || {}).value || '';
+    const provider = getMultiProvider();
+    const model = (document.getElementById('multiModelInput') || {}).value || '';
+    const token = (document.getElementById('multiTokenInput') || {}).value || '';
+    const maxUrls = parseInt((document.getElementById('multiMaxUrlsInput') || {}).value || '500', 10);
+    const maxPages = parseInt((document.getElementById('multiMaxPagesInput') || {}).value || '500', 10);
+    const maxResources = parseInt((document.getElementById('multiMaxResourcesInput') || {}).value || '2500', 10);
+    const delayMs = parseInt((document.getElementById('multiDelayMsInput') || {}).value || '150', 10);
+    const includeExternal = ((document.getElementById('multiIncludeExternal') || {}).value || 'false') === 'true';
+
+    const urls = Array.from(new Set(extractHttpUrls(urlListText)));
+    return {
+        mode,
+        site_url: siteUrl.trim(),
+        urls,
+        provider,
+        model: model.trim(),
+        token: token.trim(),
+        max_urls: Number.isFinite(maxUrls) ? maxUrls : 500,
+        max_pages: Number.isFinite(maxPages) ? maxPages : 500,
+        max_resources: Number.isFinite(maxResources) ? maxResources : 2500,
+        delay_ms: Number.isFinite(delayMs) ? delayMs : 150,
+        include_external: includeExternal
+    };
+}
+
+async function runMultiScan() {
+    const payload = buildMultiPayload();
+    if (payload.mode === 'site') {
+        if (!/^https?:\/\//i.test(payload.site_url)) {
+            alert('Provide valid site URL');
+            return;
+        }
+    } else if (!payload.urls.length) {
+        alert('Provide at least one URL in list mode');
+        return;
+    }
+
+    const progress = document.getElementById('multiProgress');
+    const progressBar = document.getElementById('multiProgressBar');
+    const progressText = document.getElementById('multiProgressText');
+    if (progress) progress.style.display = 'block';
+    if (progressBar) {
+        progressBar.style.animation = 'progressShine 1.2s linear infinite';
+        progressBar.style.width = '100%';
+    }
+    if (progressText) progressText.textContent = 'Processing...';
+
+    showLoading();
+    try {
+        const response = await fetch(`${API_BASE}/api/multiscan/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'MultiScan failed');
+        currentResults.multi = data;
+        displayMultiResults(data);
+        const tokenInput = document.getElementById('multiTokenInput');
+        if (tokenInput) tokenInput.value = '';
+        await loadMultiTokenStatus();
+    } catch (e) {
+        alert('MultiScan error: ' + e.message);
+    } finally {
+        hideLoading();
+        if (progress) progress.style.display = 'none';
+        if (progressBar) {
+            progressBar.style.animation = 'none';
+            progressBar.style.width = '0%';
+        }
+    }
+}
+
+function clearMultiScanInputs() {
+    const fields = [
+        'multiSiteUrlInput',
+        'multiUrlsInput',
+        'multiTokenInput',
+        'multiModelInput'
+    ];
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const fileInput = document.getElementById('multiUrlsFileInput');
+    if (fileInput) fileInput.value = '';
+    const resultsCard = document.getElementById('multiResults');
+    if (resultsCard) resultsCard.style.display = 'none';
+    currentResults.multi = null;
+    updateMultiUrlsInputMeta();
+    onMultiProviderChange();
+    onMultiModeChange();
 }
 
 async function checkWord() {
