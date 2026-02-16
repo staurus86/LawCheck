@@ -1028,6 +1028,189 @@ function clearMultiScanInputs() {
     onMultiModeChange();
 }
 
+async function deepCheckMultiScan() {
+    const payload = currentResults.multi;
+    const results = payload && Array.isArray(payload.results) ? payload.results : [];
+    if (!results.length) {
+        alert('No MultiScan results to deep check');
+        return;
+    }
+
+    const urlMap = [];
+    const allWords = new Set();
+    results.forEach((item, index) => {
+        if (!item.success || !item.result) return;
+        const latin = item.result.latin_words || [];
+        const unknown = item.result.unknown_cyrillic || [];
+        const words = [...latin, ...unknown];
+        if (!words.length) return;
+        words.forEach(word => {
+            const key = word.toLowerCase();
+            if (allWords.has(key)) return;
+            allWords.add(key);
+            urlMap.push({
+                index,
+                word,
+                url: item.url,
+                resourceType: item.resource_type || 'unknown'
+            });
+        });
+    });
+
+    if (!urlMap.length) {
+        alert('No words for deep check in MultiScan results');
+        return;
+    }
+
+    const words = urlMap.map(x => x.word);
+    const batchSize = 100;
+    const totalBatches = Math.ceil(words.length / batchSize);
+    const deepResults = [];
+
+    showLoading();
+    try {
+        for (let i = 0; i < totalBatches; i += 1) {
+            const start = i * batchSize;
+            const chunk = words.slice(start, start + batchSize);
+            updateLoadingText(`Deep check batch ${i + 1}/${totalBatches} (${chunk.length} words)...`);
+            const response = await fetch(`${API_BASE}/api/deep-check`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ words: chunk })
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            if (data.success && Array.isArray(data.results)) {
+                deepResults.push(...data.results);
+            }
+        }
+
+        displayMultiDeepResults(results, deepResults);
+    } catch (e) {
+        alert('Multi deep check error: ' + e.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+function displayMultiDeepResults(results, deepResults) {
+    const resultsContent = document.getElementById('multiResultsContent');
+    if (!resultsContent) return;
+
+    const resultMap = {};
+    deepResults.forEach(r => {
+        resultMap[(r.word || '').toLowerCase()] = r;
+    });
+
+    const perResource = [];
+    results.forEach(item => {
+        if (!item.success || !item.result) return;
+        const allWords = [...(item.result.latin_words || []), ...(item.result.unknown_cyrillic || [])];
+        if (!allWords.length) return;
+        const validated = [];
+        const abbreviations = [];
+        const invalid = [];
+        allWords.forEach(word => {
+            const dr = resultMap[word.toLowerCase()];
+            if (!dr) return;
+            if ((dr.reasons || []).includes('abbreviation')) {
+                abbreviations.push(dr);
+            } else if (dr.is_valid) {
+                validated.push(dr);
+            } else {
+                invalid.push(dr);
+            }
+        });
+        if (validated.length || abbreviations.length || invalid.length) {
+            perResource.push({
+                url: item.url,
+                resourceType: item.resource_type || 'unknown',
+                validated,
+                abbreviations,
+                invalid
+            });
+        }
+    });
+
+    const totalAbbr = perResource.reduce((sum, r) => sum + r.abbreviations.length, 0);
+    const totalValid = perResource.reduce((sum, r) => sum + r.validated.length, 0);
+    const totalInvalid = perResource.reduce((sum, r) => sum + r.invalid.length, 0);
+
+    let html = `
+        <div class="deep-check-results">
+            <h3>Deep check: MultiScan</h3>
+            <div class="deep-summary">
+                <span class="deep-valid">Validated: ${totalValid}</span>
+                <span class="deep-abbr">ABBR: ${totalAbbr}</span>
+                <span class="deep-invalid">Need replace: ${totalInvalid}</span>
+            </div>
+    `;
+
+    perResource.forEach(resource => {
+        html += `
+            <div class="deep-section batch">
+                <h4>
+                    <a href="${resource.url}" target="_blank" class="batch-url">${resource.url}</a>
+                    <span class="word-tag">${resource.resourceType}</span>
+                </h4>
+        `;
+
+        if (resource.abbreviations.length) {
+            html += `
+                <div class="deep-subsection">
+                    <span class="deep-label">ABBR:</span>
+                    <div class="word-list">
+                        ${resource.abbreviations.map(dr => `
+                            <span class="word-tag abbr">
+                                ${dr.word}
+                                <span class="word-translation">→ ${dr.suggestions?.join(', ') || 'translation unknown'}</span>
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        if (resource.validated.length) {
+            html += `
+                <div class="deep-subsection">
+                    <span class="deep-label">Validated:</span>
+                    <div class="word-list">
+                        ${resource.validated.map(dr => `
+                            <span class="word-tag valid">
+                                ${dr.word}
+                                ${dr.normal_form ? `<span class="word-reason">(${dr.normal_form})</span>` : ''}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        if (resource.invalid.length) {
+            html += `
+                <div class="deep-subsection">
+                    <span class="deep-label">Need replace:</span>
+                    <div class="word-list">
+                        ${resource.invalid.map(dr => `
+                            <span class="word-tag invalid">
+                                ${dr.word}
+                                ${dr.suggestions?.length ? `<span class="word-suggestions">→ ${dr.suggestions.join(', ')}</span>` : ''}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+    });
+
+    html += `</div>`;
+    resultsContent.innerHTML += html;
+    resultsContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 async function checkWord() {
     const word = document.getElementById('wordInput').value.trim();
     
