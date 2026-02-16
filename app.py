@@ -646,20 +646,6 @@ def check_text():
             violations_total=result.get('violations_count', 0)
         )
         insert_run_history(
-            check_type='url',
-            endpoint='/api/check-url',
-            success=True,
-            duration_ms=duration_ms,
-            source_type='url',
-            context_short=url[:255],
-            violations_count=result.get('violations_count', 0)
-        )
-        upsert_violation_words(
-            (result.get('latin_words') or [])
-            + (result.get('unknown_cyrillic') or [])
-            + (result.get('nenormative_words') or [])
-        )
-        insert_run_history(
             check_type='text',
             endpoint='/api/check',
             success=True,
