@@ -2,14 +2,17 @@
 # -*- coding: utf-8 -*-
 """
 Flask API для проверки текста на соответствие закону №168-ФЗ
-УЛУЧШЕННАЯ ВЕРСИЯ с максимальным функционалом
+РЕФАКТОРЕННАЯ ВЕРСИЯ с модульной архитектурой
 """
 
 from flask import Flask, render_template, request, jsonify, send_file, session, Response
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import os
+import logging
+from logging.handlers import RotatingFileHandler
 from datetime import datetime
-from checker import RussianLanguageChecker
 import requests
 from bs4 import BeautifulSoup
 import io
@@ -22,66 +25,93 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from collections import deque
 from urllib.parse import urljoin, urldefrag, urlparse
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
+
+# Импорты новых модулей
+from config import get_config
+from utils import init_db_manager, get_db_manager
+from utils.helpers import (
+    mask_token, extract_data_url_payload, normalize_http_url,
+    safe_int, safe_bool, extract_openai_text, extract_ocr_usage
+)
+from services import get_checker_service, OCRService
+from routes import page_bp
 
 try:
     from pypdf import PdfReader
 except Exception:
     PdfReader = None
 
+# Создание приложения с конфигурацией
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max request size
-app.secret_key = os.getenv('FLASK_SECRET_KEY', os.getenv('SECRET_KEY', 'change-this-secret-key'))
-OCR_TIMEOUT = int(os.getenv('OCR_TIMEOUT', '30'))
-OPENAI_OCR_BASE_URL = os.getenv('OPENAI_OCR_BASE_URL', 'https://api.openai.com/v1').strip()
-GOOGLE_VISION_BASE_URL = os.getenv('GOOGLE_VISION_BASE_URL', 'https://vision.googleapis.com/v1').strip()
-OCRSPACE_BASE_URL = os.getenv('OCRSPACE_BASE_URL', 'https://api.ocr.space').strip()
-MULTISCAN_MAX_URLS_HARD = int(os.getenv('MULTISCAN_MAX_URLS_HARD', '2000'))
-MULTISCAN_MAX_PAGES_HARD = int(os.getenv('MULTISCAN_MAX_PAGES_HARD', '2000'))
-MULTISCAN_MAX_RESOURCES_HARD = int(os.getenv('MULTISCAN_MAX_RESOURCES_HARD', '8000'))
-MULTISCAN_MAX_TEXT_CHARS = int(os.getenv('MULTISCAN_MAX_TEXT_CHARS', '200000'))
-MULTISCAN_MAX_DOWNLOAD_BYTES = int(os.getenv('MULTISCAN_MAX_DOWNLOAD_BYTES', str(8 * 1024 * 1024)))
-MULTISCAN_USER_AGENT = os.getenv('MULTISCAN_USER_AGENT', 'LawChecker-MultiScan/1.0')
-METRICS_RETENTION_DAYS = int(os.getenv('METRICS_RETENTION_DAYS', '60'))
-METRICS_CLEANUP_INTERVAL_SEC = int(os.getenv('METRICS_CLEANUP_INTERVAL_SEC', '3600'))
+config = get_config()
 
-# Database (Railway PostgreSQL)
-RAW_DATABASE_URL = (os.getenv('DATABASE_URL') or os.getenv('database_URL') or '').strip()
-if RAW_DATABASE_URL.startswith('postgres://'):
-    RAW_DATABASE_URL = RAW_DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+# Применение конфигурации
+app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
+app.secret_key = config.SECRET_KEY
 
-db_engine = None
-if RAW_DATABASE_URL:
-    try:
-        db_engine = create_engine(RAW_DATABASE_URL, pool_pre_ping=True, future=True)
-    except Exception as _db_init_error:
-        print(f"[WARN] Database init failed: {_db_init_error}")
-        db_engine = None
+# Настройка логирования
+if not app.debug:
+    if not os.path.exists('logs'):
+        os.mkdir('logs')
+    file_handler = RotatingFileHandler(
+        config.LOG_FILE,
+        maxBytes=config.LOG_MAX_BYTES,
+        backupCount=config.LOG_BACKUP_COUNT
+    )
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+    app.logger.info('LawChecker startup')
 
-_last_metrics_cleanup_ts = 0.0
+# Конфигурационные переменные (для совместимости)
+OCR_TIMEOUT = config.OCR_TIMEOUT
+OPENAI_OCR_BASE_URL = config.OPENAI_OCR_BASE_URL
+GOOGLE_VISION_BASE_URL = config.GOOGLE_VISION_BASE_URL
+OCRSPACE_BASE_URL = config.OCRSPACE_BASE_URL
+MULTISCAN_MAX_URLS_HARD = config.MULTISCAN_MAX_URLS_HARD
+MULTISCAN_MAX_PAGES_HARD = config.MULTISCAN_MAX_PAGES_HARD
+MULTISCAN_MAX_RESOURCES_HARD = config.MULTISCAN_MAX_RESOURCES_HARD
+MULTISCAN_MAX_TEXT_CHARS = config.MULTISCAN_MAX_TEXT_CHARS
+MULTISCAN_MAX_DOWNLOAD_BYTES = config.MULTISCAN_MAX_DOWNLOAD_BYTES
+MULTISCAN_USER_AGENT = config.MULTISCAN_USER_AGENT
+METRICS_RETENTION_DAYS = config.METRICS_RETENTION_DAYS
+METRICS_CLEANUP_INTERVAL_SEC = config.METRICS_CLEANUP_INTERVAL_SEC
+
+# Инициализация БД через новый модуль
+db_manager = init_db_manager(
+    database_url=config.DATABASE_URL,
+    retention_days=config.METRICS_RETENTION_DAYS,
+    cleanup_interval_sec=config.METRICS_CLEANUP_INTERVAL_SEC
+)
+
+# Для совместимости с существующим кодом
+db_engine = db_manager.db_engine if db_manager else None
+
 # CORS - разрешаем все домены
 CORS(app, resources={
     r"/api/*": {
-        "origins": "*",
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
+        "origins": config.CORS_ORIGINS,
+        "methods": config.CORS_METHODS,
+        "allow_headers": config.CORS_ALLOW_HEADERS
     }
 })
 
-# Lazy initialization - checker будет создан при первом запросе
-checker = None
+# Инициализация сервисов
+ocr_service = OCRService(
+    openai_base_url=config.OPENAI_OCR_BASE_URL,
+    google_base_url=config.GOOGLE_VISION_BASE_URL,
+    ocrspace_base_url=config.OCRSPACE_BASE_URL,
+    timeout=config.OCR_TIMEOUT
+)
 
+# Получение checker через сервис
 def get_checker():
     """Get or create checker instance with lazy initialization"""
-    global checker
-    if checker is None:
-        import time
-        print("[INFO] Initializing RussianLanguageChecker...")
-        start_time = time.time()
-        checker = RussianLanguageChecker()
-        elapsed = time.time() - start_time
-        print(f"[OK] Checker initialized in {elapsed:.2f}s")
-    return checker
+    return get_checker_service().get_checker()
 
 # Хранилище истории проверок (в продакшене используйте Redis/Database)
 check_history = []
@@ -91,247 +121,51 @@ statistics = {
     'most_common_violations': defaultdict(int)
 }
 
+# Регистрация page routes blueprint
+app.register_blueprint(page_bp)
 
-def init_analytics_db():
-    if db_engine is None:
-        return
-    try:
-        with db_engine.begin() as conn:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS events (
-                    id BIGSERIAL PRIMARY KEY,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    event_type VARCHAR(32) NOT NULL,
-                    endpoint VARCHAR(128) NOT NULL,
-                    success BOOLEAN NOT NULL,
-                    duration_ms DOUBLE PRECISION,
-                    source_type VARCHAR(32),
-                    items_total INTEGER NOT NULL DEFAULT 0,
-                    items_error INTEGER NOT NULL DEFAULT 0,
-                    violations_total INTEGER NOT NULL DEFAULT 0
-                )
-            """))
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS errors (
-                    id BIGSERIAL PRIMARY KEY,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    endpoint VARCHAR(128) NOT NULL,
-                    status_code INTEGER NOT NULL,
-                    message_short TEXT NOT NULL
-                )
-            """))
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS run_history (
-                    id BIGSERIAL PRIMARY KEY,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    check_type VARCHAR(32) NOT NULL,
-                    endpoint VARCHAR(128) NOT NULL,
-                    source_type VARCHAR(32),
-                    context_short VARCHAR(255),
-                    success BOOLEAN NOT NULL,
-                    duration_ms DOUBLE PRECISION,
-                    violations_count INTEGER NOT NULL DEFAULT 0
-                )
-            """))
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS violation_words (
-                    word VARCHAR(255) PRIMARY KEY,
-                    count BIGINT NOT NULL DEFAULT 0,
-                    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-            """))
-    except Exception as e:
-        print(f"[WARN] DB schema init failed: {e}")
+# Rate limiting для защиты API
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri=config.RATELIMIT_STORAGE_URL
+)
 
 
+# Функции работы с БД (обертки для совместимости)
 def log_event(event_type, endpoint, success, duration_ms=None, source_type=None, items_total=0, items_error=0, violations_total=0):
-    if db_engine is None:
-        return
-    try:
-        with db_engine.begin() as conn:
-            conn.execute(text("""
-                INSERT INTO events (
-                    event_type, endpoint, success, duration_ms, source_type, items_total, items_error, violations_total
-                ) VALUES (
-                    :event_type, :endpoint, :success, :duration_ms, :source_type, :items_total, :items_error, :violations_total
-                )
-            """), {
-                'event_type': event_type,
-                'endpoint': endpoint,
-                'success': bool(success),
-                'duration_ms': float(duration_ms) if duration_ms is not None else None,
-                'source_type': source_type,
-                'items_total': int(items_total or 0),
-                'items_error': int(items_error or 0),
-                'violations_total': int(violations_total or 0)
-            })
-    except Exception:
-        pass
-    cleanup_analytics_db()
+    """Логирование события через db_manager"""
+    if db_manager:
+        db_manager.log_event(event_type, endpoint, success, duration_ms, source_type, items_total, items_error, violations_total)
 
 
 def log_error(endpoint, status_code, message):
-    if db_engine is None:
-        return
-    short = (message or '').strip()[:1000]
-    if not short:
-        short = 'unknown error'
-    try:
-        with db_engine.begin() as conn:
-            conn.execute(text("""
-                INSERT INTO errors (endpoint, status_code, message_short)
-                VALUES (:endpoint, :status_code, :message_short)
-            """), {
-                'endpoint': endpoint,
-                'status_code': int(status_code),
-                'message_short': short
-            })
-    except Exception:
-        pass
-    cleanup_analytics_db()
+    """Логирование ошибки через db_manager"""
+    if db_manager:
+        db_manager.log_error(endpoint, status_code, message)
 
 
 def insert_run_history(check_type, endpoint, success, duration_ms=None, source_type=None, context_short=None, violations_count=0):
-    if db_engine is None:
-        return
-    try:
-        with db_engine.begin() as conn:
-            conn.execute(text("""
-                INSERT INTO run_history (
-                    check_type, endpoint, source_type, context_short, success, duration_ms, violations_count
-                ) VALUES (
-                    :check_type, :endpoint, :source_type, :context_short, :success, :duration_ms, :violations_count
-                )
-            """), {
-                'check_type': (check_type or 'unknown')[:32],
-                'endpoint': (endpoint or '')[:128],
-                'source_type': (source_type or '')[:32] or None,
-                'context_short': ((context_short or '').strip()[:255] or None),
-                'success': bool(success),
-                'duration_ms': float(duration_ms) if duration_ms is not None else None,
-                'violations_count': int(violations_count or 0)
-            })
-    except Exception:
-        pass
+    """Добавление записи в историю через db_manager"""
+    if db_manager:
+        db_manager.insert_run_history(check_type, endpoint, success, duration_ms, source_type, context_short, violations_count)
 
 
 def upsert_violation_words(words):
-    if db_engine is None:
-        return
-    clean_words = []
-    for raw in (words or []):
-        word = (raw or '').strip()
-        if word:
-            clean_words.append(word[:255])
-    if not clean_words:
-        return
-    try:
-        with db_engine.begin() as conn:
-            for word in clean_words:
-                conn.execute(text("""
-                    INSERT INTO violation_words (word, count, last_seen_at)
-                    VALUES (:word, 1, NOW())
-                    ON CONFLICT (word)
-                    DO UPDATE SET count = violation_words.count + 1, last_seen_at = NOW()
-                """), {'word': word})
-    except Exception:
-        pass
+    """Обновление счетчиков слов-нарушений через db_manager"""
+    if db_manager:
+        db_manager.upsert_violation_words(words)
 
 
 def cleanup_analytics_db(force=False):
-    global _last_metrics_cleanup_ts
-    if db_engine is None:
-        return
-    now_ts = time.time()
-    if not force and (now_ts - _last_metrics_cleanup_ts) < METRICS_CLEANUP_INTERVAL_SEC:
-        return
-    _last_metrics_cleanup_ts = now_ts
-    try:
-        with db_engine.begin() as conn:
-            conn.execute(text("""
-                DELETE FROM events
-                WHERE created_at < NOW() - make_interval(days => :days)
-            """), {'days': METRICS_RETENTION_DAYS})
-            conn.execute(text("""
-                DELETE FROM errors
-                WHERE created_at < NOW() - make_interval(days => :days)
-            """), {'days': METRICS_RETENTION_DAYS})
-            conn.execute(text("""
-                DELETE FROM run_history
-                WHERE created_at < NOW() - make_interval(days => :days)
-            """), {'days': METRICS_RETENTION_DAYS})
-            conn.execute(text("""
-                DELETE FROM violation_words
-                WHERE last_seen_at < NOW() - make_interval(days => :days)
-            """), {'days': METRICS_RETENTION_DAYS})
-    except Exception:
-        pass
+    """Очистка старых данных через db_manager"""
+    if db_manager:
+        db_manager.cleanup_old_data(force=force)
 
+# Page routes moved to routes/page_routes.py (registered as blueprint above)
 
-init_analytics_db()
-cleanup_analytics_db(force=True)
-
-@app.route('/')
-def index():
-    """Главная страница"""
-    return render_template('index.html')
-
-@app.route('/about')
-def about():
-    """Страница о законе"""
-    return render_template('about.html')
-
-@app.route('/api-docs')
-def api_docs():
-    """API документация"""
-    return render_template('api_docs.html')
-
-@app.route('/examples')
-def examples():
-    """Примеры использования"""
-    return render_template('examples.html')
-
-@app.route('/payment')
-def payment():
-    """Страница тарифов/оплаты"""
-    tariff = (request.args.get('tariff') or 'symbols-20000').strip()
-    return render_template('payment.html', selected_tariff=tariff)
-
-@app.route('/admin/metrics')
-def admin_metrics():
-    """Простой дашборд метрик (read-only)"""
-    return render_template('admin_metrics.html')
-    
-@app.route('/robots.txt')
-def robots():
-    """Robots.txt"""
-    return send_file('static/robots.txt', mimetype='text/plain')
-
-@app.route('/sitemap.xml')
-def sitemap():
-    """Sitemap.xml"""
-    base = request.url_root.rstrip('/')
-    urls = ['/', '/about', '/api-docs', '/examples', '/payment']
-    lastmod = datetime.utcnow().strftime('%Y-%m-%d')
-    items = []
-    for path in urls:
-        items.append(
-            f"<url><loc>{base}{path}</loc><lastmod>{lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>"
-        )
-    xml = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
-        + ''.join(items) +
-        '</urlset>'
-    )
-    return Response(xml, mimetype='application/xml')
-
-@app.route('/favicon.ico')
-def favicon():
-    """Favicon"""
-    return '', 204  # No content - используем data URI в HTML
-
-
+# Global error handlers (дополняют error handlers в blueprint)
 @app.errorhandler(404)
 def not_found(_error):
     return render_template('404.html'), 404
@@ -341,162 +175,30 @@ def not_found(_error):
 def server_error(_error):
     return render_template('500.html'), 500
 
-def _mask_token(token):
-    if not token:
-        return ''
-    if len(token) <= 8:
-        return '*' * len(token)
-    return f"{token[:4]}...{token[-4:]}"
+# Алиасы для совместимости (функции перенесены в utils.helpers)
+_mask_token = mask_token
+_extract_data_url_payload = extract_data_url_payload
+_normalize_http_url = normalize_http_url
+_safe_int = safe_int
+_safe_bool = safe_bool
+_extract_openai_text = extract_openai_text
+_extract_ocr_usage = extract_ocr_usage
 
 
-def _extract_data_url_payload(image_data_url):
-    if not image_data_url or ';base64,' not in image_data_url:
-        raise ValueError('Invalid image data URL')
-    return image_data_url.split(';base64,', 1)[1]
-
-
-def _extract_openai_text(response_json):
-    if isinstance(response_json.get('output_text'), str) and response_json.get('output_text').strip():
-        return response_json['output_text'].strip()
-    chunks = []
-    for output_item in response_json.get('output', []):
-        for content_item in output_item.get('content', []):
-            if content_item.get('type') in ('output_text', 'text'):
-                text_value = content_item.get('text', '')
-                if text_value:
-                    chunks.append(text_value)
-    return '\n'.join(chunks).strip()
-
-
+# OCR функции через сервис
 def _ocr_openai(api_key, model, image_url=None, image_data_url=None):
-    input_image = image_url or image_data_url
-    if not input_image:
-        raise ValueError('Pass image_url or image_data_url')
-    payload = {
-        'model': model or 'gpt-4.1-mini',
-        'input': [{
-            'role': 'user',
-            'content': [
-                {'type': 'input_text', 'text': 'Extract all text from this image and return plain raw OCR text only. Do not edit, normalize, translate, summarize, censor, or correct anything. Preserve original wording, casing, punctuation, numbers, and line breaks exactly as recognized.'},
-                {'type': 'input_image', 'image_url': input_image}
-            ]
-        }]
-    }
-    response = requests.post(
-        f"{OPENAI_OCR_BASE_URL.rstrip('/')}/responses",
-        headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-        json=payload,
-        timeout=OCR_TIMEOUT
-    )
-    response.raise_for_status()
-    data = response.json()
-    return _extract_openai_text(data), data
+    """OCR через OpenAI (обертка для совместимости)"""
+    return ocr_service.ocr_openai(api_key, model, image_url, image_data_url)
 
 
 def _ocr_google(api_key, model, image_url=None, image_data_url=None):
-    feature_type = model or 'DOCUMENT_TEXT_DETECTION'
-    image_block = {}
-    if image_data_url:
-        image_block['content'] = _extract_data_url_payload(image_data_url)
-    elif image_url:
-        image_block['source'] = {'imageUri': image_url}
-    else:
-        raise ValueError('Pass image_url or image_data_url')
-    payload = {'requests': [{'image': image_block, 'features': [{'type': feature_type}]}]}
-    response = requests.post(
-        f"{GOOGLE_VISION_BASE_URL.rstrip('/')}/images:annotate?key={api_key}",
-        headers={'Content-Type': 'application/json'},
-        json=payload,
-        timeout=OCR_TIMEOUT
-    )
-    response.raise_for_status()
-    data = response.json()
-    first = (data.get('responses') or [{}])[0]
-    text = (
-        (first.get('fullTextAnnotation') or {}).get('text')
-        or ((first.get('textAnnotations') or [{}])[0].get('description') if first.get('textAnnotations') else '')
-        or ''
-    )
-    return text.strip(), data
+    """OCR через Google Vision (обертка для совместимости)"""
+    return ocr_service.ocr_google(api_key, model, image_url, image_data_url)
 
 
 def _ocr_ocrspace(api_key, model, image_url=None, image_data_url=None):
-    data = {'language': model or 'rus', 'isOverlayRequired': 'false', 'OCREngine': '2'}
-    files = None
-    if image_data_url:
-        file_bytes = base64.b64decode(_extract_data_url_payload(image_data_url))
-        files = {'file': ('image.png', file_bytes)}
-    elif image_url:
-        data['url'] = image_url
-    else:
-        raise ValueError('Pass image_url or image_data_url')
-    response = requests.post(
-        f"{OCRSPACE_BASE_URL.rstrip('/')}/parse/image",
-        headers={'apikey': api_key},
-        data=data,
-        files=files,
-        timeout=OCR_TIMEOUT
-    )
-    response.raise_for_status()
-    payload = response.json()
-    if payload.get('IsErroredOnProcessing'):
-        raise ValueError('; '.join(payload.get('ErrorMessage') or ['OCR.Space error']))
-    parsed = payload.get('ParsedResults') or []
-    text_parts = [item.get('ParsedText', '') for item in parsed if item.get('ParsedText')]
-    return '\n'.join(text_parts).strip(), payload
-
-
-def _extract_ocr_usage(provider, raw_response):
-    if not isinstance(raw_response, dict):
-        return {}
-    if provider == 'openai':
-        usage = raw_response.get('usage') or {}
-        return {
-            'input_tokens': usage.get('input_tokens'),
-            'output_tokens': usage.get('output_tokens'),
-            'total_tokens': usage.get('total_tokens')
-        }
-    if provider == 'google':
-        first = (raw_response.get('responses') or [{}])[0]
-        pages = ((first.get('fullTextAnnotation') or {}).get('pages') or [])
-        text_annotations = first.get('textAnnotations') or []
-        return {'pages_detected': len(pages), 'text_annotations': len(text_annotations)}
-    if provider == 'ocrspace':
-        parsed = raw_response.get('ParsedResults') or []
-        processing_ms = None
-        if parsed:
-            value = parsed[0].get('ProcessingTimeInMilliseconds')
-            try:
-                processing_ms = int(float(value))
-            except (TypeError, ValueError):
-                processing_ms = None
-        return {'parsed_results': len(parsed), 'processing_ms': processing_ms}
-    return {}
-
-
-def _normalize_http_url(raw_url):
-    url = (raw_url or '').strip()
-    if not url:
-        return ''
-    if not url.startswith('http://') and not url.startswith('https://'):
-        return ''
-    return urldefrag(url)[0]
-
-
-def _safe_int(value, default_value, min_value, max_value):
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        parsed = default_value
-    return max(min_value, min(parsed, max_value))
-
-
-def _safe_bool(value, default_value=False):
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return default_value
-    return str(value).strip().lower() in ('1', 'true', 'yes', 'y', 'on')
+    """OCR через OCR.Space (обертка для совместимости)"""
+    return ocr_service.ocr_ocrspace(api_key, model, image_url, image_data_url)
 
 
 def _is_image_url(url):

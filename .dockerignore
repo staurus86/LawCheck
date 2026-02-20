@@ -1,22 +1,58 @@
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
+*.py[cod]
+*$py.class
 *.so
+.Python
 *.egg
 *.egg-info/
 dist/
 build/
 *.log
-.DS_Store
-.vscode/
-.venv/
+
+# Virtual environments
+.env
+.venv
 env/
 venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
 .git/
 .gitignore
-README*
-*.md
-*.bak
+
+# Backups
+*.backup
 *.backup*
+*.bak
+app_original.py.bak
+app.py.backup*
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker
+docker-compose.override.yml
