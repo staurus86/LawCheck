@@ -259,51 +259,102 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Failed to upsert violation words: {e}")
 
-    def cleanup_old_data(self, force: bool = False) -> None:
+    def cleanup_old_data(self, force: bool = False) -> dict:
         """
         Очистка старых данных из БД
 
         Args:
             force: Принудительная очистка (игнорируя интервал)
+
+        Returns:
+            Словарь с результатами очистки
         """
         if self.db_engine is None:
-            return
+            return {'error': 'Database not available'}
 
         now_ts = time.time()
         if not force and (now_ts - self._last_metrics_cleanup_ts) < self.cleanup_interval_sec:
-            return
+            return {'skipped': True, 'reason': 'Too soon since last cleanup'}
 
         self._last_metrics_cleanup_ts = now_ts
+        results = {}
 
         try:
             with self.db_engine.begin() as conn:
                 # Очистка событий
-                conn.execute(text("""
+                result = conn.execute(text("""
                     DELETE FROM events
                     WHERE created_at < NOW() - make_interval(days => :days)
                 """), {'days': self.retention_days})
+                results['events_deleted'] = result.rowcount
 
                 # Очистка ошибок
-                conn.execute(text("""
+                result = conn.execute(text("""
                     DELETE FROM errors
                     WHERE created_at < NOW() - make_interval(days => :days)
                 """), {'days': self.retention_days})
+                results['errors_deleted'] = result.rowcount
 
                 # Очистка истории
-                conn.execute(text("""
+                result = conn.execute(text("""
                     DELETE FROM run_history
                     WHERE created_at < NOW() - make_interval(days => :days)
                 """), {'days': self.retention_days})
+                results['history_deleted'] = result.rowcount
 
                 # Очистка слов-нарушений
-                conn.execute(text("""
+                result = conn.execute(text("""
                     DELETE FROM violation_words
                     WHERE last_seen_at < NOW() - make_interval(days => :days)
                 """), {'days': self.retention_days})
+                results['words_deleted'] = result.rowcount
 
-                logger.debug("Old data cleaned up successfully")
+                logger.info(f"Old data cleaned up: {results}")
+                results['success'] = True
+                return results
         except Exception as e:
             logger.error(f"Failed to cleanup old data: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def cleanup_all_metrics(self) -> dict:
+        """
+        Полная очистка всех метрик (для администратора)
+
+        Returns:
+            Словарь с результатами очистки
+        """
+        if self.db_engine is None:
+            return {'error': 'Database not available'}
+
+        results = {}
+
+        try:
+            with self.db_engine.begin() as conn:
+                # Удаление всех событий
+                result = conn.execute(text("DELETE FROM events"))
+                results['events_deleted'] = result.rowcount
+
+                # Удаление всех ошибок
+                result = conn.execute(text("DELETE FROM errors"))
+                results['errors_deleted'] = result.rowcount
+
+                # Удаление всей истории
+                result = conn.execute(text("DELETE FROM run_history"))
+                results['history_deleted'] = result.rowcount
+
+                # Удаление всех слов
+                result = conn.execute(text("DELETE FROM violation_words"))
+                results['words_deleted'] = result.rowcount
+
+                # VACUUM для освобождения места
+                conn.execute(text("VACUUM ANALYZE"))
+
+                logger.warning(f"ALL metrics cleaned up: {results}")
+                results['success'] = True
+                return results
+        except Exception as e:
+            logger.error(f"Failed to cleanup all metrics: {e}")
+            return {'success': False, 'error': str(e)}
 
 
 # Singleton экземпляр (будет инициализирован в app.py)

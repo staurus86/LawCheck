@@ -314,6 +314,7 @@ def _build_resource_result(url, resource_type, check_result, source_meta=None):
 # ==================== API ENDPOINTS ====================
 
 @app.route('/api/check', methods=['POST'])
+@limiter.limit("30 per minute")
 def check_text():
     """API: Проверка текста"""
     try:
@@ -376,6 +377,7 @@ def check_text():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/check-url', methods=['POST'])
+@limiter.limit("20 per minute")
 def check_url():
     """API: Проверка URL"""
     try:
@@ -449,6 +451,7 @@ def check_url():
         return jsonify({'error': f'Ошибка загрузки: {str(e)}'}), 500
 
 @app.route('/api/batch-check', methods=['POST'])
+@limiter.limit("10 per hour")
 def batch_check():
     """API: Пакетная проверка"""
     try:
@@ -548,30 +551,49 @@ def batch_check():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/deep-check', methods=['POST'])
+@limiter.limit("20 per minute")
 def deep_check():
     """API: Глубокая проверка слов с использованием морфологии и speller"""
     try:
         data = request.get_json(silent=True) or {}
         words = data.get('words', [])
-        
+
         if not words:
             return jsonify({'error': 'Список слов пуст'}), 400
-        
+
+        if not isinstance(words, list):
+            return jsonify({'error': 'words должен быть массивом'}), 400
+
+        # Используем метод через checker_service
         checker_instance = get_checker()
-        results = []
-        
-        for word in words:
-            result = checker_instance._deep_check_single(word)
-            results.append(result)
-        
+
+        # Вызываем deep_check_words который есть в checker.py
+        if hasattr(checker_instance, 'deep_check_words'):
+            results = checker_instance.deep_check_words(words)
+        else:
+            # Fallback на прямой вызов _deep_check_single
+            results = []
+            for word in words:
+                if hasattr(checker_instance, '_deep_check_single'):
+                    result = checker_instance._deep_check_single(word)
+                    results.append(result)
+                else:
+                    results.append({
+                        'word': word,
+                        'is_valid': False,
+                        'error': 'Method not available'
+                    })
+
         return jsonify({
             'success': True,
             'results': results,
             'timestamp': datetime.now().isoformat()
         })
-    
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"Deep check error: {str(e)}", exc_info=True)
+        log_error('/api/deep-check', 500, str(e))
+        return jsonify({'error': str(e), 'details': 'Check server logs'}), 500
 
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
@@ -597,6 +619,30 @@ def get_stats():
             'morph_available': False,
             'error': str(e)
         }), 500
+
+
+@app.route('/api/metrics/cleanup', methods=['POST'])
+@limiter.limit("5 per hour")
+def cleanup_metrics():
+    """API: Очистка метрик (полная очистка для освобождения места)"""
+    try:
+        # Проверка секретного ключа для безопасности
+        data = request.get_json(silent=True) or {}
+        secret = data.get('secret')
+
+        # Простая защита - требуем секретный ключ
+        if secret != app.secret_key[:16]:  # Первые 16 символов secret_key
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        if db_manager:
+            result = db_manager.cleanup_all_metrics()
+            app.logger.warning(f"Metrics cleaned up by admin: {result}")
+            return jsonify(result)
+        else:
+            return jsonify({'error': 'Database not available'}), 503
+    except Exception as e:
+        app.logger.error(f"Cleanup metrics error: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/metrics', methods=['GET'])

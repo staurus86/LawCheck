@@ -31,6 +31,7 @@
             <div class="quick-links">
                 <a class="btn btn-secondary" href="/">← Назад к проверке</a>
                 <button class="btn btn-primary" onclick="refreshDashboard()">Обновить</button>
+                <button class="btn btn-danger" onclick="cleanupMetrics()" style="margin-left: 10px;">🗑️ Очистить БД</button>
             </div>
         </div>
     </section>
@@ -261,6 +262,47 @@
                         : row(['-', '-', '-', '-', '-', '-']);
             } catch (e) {
                 document.getElementById('updatedAt').textContent = `Ошибка: ${e.message}`;
+            }
+        }
+
+        async function cleanupMetrics() {
+            if (!confirm('⚠️ ВНИМАНИЕ!\n\nЭта операция ПОЛНОСТЬЮ удалит ВСЕ метрики из БД:\n- События\n- Ошибки\n- История проверок\n- Слова-нарушения\n\nЭто освободит место в PostgreSQL.\n\nПродолжить?')) {
+                return;
+            }
+
+            const secret = prompt('Введите первые 16 символов SECRET_KEY для подтверждения:');
+            if (!secret) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/metrics/cleanup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ secret })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    alert(`Ошибка: ${result.error || 'Не удалось очистить метрики'}`);
+                    return;
+                }
+
+                if (result.success) {
+                    alert(`✅ Метрики успешно очищены!\n\n` +
+                          `Удалено:\n` +
+                          `- События: ${result.events_deleted || 0}\n` +
+                          `- Ошибки: ${result.errors_deleted || 0}\n` +
+                          `- История: ${result.history_deleted || 0}\n` +
+                          `- Слова: ${result.words_deleted || 0}\n\n` +
+                          `VACUUM выполнен для освобождения места.`);
+                    refreshDashboard();
+                } else {
+                    alert(`Ошибка: ${result.error || 'Неизвестная ошибка'}`);
+                }
+            } catch (error) {
+                alert(`Ошибка сети: ${error.message}`);
             }
         }
 
