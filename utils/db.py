@@ -329,6 +329,7 @@ class DatabaseManager:
         results = {}
 
         try:
+            # Шаг 1: Удаление данных (в транзакции)
             with self.db_engine.begin() as conn:
                 # Удаление всех событий
                 result = conn.execute(text("DELETE FROM events"))
@@ -346,12 +347,15 @@ class DatabaseManager:
                 result = conn.execute(text("DELETE FROM violation_words"))
                 results['words_deleted'] = result.rowcount
 
-                # VACUUM для освобождения места
+            # Шаг 2: VACUUM вне транзакции (требует autocommit)
+            with self.db_engine.connect() as conn:
+                conn.execution_options(isolation_level="AUTOCOMMIT")
                 conn.execute(text("VACUUM ANALYZE"))
+                results['vacuum_completed'] = True
 
-                logger.warning(f"ALL metrics cleaned up: {results}")
-                results['success'] = True
-                return results
+            logger.warning(f"ALL metrics cleaned up: {results}")
+            results['success'] = True
+            return results
         except Exception as e:
             logger.error(f"Failed to cleanup all metrics: {e}")
             return {'success': False, 'error': str(e)}
