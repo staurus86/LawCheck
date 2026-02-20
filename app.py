@@ -626,13 +626,19 @@ def get_stats():
 def cleanup_metrics():
     """API: Очистка метрик (полная очистка для освобождения места)"""
     try:
-        # Проверка секретного ключа для безопасности
         data = request.get_json(silent=True) or {}
-        secret = data.get('secret')
+        secret = data.get('secret', '').strip()
 
-        # Простая защита - требуем секретный ключ
-        if secret != app.secret_key[:16]:  # Первые 16 символов secret_key
-            return jsonify({'error': 'Unauthorized'}), 401
+        # Вариант 1: SECRET_KEY (первые 16 символов)
+        # Вариант 2: Простой пароль "CLEANUP_DB" (для удобства)
+        valid_secret = app.secret_key[:16]
+        simple_password = "CLEANUP_DB"
+
+        if secret != valid_secret and secret != simple_password:
+            return jsonify({
+                'error': 'Неверный пароль',
+                'hint': 'Используйте "CLEANUP_DB" или первые 16 символов SECRET_KEY'
+            }), 401
 
         if db_manager:
             result = db_manager.cleanup_all_metrics()

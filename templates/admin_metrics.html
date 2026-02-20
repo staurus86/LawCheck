@@ -270,7 +270,10 @@
                 return;
             }
 
-            const secret = prompt('Введите первые 16 символов SECRET_KEY для подтверждения:');
+            const secret = prompt('Введите пароль для подтверждения:\n\n' +
+                                  'Можно использовать:\n' +
+                                  '1. "CLEANUP_DB" (простой пароль)\n' +
+                                  '2. Первые 16 символов вашего SECRET_KEY');
             if (!secret) {
                 return;
             }
