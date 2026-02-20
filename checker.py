@@ -560,10 +560,13 @@ class RussianLanguageChecker:
     def _deep_check_single(self, word):
         """Глубокая проверка одного слова"""
         word_lower = word.lower()
-        
+
         if word_lower in self._normal_form_cache:
             cached = self._normal_form_cache[word_lower]
-            return cached.copy()
+            # Проверяем что cached это dict, а не str
+            if isinstance(cached, dict):
+                return cached.copy()
+            # Если это не dict, игнорируем кэш и пересоздаем
 
         result = {
             'word': word,
