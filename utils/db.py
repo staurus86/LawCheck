@@ -247,15 +247,14 @@ class DatabaseManager:
 
         try:
             with self.db_engine.begin() as conn:
-                for word in clean_words:
-                    conn.execute(text("""
-                        INSERT INTO violation_words (word, count, last_seen_at)
-                        VALUES (:word, 1, NOW())
-                        ON CONFLICT (word)
-                        DO UPDATE SET
-                            count = violation_words.count + 1,
-                            last_seen_at = NOW()
-                    """), {'word': word})
+                conn.execute(text("""
+                    INSERT INTO violation_words (word, count, last_seen_at)
+                    SELECT unnest(:words ::text[]), 1, NOW()
+                    ON CONFLICT (word)
+                    DO UPDATE SET
+                        count = violation_words.count + 1,
+                        last_seen_at = NOW()
+                """), {'words': clean_words})
         except Exception as e:
             logger.error(f"Failed to upsert violation words: {e}")
 

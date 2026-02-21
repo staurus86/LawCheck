@@ -114,7 +114,7 @@ def get_checker():
     return get_checker_service().get_checker()
 
 # Хранилище истории проверок (в продакшене используйте Redis/Database)
-check_history = []
+check_history = deque(maxlen=1000)
 statistics = {
     'total_checks': 0,
     'total_violations': 0,
@@ -389,16 +389,26 @@ def check_url():
             return jsonify({'error': 'Некорректный URL'}), 400
         
         # Загрузка страницы
-        response = requests.get(url, timeout=15, headers={
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        })
-        
+        try:
+            response = requests.get(url, timeout=15, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            response.raise_for_status()
+        except requests.exceptions.Timeout:
+            return jsonify({'error': 'Сайт не отвечает (таймаут 15 сек)'}), 504
+        except requests.exceptions.ConnectionError:
+            return jsonify({'error': 'Не удалось подключиться к сайту'}), 502
+        except requests.exceptions.HTTPError as http_err:
+            return jsonify({'error': f'HTTP ошибка: {http_err.response.status_code}'}), 502
+        except requests.exceptions.RequestException as req_err:
+            return jsonify({'error': f'Ошибка загрузки: {str(req_err)}'}), 502
+
         soup = BeautifulSoup(response.text, 'html.parser')
-        
+
         # Удаляем ненужное
         for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
             tag.decompose()
-        
+
         # Извлекаем текст и мета-информацию
         text = soup.get_text(separator=' ', strip=True)
         title = soup.find('title')
@@ -558,11 +568,11 @@ def deep_check():
         data = request.get_json(silent=True) or {}
         words = data.get('words', [])
 
-        if not words:
-            return jsonify({'error': 'Список слов пуст'}), 400
-
         if not isinstance(words, list):
             return jsonify({'error': 'words должен быть массивом'}), 400
+
+        if not words:
+            return jsonify({'error': 'Список слов пуст'}), 400
 
         # Используем метод через checker_service
         checker_instance = get_checker()
@@ -1391,10 +1401,11 @@ def multiscan_run():
 @app.route('/api/history', methods=['GET'])
 def get_history():
     """API: История проверок"""
-    limit = int(request.args.get('limit', 10))
+    limit = _safe_int(request.args.get('limit', 10), 10, 1, 1000)
+    history_list = list(check_history)
     return jsonify({
-        'history': check_history[-limit:][::-1],
-        'total': len(check_history)
+        'history': history_list[-limit:][::-1],
+        'total': len(history_list)
     })
 
 @app.route('/api/export/txt', methods=['POST'])
@@ -1533,9 +1544,10 @@ def export_txt():
                 lines.append("")
         
         # Подвал
+        site_url = request.host_url.rstrip('/')
         lines.append("=" * 70)
         lines.append("Создано: LawChecker Online")
-        lines.append("Сайт: https://lawcheck-production.up.railway.app")
+        lines.append(f"Сайт: {site_url}")
         lines.append("Закон: Федеральный закон №168-ФЗ «О русском языке»")
         lines.append("=" * 70)
         
@@ -1835,7 +1847,7 @@ def export_multiscan_txt():
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 
 def save_to_history(check_type, result, context):
-    """Сохранение в историю"""
+    """Сохранение в историю (deque с maxlen=1000 автоматически вытесняет старые записи)"""
     check_history.append({
         'id': str(uuid.uuid4()),
         'type': check_type,
@@ -1844,10 +1856,6 @@ def save_to_history(check_type, result, context):
         'compliant': result['law_compliant'],
         'context': context
     })
-    
-    # Ограничиваем размер истории
-    if len(check_history) > 1000:
-        check_history.pop(0)
 
 def update_statistics(result):
     """Обновление статистики"""

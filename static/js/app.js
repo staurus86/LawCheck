@@ -108,7 +108,7 @@ function updateTextInputMeta() {
     const text = input.value || '';
     const chars = text.length;
     const words = (text.trim().match(/\S+/g) || []).length;
-    meta.textContent = `${chars} chars | ${words} words`;
+    meta.textContent = `${chars} символов | ${words} слов`;
 }
 
 function updateBatchInputMeta() {
@@ -120,7 +120,7 @@ function updateBatchInputMeta() {
         .map(v => v.trim())
         .filter(v => v.startsWith('http'));
     const unique = new Set(urls);
-    meta.textContent = `${urls.length} URLs (${unique.size} unique)`;
+    meta.textContent = `${urls.length} ссылок (${unique.size} уникальных)`;
 }
 
 function updateImagesInputMeta() {
@@ -130,7 +130,7 @@ function updateImagesInputMeta() {
     const text = input.value || '';
     const chars = text.length;
     const words = (text.trim().match(/\S+/g) || []).length;
-    meta.textContent = `${chars} chars | ${words} words`;
+    meta.textContent = `${chars} символов | ${words} слов`;
 }
 
 function updateImagesBatchInputMeta() {
@@ -142,7 +142,7 @@ function updateImagesBatchInputMeta() {
         .map(v => v.trim())
         .filter(v => v.startsWith('http'));
     const unique = new Set(urls);
-    meta.textContent = `${urls.length} image URLs (${unique.size} unique)`;
+    meta.textContent = `${urls.length} ссылок на изображения (${unique.size} уникальных)`;
 }
 
 function updateMultiUrlsInputMeta() {
@@ -151,8 +151,10 @@ function updateMultiUrlsInputMeta() {
     if (!input || !meta) return;
     const urls = extractHttpUrls(input.value || '');
     const unique = new Set(urls);
-    meta.textContent = `${urls.length} URLs (${unique.size} unique)`;
+    meta.textContent = `${urls.length} ссылок (${unique.size} уникальных)`;
 }
+
+const TEXT_AUTOSAVE_KEY = 'lawchecker.textInput.draft';
 
 function initFieldMetrics() {
     const textInput = document.getElementById('textInput');
@@ -160,7 +162,17 @@ function initFieldMetrics() {
     const imagesInput = document.getElementById('imagesInput');
     const imagesBatchInput = document.getElementById('imagesBatchInput');
     const multiUrlsInput = document.getElementById('multiUrlsInput');
-    if (textInput) textInput.addEventListener('input', updateTextInputMeta);
+
+    // Восстанавливаем сохранённый черновик
+    if (textInput) {
+        const saved = localStorage.getItem(TEXT_AUTOSAVE_KEY);
+        if (saved) textInput.value = saved;
+        textInput.addEventListener('input', () => {
+            updateTextInputMeta();
+            localStorage.setItem(TEXT_AUTOSAVE_KEY, textInput.value);
+        });
+    }
+
     if (batchInput) batchInput.addEventListener('input', updateBatchInputMeta);
     if (imagesInput) imagesInput.addEventListener('input', updateImagesInputMeta);
     if (imagesBatchInput) imagesBatchInput.addEventListener('input', updateImagesBatchInputMeta);
@@ -450,14 +462,14 @@ async function loadImageTokenStatus() {
         });
         const data = await response.json();
         if (data.success && data.has_token) {
-            statusEl.textContent = `token: ${data.token_masked || 'saved'}`;
+            statusEl.textContent = `токен: ${data.token_masked || 'сохранён'}`;
             statusEl.className = 'images-token-status success';
         } else {
-            statusEl.textContent = 'token not set';
+            statusEl.textContent = 'токен не задан';
             statusEl.className = 'images-token-status';
         }
     } catch (e) {
-        statusEl.textContent = 'token status error';
+        statusEl.textContent = 'ошибка статуса токена';
         statusEl.className = 'images-token-status error';
     }
 }
@@ -469,7 +481,7 @@ async function saveImageApiToken() {
     const provider = getImagesProvider();
     const token = input.value.trim();
     if (!token) {
-        alert('Enter API token');
+        alert('Введите API токен');
         return;
     }
     try {
@@ -480,12 +492,12 @@ async function saveImageApiToken() {
             body: JSON.stringify({ provider, token })
         });
         const data = await response.json();
-        if (!data.success) throw new Error(data.error || 'Token save failed');
-        statusEl.textContent = `token saved: ${data.token_masked || ''}`;
+        if (!data.success) throw new Error(data.error || 'Ошибка сохранения токена');
+        statusEl.textContent = `токен сохранён: ${data.token_masked || ''}`;
         statusEl.className = 'images-token-status success';
         input.value = '';
     } catch (e) {
-        statusEl.textContent = `error: ${e.message}`;
+        statusEl.textContent = `ошибка: ${e.message}`;
         statusEl.className = 'images-token-status error';
     }
 }
@@ -510,17 +522,17 @@ async function buildImagesPayload() {
     const file = fileInput && fileInput.files ? fileInput.files[0] : null;
 
     if (!imageUrl && !file) {
-        alert('Provide image URL or upload file');
+        alert('Укажите URL изображения или загрузите файл');
         return;
     }
 
     if (file) {
         if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-            alert('Only jpg/png/webp are supported');
+            alert('Поддерживаются только форматы jpg/png/webp');
             return;
         }
         if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
-            alert('Image is too large. Max size is 8MB');
+            alert('Файл слишком большой. Максимум 8 МБ');
             return;
         }
     }
@@ -542,10 +554,10 @@ function appendImageOcrSummary(ocr, targetEl) {
     const usage = ocr.usage || {};
     targetEl.innerHTML += `
         <div class="image-db-summary">
-            <h4>OCR log</h4>
-            <p>provider: ${ocr.provider || '-'} | model: ${ocr.model || '-'} | source: ${ocr.source || '-'}</p>
-            <p>timings ms: ocr=${timings.ocr ?? '-'}, check=${timings.text_check ?? '-'}, total=${timings.total ?? '-'}</p>
-            <p>usage: ${Object.keys(usage).length ? Object.entries(usage).map(([k, v]) => `${k}=${v}`).join(', ') : 'n/a'}</p>
+            <h4>Лог OCR</h4>
+            <p>Провайдер: ${ocr.provider || '-'} | Модель: ${ocr.model || '-'} | Источник: ${ocr.source || '-'}</p>
+            <p>Время (мс): ocr=${timings.ocr ?? '-'}, проверка=${timings.text_check ?? '-'}, всего=${timings.total ?? '-'}</p>
+            <p>Использование: ${Object.keys(usage).length ? Object.entries(usage).map(([k, v]) => `${k}=${v}`).join(', ') : 'нет данных'}</p>
         </div>
     `;
 }
@@ -589,7 +601,7 @@ async function scrapTextFromImageAndCheck() {
         if (!data.success) throw new Error(data.error || 'OCR failed');
 
         const extractedText = (data.extracted_text || '').trim();
-        if (!extractedText) throw new Error('OCR returned empty text');
+        if (!extractedText) throw new Error('OCR не распознал текст (пустой результат)');
         if (extractedTextArea) {
             extractedTextArea.value = extractedText;
             updateImagesInputMeta();
@@ -597,7 +609,7 @@ async function scrapTextFromImageAndCheck() {
 
         await runStandardCheckForImageText(extractedText, data.source_url || '', data.ocr || null);
     } catch (e) {
-        alert('Image scrape error: ' + e.message);
+        alert('Ошибка распознавания изображения: ' + e.message);
     } finally {
         hideLoading();
     }
@@ -607,7 +619,7 @@ async function checkExtractedImageText() {
     const extractedTextArea = document.getElementById('imagesInput');
     const text = extractedTextArea ? extractedTextArea.value.trim() : '';
     if (!text) {
-        alert('No extracted text to check');
+        alert('Нет извлечённого текста для проверки');
         return;
     }
 
@@ -617,7 +629,7 @@ async function checkExtractedImageText() {
     try {
         await runStandardCheckForImageText(text, sourceUrl, ocr);
     } catch (e) {
-        alert('Text check error: ' + e.message);
+        alert('Ошибка проверки текста: ' + e.message);
     } finally {
         hideLoading();
     }
@@ -649,7 +661,7 @@ async function checkImagesByDatabase() {
         const resultsContent = document.getElementById('imagesResultsContent');
         appendImageOcrSummary(data.result.ocr, resultsContent);
     } catch (e) {
-        alert('Image check error: ' + e.message);
+        alert('Ошибка проверки изображения: ' + e.message);
     } finally {
         hideLoading();
     }
@@ -667,14 +679,14 @@ function renderImageBatchItem(item, index) {
                     <span class="batch-number">[${index + 1}]</span>
                     <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
                 </div>
-                <div class="batch-item-error">Error: ${item.error || 'Unknown error'}</div>
+                <div class="batch-item-error">Ошибка: ${item.error || 'Неизвестная ошибка'}</div>
             </div>
         `;
     }
 
     const r = item.result;
     const statusIcon = r.law_compliant ? '✅' : '⚠️';
-    const statusText = r.law_compliant ? 'compliant' : `violations: ${r.violations_count || 0}`;
+    const statusText = r.law_compliant ? 'соответствует' : `нарушений: ${r.violations_count || 0}`;
     return `
         <div class="batch-item ${r.law_compliant ? 'success' : 'warning'}">
             <div class="batch-item-header">
@@ -684,8 +696,8 @@ function renderImageBatchItem(item, index) {
             </div>
             <div class="batch-item-stats">
                 <span class="batch-violations-count">${statusText}</span>
-                <span class="batch-words-count">words: ${r.total_words || 0}</span>
-                <span class="batch-words-count">ocr chars: ${(r.extracted_text || '').length}</span>
+                <span class="batch-words-count">слов: ${r.total_words || 0}</span>
+                <span class="batch-words-count">OCR символов: ${(r.extracted_text || '').length}</span>
             </div>
         </div>
     `;
@@ -706,19 +718,19 @@ function displayImagesBatchResults(results) {
             <div class="summary-stats">
                 <div class="summary-stat">
                     <span class="summary-value">${total}</span>
-                    <span class="summary-label">Total images</span>
+                    <span class="summary-label">Всего изображений</span>
                 </div>
                 <div class="summary-stat success">
                     <span class="summary-value">${success}</span>
-                    <span class="summary-label">Processed</span>
+                    <span class="summary-label">Обработано</span>
                 </div>
                 <div class="summary-stat warning">
                     <span class="summary-value">${withViolations}</span>
-                    <span class="summary-label">With violations</span>
+                    <span class="summary-label">С нарушениями</span>
                 </div>
                 <div class="summary-stat error">
                     <span class="summary-value">${failed}</span>
-                    <span class="summary-label">Failed</span>
+                    <span class="summary-label">С ошибками</span>
                 </div>
             </div>
         </div>
@@ -745,7 +757,7 @@ async function checkImagesBatchQueue() {
         .map(v => v.trim())
         .filter(v => v.startsWith('http'));
     if (!urls.length) {
-        alert('Provide at least one image URL');
+        alert('Укажите хотя бы одну ссылку на изображение');
         return;
     }
 
@@ -860,14 +872,14 @@ async function loadMultiTokenStatus() {
         });
         const data = await response.json();
         if (data.success && data.has_token) {
-            statusEl.textContent = `token: ${data.token_masked || 'saved'}`;
+            statusEl.textContent = `токен: ${data.token_masked || 'сохранён'}`;
             statusEl.className = 'images-token-status success';
         } else {
-            statusEl.textContent = 'token not set';
+            statusEl.textContent = 'токен не задан';
             statusEl.className = 'images-token-status';
         }
     } catch (_e) {
-        statusEl.textContent = 'token status error';
+        statusEl.textContent = 'ошибка статуса токена';
         statusEl.className = 'images-token-status error';
     }
 }
@@ -879,7 +891,7 @@ async function saveMultiApiToken() {
     if (!input || !statusEl) return;
     const token = input.value.trim();
     if (!token) {
-        alert('Enter API token');
+        alert('Введите API токен');
         return;
     }
     try {
@@ -890,12 +902,12 @@ async function saveMultiApiToken() {
             body: JSON.stringify({ provider, token })
         });
         const data = await response.json();
-        if (!data.success) throw new Error(data.error || 'Token save failed');
-        statusEl.textContent = `token saved: ${data.token_masked || ''}`;
+        if (!data.success) throw new Error(data.error || 'Ошибка сохранения токена');
+        statusEl.textContent = `токен сохранён: ${data.token_masked || ''}`;
         statusEl.className = 'images-token-status success';
         input.value = '';
     } catch (e) {
-        statusEl.textContent = `error: ${e.message}`;
+        statusEl.textContent = `ошибка: ${e.message}`;
         statusEl.className = 'images-token-status error';
     }
 }
@@ -930,7 +942,7 @@ async function loadMultiUrlsFromFile(event) {
         input.value = unique.join('\n');
         updateMultiUrlsInputMeta();
     } catch (e) {
-        alert('Failed to read file: ' + e.message);
+        alert('Ошибка чтения файла: ' + e.message);
     }
 }
 
@@ -941,9 +953,9 @@ function renderMultiItem(item, index) {
                 <div class="batch-item-header">
                     <span class="batch-number">[${index + 1}]</span>
                     <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
-                    <span class="word-tag invalid">${item.resource_type || 'unknown'}</span>
+                    <span class="word-tag invalid">${item.resource_type || 'неизвестно'}</span>
                 </div>
-                <div class="batch-item-error">Error: ${item.error || 'Unknown error'}</div>
+                <div class="batch-item-error">Ошибка: ${item.error || 'Неизвестная ошибка'}</div>
             </div>
         `;
     }
@@ -955,18 +967,18 @@ function renderMultiItem(item, index) {
             <div class="batch-item-header">
                 <span class="batch-number">[${index + 1}]</span>
                 <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
-                <span class="word-tag">${item.resource_type || 'unknown'}</span>
+                <span class="word-tag">${item.resource_type || 'неизвестно'}</span>
             </div>
             <div class="batch-item-stats">
-                <span class="batch-violations-count">${item.law_compliant ? 'compliant' : `violations: ${item.violations_count || 0}`}</span>
-                <span class="batch-words-count">words: ${(item.result && item.result.total_words) || 0}</span>
+                <span class="batch-violations-count">${item.law_compliant ? 'соответствует' : `нарушений: ${item.violations_count || 0}`}</span>
+                <span class="batch-words-count">слов: ${(item.result && item.result.total_words) || 0}</span>
             </div>
             ${forbiddenPreview.length ? `
                 <div class="word-list">
                     ${forbiddenPreview.map(w => `<span class="word-tag">${w}</span>`).join('')}
                     ${(item.forbidden_words || []).length > forbiddenPreview.length ? `<span class="more-words">... +${(item.forbidden_words || []).length - forbiddenPreview.length}</span>` : ''}
                 </div>
-            ` : '<div class="text-muted">No forbidden words found.</div>'}
+            ` : '<div class="text-muted">Запрещённых слов не найдено.</div>'}
         </div>
     `;
 }
@@ -983,23 +995,23 @@ function displayMultiResults(payload) {
             <div class="summary-stats">
                 <div class="summary-stat">
                     <span class="summary-value">${payload.total || 0}</span>
-                    <span class="summary-label">Total</span>
+                    <span class="summary-label">Всего</span>
                 </div>
                 <div class="summary-stat success">
                     <span class="summary-value">${payload.processed_success || 0}</span>
-                    <span class="summary-label">Success</span>
+                    <span class="summary-label">Успешно</span>
                 </div>
                 <div class="summary-stat error">
                     <span class="summary-value">${payload.processed_error || 0}</span>
-                    <span class="summary-label">Errors</span>
+                    <span class="summary-label">Ошибок</span>
                 </div>
                 <div class="summary-stat warning">
                     <span class="summary-value">${payload.with_violations || 0}</span>
-                    <span class="summary-label">With violations</span>
+                    <span class="summary-label">С нарушениями</span>
                 </div>
             </div>
-            <p class="text-muted">Types: pages=${byType.page || 0}, images=${byType.image || 0}, pdf=${byType.pdf || 0}</p>
-            <p class="text-muted">Total time: ${(payload.timings_ms && payload.timings_ms.total) || '-'} ms</p>
+            <p class="text-muted">Типы: страниц=${byType.page || 0}, изображений=${byType.image || 0}, PDF=${byType.pdf || 0}</p>
+            <p class="text-muted">Общее время: ${(payload.timings_ms && payload.timings_ms.total) || '-'} мс</p>
         </div>
     `;
 
@@ -1046,11 +1058,11 @@ async function runMultiScan() {
     const payload = buildMultiPayload();
     if (payload.mode === 'site') {
         if (!/^https?:\/\//i.test(payload.site_url)) {
-            alert('Provide valid site URL');
+            alert('Введите корректный URL сайта');
             return;
         }
     } else if (!payload.urls.length) {
-        alert('Provide at least one URL in list mode');
+        alert('Введите хотя бы одну ссылку в списке');
         return;
     }
 
@@ -1062,7 +1074,7 @@ async function runMultiScan() {
         progressBar.style.animation = 'progressShine 1.2s linear infinite';
         progressBar.style.width = '100%';
     }
-    if (progressText) progressText.textContent = 'Processing...';
+    if (progressText) progressText.textContent = 'Обработка...';
 
     showLoading();
     try {
@@ -1073,7 +1085,7 @@ async function runMultiScan() {
             body: JSON.stringify(payload)
         });
         const data = await response.json();
-        if (!data.success) throw new Error(data.error || 'MultiScan failed');
+        if (!data.success) throw new Error(data.error || 'Ошибка мульти-скана');
         currentResults.multi = data;
         currentDeepResults.multi = null;
         displayMultiResults(data);
@@ -1081,7 +1093,7 @@ async function runMultiScan() {
         if (tokenInput) tokenInput.value = '';
         await loadMultiTokenStatus();
     } catch (e) {
-        alert('MultiScan error: ' + e.message);
+        alert('Ошибка мульти-скана: ' + e.message);
     } finally {
         hideLoading();
         if (progress) progress.style.display = 'none';
@@ -1118,7 +1130,7 @@ async function deepCheckMultiScan() {
     const payload = currentResults.multi;
     const results = payload && Array.isArray(payload.results) ? payload.results : [];
     if (!results.length) {
-        alert('No MultiScan results to deep check');
+        alert('Нет результатов мульти-скана для глубокой проверки');
         return;
     }
 
@@ -1144,7 +1156,7 @@ async function deepCheckMultiScan() {
     });
 
     if (!urlMap.length) {
-        alert('No words for deep check in MultiScan results');
+        alert('Нет слов для глубокой проверки в результатах мульти-скана');
         return;
     }
 
@@ -1178,7 +1190,7 @@ async function deepCheckMultiScan() {
         };
         displayMultiDeepResults(results, deepResults);
     } catch (e) {
-        alert('Multi deep check error: ' + e.message);
+        alert('Ошибка глубокой проверки: ' + e.message);
     } finally {
         hideLoading();
     }
@@ -1229,11 +1241,11 @@ function displayMultiDeepResults(results, deepResults) {
 
     let html = `
         <div class="deep-check-results">
-            <h3>Deep check: MultiScan</h3>
+            <h3>🔬 Глубокая проверка: МультиСкан</h3>
             <div class="deep-summary">
-                <span class="deep-valid">Validated: ${totalValid}</span>
-                <span class="deep-abbr">ABBR: ${totalAbbr}</span>
-                <span class="deep-invalid">Need replace: ${totalInvalid}</span>
+                <span class="deep-valid">✅ Подтверждено: ${totalValid}</span>
+                <span class="deep-abbr">📚 Аббревиатуры: ${totalAbbr}</span>
+                <span class="deep-invalid">❌ Требуют замены: ${totalInvalid}</span>
             </div>
     `;
 
@@ -1249,12 +1261,12 @@ function displayMultiDeepResults(results, deepResults) {
         if (resource.abbreviations.length) {
             html += `
                 <div class="deep-subsection">
-                    <span class="deep-label">ABBR:</span>
+                    <span class="deep-label">📚 Аббревиатуры:</span>
                     <div class="word-list">
                         ${resource.abbreviations.map(dr => `
                             <span class="word-tag abbr">
                                 ${dr.word}
-                                <span class="word-translation">→ ${dr.suggestions?.join(', ') || 'translation unknown'}</span>
+                                <span class="word-translation">→ ${dr.suggestions?.join(', ') || 'перевод неизвестен'}</span>
                             </span>
                         `).join('')}
                     </div>
@@ -1265,7 +1277,7 @@ function displayMultiDeepResults(results, deepResults) {
         if (resource.validated.length) {
             html += `
                 <div class="deep-subsection">
-                    <span class="deep-label">Validated:</span>
+                    <span class="deep-label">✅ Подтверждено:</span>
                     <div class="word-list">
                         ${resource.validated.map(dr => `
                             <span class="word-tag valid">
@@ -1281,7 +1293,7 @@ function displayMultiDeepResults(results, deepResults) {
         if (resource.invalid.length) {
             html += `
                 <div class="deep-subsection">
-                    <span class="deep-label">Need replace:</span>
+                    <span class="deep-label">❌ Требуют замены:</span>
                     <div class="word-list">
                         ${resource.invalid.map(dr => `
                             <span class="word-tag invalid">
@@ -1804,26 +1816,26 @@ function buildSingleDeepReport(type, result, deepPayload) {
     const summary = deepSummaryFromList(deepResults);
     const lines = [];
     lines.push('======================================================================');
-    lines.push(`DEEP CHECK REPORT: ${type.toUpperCase()}`);
+    lines.push(`ОТЧЁТ ГЛУБОКОЙ ПРОВЕРКИ: ${type.toUpperCase()}`);
     lines.push('======================================================================');
-    lines.push(`Date: ${new Date().toLocaleString()}`);
-    lines.push(`Total words in text: ${result?.total_words || 0}`);
-    lines.push(`Violations (base check): ${result?.violations_count || 0}`);
-    lines.push(`Deep validated: ${summary.valid.length}`);
-    lines.push(`Deep abbreviations: ${summary.abbreviations.length}`);
-    lines.push(`Deep need replace: ${summary.invalid.length}`);
+    lines.push(`Дата: ${new Date().toLocaleString('ru-RU')}`);
+    lines.push(`Всего слов в тексте: ${result?.total_words || 0}`);
+    lines.push(`Нарушений (базовая проверка): ${result?.violations_count || 0}`);
+    lines.push(`Подтверждено (глубокая): ${summary.valid.length}`);
+    lines.push(`Аббревиатуры: ${summary.abbreviations.length}`);
+    lines.push(`Требует замены: ${summary.invalid.length}`);
     lines.push('');
 
     if (summary.abbreviations.length) {
-        lines.push('[ABBREVIATIONS]');
+        lines.push('[АББРЕВИАТУРЫ]');
         summary.abbreviations.forEach(item => {
-            lines.push(`- ${item.word} -> ${(item.suggestions || []).join(', ') || 'translation unknown'}`);
+            lines.push(`- ${item.word} -> ${(item.suggestions || []).join(', ') || 'перевод неизвестен'}`);
         });
         lines.push('');
     }
 
     if (summary.valid.length) {
-        lines.push('[VALIDATED]');
+        lines.push('[ПОДТВЕРЖДЕНО]');
         summary.valid.forEach(item => {
             lines.push(`- ${item.word}${item.normal_form ? ` (${item.normal_form})` : ''}`);
         });
@@ -1831,7 +1843,7 @@ function buildSingleDeepReport(type, result, deepPayload) {
     }
 
     if (summary.invalid.length) {
-        lines.push('[NEED REPLACE]');
+        lines.push('[ТРЕБУЕТ ЗАМЕНЫ]');
         summary.invalid.forEach(item => {
             lines.push(`- ${item.word}${item.suggestions?.length ? ` -> ${item.suggestions.join(', ')}` : ''}`);
         });
@@ -1850,10 +1862,10 @@ function buildCollectionDeepReport(type, results, deepPayload) {
 
     const lines = [];
     lines.push('======================================================================');
-    lines.push(`DEEP CHECK REPORT: ${type.toUpperCase()}`);
+    lines.push(`ОТЧЁТ ГЛУБОКОЙ ПРОВЕРКИ: ${type.toUpperCase()}`);
     lines.push('======================================================================');
-    lines.push(`Date: ${new Date().toLocaleString()}`);
-    lines.push(`Resources total: ${results.length}`);
+    lines.push(`Дата: ${new Date().toLocaleString('ru-RU')}`);
+    lines.push(`Всего ресурсов: ${results.length}`);
     lines.push('');
 
     let totalValid = 0;
@@ -1863,10 +1875,10 @@ function buildCollectionDeepReport(type, results, deepPayload) {
     results.forEach((entry, idx) => {
         lines.push('----------------------------------------------------------------------');
         lines.push(`[${idx + 1}] ${entry.url || '-'}`);
-        if (entry.resource_type) lines.push(`Type: ${entry.resource_type}`);
+        if (entry.resource_type) lines.push(`Тип: ${entry.resource_type}`);
 
         if (!entry.success || !entry.result) {
-            lines.push(`Status: ERROR (${entry.error || 'Unknown error'})`);
+            lines.push(`Статус: ОШИБКА (${entry.error || 'Неизвестная ошибка'})`);
             lines.push('');
             return;
         }
@@ -1890,22 +1902,22 @@ function buildCollectionDeepReport(type, results, deepPayload) {
         totalValid += valid.length;
         totalAbbr += abbreviations.length;
         totalInvalid += invalid.length;
-        lines.push(`Deep summary: validated=${valid.length}, abbr=${abbreviations.length}, need_replace=${invalid.length}`);
+        lines.push(`Итог: подтверждено=${valid.length}, аббревиатур=${abbreviations.length}, требует_замены=${invalid.length}`);
 
         if (abbreviations.length) {
-            lines.push('  ABBR:');
+            lines.push('  АББРЕВИАТУРЫ:');
             abbreviations.forEach(item => {
-                lines.push(`    - ${item.word} -> ${(item.suggestions || []).join(', ') || 'translation unknown'}`);
+                lines.push(`    - ${item.word} -> ${(item.suggestions || []).join(', ') || 'перевод неизвестен'}`);
             });
         }
         if (valid.length) {
-            lines.push('  VALIDATED:');
+            lines.push('  ПОДТВЕРЖДЕНО:');
             valid.forEach(item => {
                 lines.push(`    - ${item.word}${item.normal_form ? ` (${item.normal_form})` : ''}`);
             });
         }
         if (invalid.length) {
-            lines.push('  NEED REPLACE:');
+            lines.push('  ТРЕБУЕТ ЗАМЕНЫ:');
             invalid.forEach(item => {
                 lines.push(`    - ${item.word}${item.suggestions?.length ? ` -> ${item.suggestions.join(', ')}` : ''}`);
             });
@@ -1913,7 +1925,7 @@ function buildCollectionDeepReport(type, results, deepPayload) {
         lines.push('');
     });
 
-    lines.splice(5, 0, `Deep totals: validated=${totalValid}, abbr=${totalAbbr}, need_replace=${totalInvalid}`);
+    lines.splice(5, 0, `Общий итог: подтверждено=${totalValid}, аббревиатур=${totalAbbr}, требует_замены=${totalInvalid}`);
     return lines.join('\n');
 }
 
@@ -2296,7 +2308,7 @@ function displayDeepResults(type, results) {
             <h3>🔬 Результаты глубокой проверки</h3>
             <div class="deep-summary">
                 <span class="deep-valid">✅ Подтверждено: ${otherValid.length}</span>
-                <span class="deep-abbr">📚 ABBR: ${abbreviations.length}</span>
+                <span class="deep-abbr">📚 Аббревиатуры: ${abbreviations.length}</span>
                 <span class="deep-invalid">❌ Неизвестно: ${invalidWords.length}</span>
             </div>
     `;
@@ -2381,23 +2393,29 @@ function clearText() {
     document.getElementById('textResults').style.display = 'none';
     currentResults.text = null;
     currentDeepResults.text = null;
+    localStorage.removeItem(TEXT_AUTOSAVE_KEY);
     updateTextInputMeta();
 }
 
 function loadSample() {
-    document.getElementById('textInput').value = `Пример текста для проверки закона о русском языке.
+    const sampleText = `Пример текста для проверки закона о русском языке.
 
-Этот сервис проверяет тексты на соответствие федеральному закону №168-ФЗ. 
+Этот сервис проверяет тексты на соответствие федеральному закону №168-ФЗ.
 Он находит слова на латинице, англицизмы и ненормативную лексику.
 
 Попробуйте добавить english words или специальные термины для проверки!`;
+    const textInput = document.getElementById('textInput');
+    if (textInput) {
+        textInput.value = sampleText;
+        localStorage.setItem(TEXT_AUTOSAVE_KEY, sampleText);
+    }
     updateTextInputMeta();
 }
 
 async function copyExtractedImageText() {
     const input = document.getElementById('imagesInput');
     if (!input || !input.value.trim()) {
-        alert('No extracted text to copy');
+        alert('Нет извлечённого текста для копирования');
         return;
     }
     try {
