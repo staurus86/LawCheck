@@ -238,23 +238,29 @@ class DatabaseManager:
 
         clean_words = []
         for raw in (words or []):
-            word = (raw or '').strip()
+            if not isinstance(raw, str):
+                continue
+            word = raw.strip()
             if word:
                 clean_words.append(word[:255])
+
+        # Ограничиваем до 30 слов за один вызов, чтобы не раздувать БД
+        clean_words = clean_words[:30]
 
         if not clean_words:
             return
 
         try:
             with self.db_engine.begin() as conn:
-                conn.execute(text("""
-                    INSERT INTO violation_words (word, count, last_seen_at)
-                    SELECT unnest(:words ::text[]), 1, NOW()
-                    ON CONFLICT (word)
-                    DO UPDATE SET
-                        count = violation_words.count + 1,
-                        last_seen_at = NOW()
-                """), {'words': clean_words})
+                for word in clean_words:
+                    conn.execute(text("""
+                        INSERT INTO violation_words (word, count, last_seen_at)
+                        VALUES (:word, 1, NOW())
+                        ON CONFLICT (word)
+                        DO UPDATE SET
+                            count = violation_words.count + 1,
+                            last_seen_at = NOW()
+                    """), {'word': word})
         except Exception as e:
             logger.error(f"Failed to upsert violation words: {e}")
 

@@ -30,8 +30,8 @@ class Config:
     MULTISCAN_USER_AGENT: str = os.getenv('MULTISCAN_USER_AGENT', 'LawChecker-MultiScan/1.0')
 
     # Метрики и БД
-    METRICS_RETENTION_DAYS: int = int(os.getenv('METRICS_RETENTION_DAYS', '60'))
-    METRICS_CLEANUP_INTERVAL_SEC: int = int(os.getenv('METRICS_CLEANUP_INTERVAL_SEC', '3600'))
+    METRICS_RETENTION_DAYS: int = int(os.getenv('METRICS_RETENTION_DAYS', '30'))
+    METRICS_CLEANUP_INTERVAL_SEC: int = int(os.getenv('METRICS_CLEANUP_INTERVAL_SEC', '1800'))
 
     # Database (Railway PostgreSQL)
     @staticmethod

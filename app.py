@@ -154,8 +154,11 @@ def insert_run_history(check_type, endpoint, success, duration_ms=None, source_t
 
 def upsert_violation_words(words):
     """Обновление счетчиков слов-нарушений через db_manager"""
-    if db_manager:
-        db_manager.upsert_violation_words(words)
+    try:
+        if db_manager:
+            db_manager.upsert_violation_words(words)
+    except Exception as e:
+        logger.warning(f"upsert_violation_words skipped: {e}")
 
 
 def cleanup_analytics_db(force=False):
