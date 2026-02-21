@@ -11,6 +11,89 @@ function debounce(fn, delay) {
     };
 }
 
+// Раскрывающийся список слов со спойлером
+// words — массив, limit — сколько показывать сразу, tagClass — CSS-класс тега, transform — fn(word)→string
+function renderWordList(words, limit, tagClass = '', transform = null) {
+    if (!words || !words.length) return '<div class="word-list"></div>';
+    const t = transform || (w => w);
+    const shown = words.slice(0, limit);
+    const hidden = words.slice(limit);
+    let html = '<div class="word-list">';
+    html += shown.map(w => `<span class="word-tag ${tagClass}">${t(w)}</span>`).join('');
+    if (hidden.length > 0) {
+        const uid = 'ws' + Math.random().toString(36).slice(2, 9);
+        html += `<span class="word-spoiler-hidden" id="${uid}" style="display:none">`;
+        html += hidden.map(w => `<span class="word-tag ${tagClass}">${t(w)}</span>`).join('');
+        html += `</span>`;
+        html += `<button class="spoiler-toggle-btn" onclick="toggleWordSpoiler(this,'${uid}',${hidden.length})">▼ Показать ещё ${hidden.length}</button>`;
+    }
+    html += '</div>';
+    return html;
+}
+
+// Переключатель спойлера в списке слов
+function toggleWordSpoiler(btn, uid, count) {
+    const el = document.getElementById(uid);
+    if (!el) return;
+    const isHidden = el.style.display === 'none';
+    el.style.display = isHidden ? 'inline' : 'none';
+    btn.textContent = isHidden ? `▲ Скрыть (${count})` : `▼ Показать ещё ${count}`;
+}
+
+// Человекочитаемые метки причин глубокой проверки
+const DEEP_REASON_LABELS = {
+    'normal_form_in_dict': 'в словаре (норм. форма)',
+    'proper_name': 'имя собственное',
+    'geo_name': 'гео. название',
+    'organization': 'организация',
+    'abbreviation': 'аббревиатура',
+    'speller_confirmed': 'подтверждено орфографией',
+};
+function deepReasonLabel(reason) {
+    if (!reason) return '';
+    if (reason.startsWith('speller_variant:')) return `вариант: ${reason.split(':')[1].trim()}`;
+    return DEEP_REASON_LABELS[reason] || reason;
+}
+
+// Подсветка нарушений прямо в исходном тексте (доп. кнопка)
+function toggleHighlight(type, btn) {
+    const overlay = document.getElementById(`highlight-${type}`);
+    if (!overlay) return;
+    if (overlay.style.display !== 'none') {
+        overlay.style.display = 'none';
+        btn.textContent = '🖍 Подсветить в тексте';
+        return;
+    }
+    const result = currentResults[type];
+    if (!result) return;
+    let source = '';
+    if (type === 'text') source = document.getElementById('textInput')?.value || '';
+    else if (type === 'url') source = overlay.dataset.source || '';
+    if (!source) { alert('Исходный текст недоступен'); return; }
+
+    const latinSet   = new Set((result.latin_words     || []).map(w => w.toLowerCase()));
+    const unknownSet = new Set((result.unknown_cyrillic || []).map(w => w.toLowerCase()));
+    const nenormSet  = new Set((result.nenormative_words || []).map(w => w.toLowerCase()));
+
+    const escaped = source.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const highlighted = escaped.replace(/[а-яёА-ЯЁa-zA-Z][а-яёА-ЯЁa-zA-Z\-]*/g, match => {
+        const lower = match.toLowerCase();
+        if (nenormSet.has(lower)) return `<mark class="hl-critical">${match}</mark>`;
+        if (latinSet.has(lower))  return `<mark class="hl-latin">${match}</mark>`;
+        if (unknownSet.has(lower))return `<mark class="hl-unknown">${match}</mark>`;
+        return match;
+    });
+    overlay.innerHTML = `
+        <div class="highlight-legend">
+            <span class="hl-badge hl-critical-badge">🚫 Ненормативная</span>
+            <span class="hl-badge hl-latin-badge">🌍 Латиница</span>
+            <span class="hl-badge hl-unknown-badge">❓ Неизвестные</span>
+        </div>
+        <div class="highlight-text">${highlighted}</div>`;
+    overlay.style.display = 'block';
+    btn.textContent = '✖ Скрыть подсветку';
+}
+
 // Global variables
 let currentResults = {
     text: null,
@@ -971,7 +1054,7 @@ function renderMultiItem(item, index) {
     }
 
     const statusClass = item.law_compliant ? 'success' : 'warning';
-    const forbiddenPreview = (item.forbidden_words || []).slice(0, 20);
+    const forbidden = item.forbidden_words || [];
     return `
         <div class="batch-item ${statusClass}">
             <div class="batch-item-header">
@@ -983,12 +1066,7 @@ function renderMultiItem(item, index) {
                 <span class="batch-violations-count">${item.law_compliant ? 'соответствует' : `нарушений: ${item.violations_count || 0}`}</span>
                 <span class="batch-words-count">слов: ${(item.result && item.result.total_words) || 0}</span>
             </div>
-            ${forbiddenPreview.length ? `
-                <div class="word-list">
-                    ${forbiddenPreview.map(w => `<span class="word-tag">${w}</span>`).join('')}
-                    ${(item.forbidden_words || []).length > forbiddenPreview.length ? `<span class="more-words">... +${(item.forbidden_words || []).length - forbiddenPreview.length}</span>` : ''}
-                </div>
-            ` : '<div class="text-muted">Запрещённых слов не найдено.</div>'}
+            ${forbidden.length ? renderWordList(forbidden, 20) : '<div class="text-muted">Запрещённых слов не найдено.</div>'}
         </div>
     `;
 }
@@ -1511,17 +1589,11 @@ function displayResults(type, result, url = '') {
                         <span class="violation-icon">🚫</span>
                         <h3>Ненормативная лексика: ${result.nenormative_count}</h3>
                     </div>
-                    <div class="word-list">
-                        ${result.nenormative_words.slice(0, 20).map(w => {
-                            const censored = w[0] + '*'.repeat(w.length - 2) + w[w.length - 1];
-                            return `<span class="word-tag critical">${censored}</span>`;
-                        }).join('')}
-                    </div>
-                    ${result.nenormative_words.length > 20 ? `<p class="more-words">... и ещё ${result.nenormative_words.length - 20} слов</p>` : ''}
+                    ${renderWordList(result.nenormative_words, 20, 'critical', w => w[0] + '*'.repeat(Math.max(0,w.length-2)) + w.slice(-1))}
                 </div>
             `;
         }
-        
+
         // Слова на латинице
         if (result.latin_count > 0) {
             html += `
@@ -1530,16 +1602,11 @@ function displayResults(type, result, url = '') {
                         <span class="violation-icon">🌍</span>
                         <h3>Слова на латинице: ${result.latin_count}</h3>
                     </div>
-                    <div class="word-list">
-                        ${result.latin_words.slice(0, 30).map(w => 
-                            `<span class="word-tag">${w}</span>`
-                        ).join('')}
-                    </div>
-                    ${result.latin_words.length > 30 ? `<p class="more-words">... и ещё ${result.latin_words.length - 30} слов</p>` : ''}
+                    ${renderWordList(result.latin_words, 30)}
                 </div>
             `;
         }
-        
+
         // Неизвестные слова/англицизмы
         if (result.unknown_count > 0) {
             html += `
@@ -1548,17 +1615,20 @@ function displayResults(type, result, url = '') {
                         <span class="violation-icon">❓</span>
                         <h3>Англицизмы / Неизвестные слова: ${result.unknown_count}</h3>
                     </div>
-                    <div class="word-list">
-                        ${result.unknown_cyrillic.slice(0, 30).map(w => 
-                            `<span class="word-tag">${w}</span>`
-                        ).join('')}
-                    </div>
-                    ${result.unknown_cyrillic.length > 30 ? `<p class="more-words">... и ещё ${result.unknown_cyrillic.length - 30} слов</p>` : ''}
+                    ${renderWordList(result.unknown_cyrillic, 30)}
                 </div>
             `;
         }
-        
+
         html += '</div>';
+
+        // Кнопка подсветки нарушений в тексте (для текстовой и URL вкладок)
+        if (type === 'text' || type === 'url') {
+            html += `
+                <button class="highlight-btn" onclick="toggleHighlight('${type}', this)">🖍 Подсветить в тексте</button>
+                <div class="highlight-overlay" id="highlight-${type}" style="display:none" data-source=""></div>
+            `;
+        }
     }
     
     // Статистика
@@ -1676,35 +1746,19 @@ function displayBatchResults(results) {
                     ${allNenormativeWords.size > 0 ? `
                         <div class="batch-violation-category critical">
                             <h5>🚫 Ненормативная лексика (${allNenormativeWords.size})</h5>
-                            <div class="word-list">
-                                ${Array.from(allNenormativeWords).slice(0, 20).map(w => {
-                                    const censored = w[0] + '*'.repeat(Math.max(0, w.length - 2)) + w.slice(-1);
-                                    return `<span class="word-tag critical">${censored}</span>`;
-                                }).join('')}
-                                ${allNenormativeWords.size > 20 ? `<span class="more-words">... и ещё ${allNenormativeWords.size - 20}</span>` : ''}
-                            </div>
+                            ${renderWordList(Array.from(allNenormativeWords), 20, 'critical', w => w[0] + '*'.repeat(Math.max(0,w.length-2)) + w.slice(-1))}
                         </div>
                     ` : ''}
                     ${allLatinWords.size > 0 ? `
                         <div class="batch-violation-category">
                             <h5>🌍 Латиница (${allLatinWords.size})</h5>
-                            <div class="word-list">
-                                ${Array.from(allLatinWords).slice(0, 30).map(w => 
-                                    `<span class="word-tag">${w}</span>`
-                                ).join('')}
-                                ${allLatinWords.size > 30 ? `<span class="more-words">... и ещё ${allLatinWords.size - 30}</span>` : ''}
-                            </div>
+                            ${renderWordList(Array.from(allLatinWords), 30)}
                         </div>
                     ` : ''}
                     ${allUnknownWords.size > 0 ? `
                         <div class="batch-violation-category">
                             <h5>❓ Англицизмы / Неизвестные (${allUnknownWords.size})</h5>
-                            <div class="word-list">
-                                ${Array.from(allUnknownWords).slice(0, 30).map(w => 
-                                    `<span class="word-tag">${w}</span>`
-                                ).join('')}
-                                ${allUnknownWords.size > 30 ? `<span class="more-words">... и ещё ${allUnknownWords.size - 30}</span>` : ''}
-                            </div>
+                            ${renderWordList(Array.from(allUnknownWords), 30)}
                         </div>
                     ` : ''}
                 </div>
@@ -1755,35 +1809,19 @@ function displayBatchResults(results) {
                         ${item.result.nenormative_words?.length > 0 ? `
                             <div class="batch-detail-section critical">
                                 <h6>🚫 Ненормативная лексика:</h6>
-                                <div class="word-list">
-                                    ${item.result.nenormative_words.slice(0, 15).map(w => {
-                                        const censored = w[0] + '*'.repeat(Math.max(0, w.length - 2)) + w.slice(-1);
-                                        return `<span class="word-tag critical">${censored}</span>`;
-                                    }).join('')}
-                                    ${item.result.nenormative_words.length > 15 ? `<span class="more-words">... и ещё ${item.result.nenormative_words.length - 15}</span>` : ''}
-                                </div>
+                                ${renderWordList(item.result.nenormative_words, 15, 'critical', w => w[0] + '*'.repeat(Math.max(0,w.length-2)) + w.slice(-1))}
                             </div>
                         ` : ''}
                         ${item.result.latin_words?.length > 0 ? `
                             <div class="batch-detail-section">
                                 <h6>🌍 Латиница:</h6>
-                                <div class="word-list">
-                                    ${item.result.latin_words.slice(0, 20).map(w => 
-                                        `<span class="word-tag">${w}</span>`
-                                    ).join('')}
-                                    ${item.result.latin_words.length > 20 ? `<span class="more-words">... и ещё ${item.result.latin_words.length - 20}</span>` : ''}
-                                </div>
+                                ${renderWordList(item.result.latin_words, 20)}
                             </div>
                         ` : ''}
                         ${item.result.unknown_cyrillic?.length > 0 ? `
                             <div class="batch-detail-section">
                                 <h6>❓ Англицизмы / Неизвестные:</h6>
-                                <div class="word-list">
-                                    ${item.result.unknown_cyrillic.slice(0, 20).map(w => 
-                                        `<span class="word-tag">${w}</span>`
-                                    ).join('')}
-                                    ${item.result.unknown_cyrillic.length > 20 ? `<span class="more-words">... и ещё ${item.result.unknown_cyrillic.length - 20}</span>` : ''}
-                                </div>
+                                ${renderWordList(item.result.unknown_cyrillic, 20)}
                             </div>
                         ` : ''}
                     </div>
@@ -2324,54 +2362,39 @@ function displayDeepResults(type, results) {
     `;
 
     if (abbreviations.length > 0) {
-        html += `
-            <div class="deep-section abbreviation">
-                <h4>📚 Аббревиатуры (требуется перевод)</h4>
-                <div class="word-list">
-                    ${abbreviations.map(r => `
-                        <span class="word-tag abbr">
-                            ${r.word}
-                            <span class="word-translation" title="${r.reasons.join(', ')}">
-                                → ${r.suggestions?.join(', ') || 'перевод неизвестен'}
-                            </span>
-                        </span>
-                    `).join('')}
-                </div>
-            </div>
-        `;
+        const abbrHtml = abbreviations.map(r => `
+            <span class="word-tag abbr" title="${r.reasons.map(deepReasonLabel).join(', ')}">
+                ${r.word}
+                <span class="word-translation">→ ${r.suggestions?.join(', ') || 'перевод неизвестен'}</span>
+            </span>
+        `).join('');
+        const abbrWrap = abbreviations.length > 20
+            ? (() => { const uid='ws'+Math.random().toString(36).slice(2,9); const shownH=abbreviations.slice(0,20).map(r=>`<span class="word-tag abbr">${r.word}<span class="word-translation">→${r.suggestions?.join(', ')||'?'}</span></span>`).join(''); const hidH=abbreviations.slice(20).map(r=>`<span class="word-tag abbr" style="display:none" id="">  ${r.word}</span>`).join(''); return `<div class="word-list">${shownH}<span class="word-spoiler-hidden" id="${uid}" style="display:none">${hidH}</span><button class="spoiler-toggle-btn" onclick="toggleWordSpoiler(this,'${uid}',${abbreviations.length-20})">▼ Показать ещё ${abbreviations.length-20}</button></div>`; })()
+            : `<div class="word-list">${abbrHtml}</div>`;
+        html += `<div class="deep-section abbreviation"><h4>📚 Аббревиатуры (${abbreviations.length})</h4>${abbrWrap}</div>`;
     }
 
     if (otherValid.length > 0) {
+        const validTags = otherValid.map(r => {
+            const label = r.reasons.map(deepReasonLabel).join(', ');
+            return `<span class="word-tag valid" title="${label}">${r.word}${r.normal_form && r.normal_form !== r.word.toLowerCase() ? `<span class="word-reason">(${r.normal_form})</span>` : ''}</span>`;
+        });
         html += `
             <div class="deep-section valid">
-                <h4>✅ Слова, подтверждённые при глубокой проверке</h4>
-                <div class="word-list">
-                    ${otherValid.map(r => `
-                        <span class="word-tag valid">
-                            ${r.word}
-                            <span class="word-reason" title="${r.reasons.join(', ')}">
-                                ${r.normal_form ? `(${r.normal_form})` : ''}
-                            </span>
-                        </span>
-                    `).join('')}
-                </div>
+                <h4>✅ Подтверждено (${otherValid.length})</h4>
+                ${renderWordList(validTags, 30, '', x => x)}
             </div>
         `;
     }
 
     if (invalidWords.length > 0) {
+        const invalidTags = invalidWords.map(r =>
+            `<span class="word-tag invalid">${r.word}${r.suggestions?.length ? `<span class="word-suggestions">→ ${r.suggestions.slice(0,3).join(', ')}</span>` : ''}</span>`
+        );
         html += `
             <div class="deep-section invalid">
-                <h4>❓ Слова, не подтверждённые (требуют замены)</h4>
-                <div class="word-list">
-                    ${invalidWords.map(r => `
-                        <span class="word-tag invalid">
-                            ${r.word}
-                            ${r.suggestions?.length > 0 ?
-                                `<span class="word-suggestions">→ ${r.suggestions.join(', ')}</span>` : ''}
-                        </span>
-                    `).join('')}
-                </div>
+                <h4>❓ Требуют замены (${invalidWords.length})</h4>
+                ${renderWordList(invalidTags, 30, '', x => x)}
             </div>
         `;
     }

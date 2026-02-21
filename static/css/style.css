@@ -2206,3 +2206,89 @@ p, li, .text-muted { font-size: var(--text-sm); }
         padding: 1rem;
     }
 }
+
+/* ── Спойлер в списках слов ─────────────────────────────────── */
+.word-spoiler-hidden { display: inline; }
+
+.spoiler-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.2rem 0.75rem;
+    border-radius: 16px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    background: #f0f4ff;
+    color: #3b5bdb;
+    border: 1px dashed #99b0f0;
+    transition: background 0.18s, border-color 0.18s;
+    margin: 4px 0 0 4px;
+    vertical-align: middle;
+}
+.spoiler-toggle-btn:hover {
+    background: #dce4ff;
+    border-color: #3b5bdb;
+}
+
+/* ── Кнопка и панель подсветки ─────────────────────────────── */
+.highlight-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.4rem 1.1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    margin: 0.85rem 0 0.25rem;
+    transition: opacity 0.2s;
+    font-weight: 500;
+}
+.highlight-btn:hover { opacity: 0.87; }
+
+.highlight-overlay {
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 1.1rem 1.25rem;
+    margin-top: 0.4rem;
+    background: #fafafa;
+    max-height: 380px;
+    overflow-y: auto;
+    line-height: 1.85;
+}
+
+.highlight-legend {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.65rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid #e8e8e8;
+    font-size: 0.82rem;
+}
+
+.highlight-text {
+    white-space: pre-wrap;
+    font-size: 0.93rem;
+    color: #333;
+}
+
+mark.hl-critical { background: #ffcdd2; color: #b71c1c; border-radius: 3px; padding: 0 2px; }
+mark.hl-latin    { background: #fff3e0; color: #e65100; border-radius: 3px; padding: 0 2px; }
+mark.hl-unknown  { background: #fff9c4; color: #f57f17; border-radius: 3px; padding: 0 2px; }
+
+.hl-badge { padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.hl-critical-badge { background: #ffcdd2; color: #b71c1c; }
+.hl-latin-badge    { background: #fff3e0; color: #e65100; }
+.hl-unknown-badge  { background: #fff9c4; color: #f57f17; }
+
+/* ── Улучшения в глубоком анализе ──────────────────────────── */
+.deep-section { margin-bottom: 1.25rem; }
+.deep-section h4 { margin-bottom: 0.6rem; font-size: 1rem; }
+.word-tag.valid    { background: #e8f5e9; color: #2e7d32; }
+.word-tag.invalid  { background: #fce4ec; color: #880e4f; }
+.word-tag.abbr     { background: #e3f2fd; color: #0d47a1; }
+.word-reason  { font-size: 0.75rem; color: #888; margin-left: 3px; }
+.word-suggestions { font-size: 0.78rem; color: #2e7d32; margin-left: 4px; }
