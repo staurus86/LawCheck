@@ -523,7 +523,11 @@ class RussianLanguageChecker:
     def _get_normal_form(self, word_lower):
         """Получить нормальную форму с кэшированием"""
         if word_lower in self._normal_form_cache:
-            return self._normal_form_cache[word_lower]
+            cached = self._normal_form_cache[word_lower]
+            # _deep_check_single может сохранить dict в тот же кэш —
+            # возвращаем только строки, dict игнорируем
+            if isinstance(cached, str):
+                return cached
 
         if not self.morph:
             return word_lower
@@ -534,7 +538,7 @@ class RussianLanguageChecker:
                 normal = parsed[0].normal_form
                 self._normal_form_cache[word_lower] = normal
                 return normal
-        except:
+        except Exception:
             pass
 
         self._normal_form_cache[word_lower] = word_lower
@@ -655,7 +659,7 @@ class RussianLanguageChecker:
             self.forms_cache[word_lower] = result
             return result
 
-        except:
+        except Exception:
             return None
 
     def _check_speller_full(self, word):
@@ -711,12 +715,10 @@ class RussianLanguageChecker:
         if main_dict.exists():
             try:
                 with gzip.open(main_dict, 'rt', encoding='utf-8') as f:
-                    words = set()
                     for line in f:
                         word = line.strip().lower()
                         if word and len(word) > 1:
-                            words.add(word)
-                self.normative_words.update(words)
+                            self.normative_words.add(word)
             except Exception as e:
                 print(f"[ERROR] russian_dict.txt.gz: {e}")
 
