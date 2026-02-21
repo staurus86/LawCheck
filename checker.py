@@ -26,7 +26,8 @@ _RE_WORD = re.compile(r'\b[а-яёА-ЯЁa-zA-Z][а-яёА-ЯЁa-zA-Z\-]*\b')
 class RussianLanguageChecker:
     __slots__ = ('normative_words', 'foreign_allowed', 'nenormative_words',
                  'speller_cache', 'forms_cache', 'all_forms', 'morph', 'speller',
-                 '_word_prefixes', '_skip_words', 'abbreviations', '_normal_form_cache')
+                 '_word_prefixes', '_skip_words', 'abbreviations', '_normal_form_cache',
+                 '_nenormative_cache')
 
     def __init__(self):
         self.normative_words = set()
@@ -36,7 +37,8 @@ class RussianLanguageChecker:
         self.forms_cache = {}
         self.all_forms = set()
         self.abbreviations = {}
-        self._normal_form_cache = {}  # Кэш для нормальных форм
+        self._normal_form_cache = {}   # Кэш нормальных форм (str → str или dict)
+        self._nenormative_cache = {}   # Кэш результатов is_nenormative (str → bool)
 
         print("\n" + "="*60)
         print("INIT RussianLanguageChecker (OPTIMIZED)")
@@ -778,18 +780,22 @@ class RussianLanguageChecker:
         return {word.lower()}
 
     def is_nenormative(self, word):
-        """Проверка ненормативности - с кэшем нормальных форм"""
+        """Проверка ненормативности - с двойным кэшем (быстрый + морф.)"""
         word_lower = word.lower()
 
-        if word_lower in self.nenormative_words:
-            return True
+        if word_lower in self._nenormative_cache:
+            return self._nenormative_cache[word_lower]
 
-        if self.morph:
+        result = False
+        if word_lower in self.nenormative_words:
+            result = True
+        elif self.morph:
             normal = self._get_normal_form(word_lower)
             if normal in self.nenormative_words:
-                return True
+                result = True
 
-        return False
+        self._nenormative_cache[word_lower] = result
+        return result
 
     def check_text(self, text):
         """Быстрая проверка текста - O(1) на слово"""
@@ -833,6 +839,11 @@ class RussianLanguageChecker:
                 continue
 
             if not self._is_known_fast(wlower):
+                # Проверяем через нормальную форму (уменьшает ложные срабатывания)
+                if self.morph:
+                    normal = self._get_normal_form(wlower)
+                    if normal != wlower and self._is_known_fast(normal):
+                        continue
                 unknown_cyrillic.add(word)
 
         return {

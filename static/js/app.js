@@ -2,6 +2,15 @@
 const API_BASE = window.API_BASE_URL || 'http://localhost:5000';
 console.log('Using API:', API_BASE);
 
+// Утилита debounce — откладывает вызов функции на delay мс после последнего вызова
+function debounce(fn, delay) {
+    let timer;
+    return function(...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+
 // Global variables
 let currentResults = {
     text: null,
@@ -167,16 +176,17 @@ function initFieldMetrics() {
     if (textInput) {
         const saved = localStorage.getItem(TEXT_AUTOSAVE_KEY);
         if (saved) textInput.value = saved;
+        const debouncedTextMeta = debounce(updateTextInputMeta, 200);
         textInput.addEventListener('input', () => {
-            updateTextInputMeta();
+            debouncedTextMeta();
             localStorage.setItem(TEXT_AUTOSAVE_KEY, textInput.value);
         });
     }
 
-    if (batchInput) batchInput.addEventListener('input', updateBatchInputMeta);
-    if (imagesInput) imagesInput.addEventListener('input', updateImagesInputMeta);
-    if (imagesBatchInput) imagesBatchInput.addEventListener('input', updateImagesBatchInputMeta);
-    if (multiUrlsInput) multiUrlsInput.addEventListener('input', updateMultiUrlsInputMeta);
+    if (batchInput) batchInput.addEventListener('input', debounce(updateBatchInputMeta, 200));
+    if (imagesInput) imagesInput.addEventListener('input', debounce(updateImagesInputMeta, 200));
+    if (imagesBatchInput) imagesBatchInput.addEventListener('input', debounce(updateImagesBatchInputMeta, 200));
+    if (multiUrlsInput) multiUrlsInput.addEventListener('input', debounce(updateMultiUrlsInputMeta, 200));
     updateTextInputMeta();
     updateBatchInputMeta();
     updateImagesInputMeta();
@@ -1032,8 +1042,8 @@ function buildMultiPayload() {
     const provider = getMultiProvider();
     const model = (document.getElementById('multiModelInput') || {}).value || '';
     const token = (document.getElementById('multiTokenInput') || {}).value || '';
-    const maxUrls = parseInt((document.getElementById('multiMaxUrlsInput') || {}).value || '500', 10);
-    const maxPages = parseInt((document.getElementById('multiMaxPagesInput') || {}).value || '500', 10);
+    const maxUrls = parseInt((document.getElementById('multiMaxUrlsInput') || {}).value || '10', 10);
+    const maxPages = parseInt((document.getElementById('multiMaxPagesInput') || {}).value || '10', 10);
     const maxResources = parseInt((document.getElementById('multiMaxResourcesInput') || {}).value || '2500', 10);
     const delayMs = parseInt((document.getElementById('multiDelayMsInput') || {}).value || '150', 10);
     const includeExternal = ((document.getElementById('multiIncludeExternal') || {}).value || 'false') === 'true';
@@ -1046,8 +1056,8 @@ function buildMultiPayload() {
         provider,
         model: model.trim(),
         token: token.trim(),
-        max_urls: Number.isFinite(maxUrls) ? maxUrls : 500,
-        max_pages: Number.isFinite(maxPages) ? maxPages : 500,
+        max_urls: Number.isFinite(maxUrls) ? maxUrls : 10,
+        max_pages: Number.isFinite(maxPages) ? maxPages : 10,
         max_resources: Number.isFinite(maxResources) ? maxResources : 2500,
         delay_ms: Number.isFinite(delayMs) ? delayMs : 150,
         include_external: includeExternal
