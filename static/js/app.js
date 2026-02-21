@@ -69,6 +69,7 @@ function toggleHighlight(type, btn) {
     let source = '';
     if (type === 'text') source = document.getElementById('textInput')?.value || '';
     else if (type === 'url') source = overlay.dataset.source || '';
+    else if (type === 'images') source = currentResults.images?.extracted_text || '';
     if (!source) { alert('Исходный текст недоступен'); return; }
 
     const latinSet   = new Set((result.latin_words     || []).map(w => w.toLowerCase()));
@@ -430,6 +431,9 @@ async function checkUrl() {
             currentResults.url = data.result;
             currentDeepResults.url = null;
             displayResults('url', data.result, url);
+            // Сохраняем текст страницы для подсветки
+            const urlOverlay = document.getElementById('highlight-url');
+            if (urlOverlay) urlOverlay.dataset.source = data.source_text || '';
             console.log('✅ URL проверен:', data.result);
         } else {
             alert('Ошибка: ' + data.error);
@@ -1623,7 +1627,7 @@ function displayResults(type, result, url = '') {
         html += '</div>';
 
         // Кнопка подсветки нарушений в тексте (для текстовой и URL вкладок)
-        if (type === 'text' || type === 'url') {
+        if (type === 'text' || type === 'url' || type === 'images') {
             html += `
                 <button class="highlight-btn" onclick="toggleHighlight('${type}', this)">🖍 Подсветить в тексте</button>
                 <div class="highlight-overlay" id="highlight-${type}" style="display:none" data-source=""></div>

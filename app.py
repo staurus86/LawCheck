@@ -454,6 +454,7 @@ def check_url():
             'success': True,
             'url': url,
             'result': result,
+            'source_text': text[:50000],
             'timestamp': datetime.now().isoformat()
         })
     
