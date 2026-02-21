@@ -15,6 +15,9 @@ requests>=2.27.1
 # PDF processing
 pypdf==5.1.0
 
+# Word (DOCX) export
+python-docx>=1.2.0
+
 # Database
 SQLAlchemy>=2.0
 psycopg2-binary>=2.9

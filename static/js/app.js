@@ -1082,28 +1082,76 @@ function displayMultiResults(payload) {
 
     const results = payload.results || [];
     const byType = payload.totals_by_type || {};
+
+    // Агрегируем статистику по всем ресурсам
+    let totalWords = 0, totalViolations = 0, totalNenorm = 0, totalLatin = 0, totalUnknown = 0;
+    const allForbiddenSet = new Set();
+    for (const item of results) {
+        if (!item.success) continue;
+        const r = item.result || {};
+        totalWords      += r.total_words      || 0;
+        totalViolations += item.violations_count || 0;
+        totalNenorm     += r.nenormative_count || 0;
+        totalLatin      += r.latin_count       || 0;
+        totalUnknown    += r.unknown_count     || 0;
+        (item.forbidden_words || []).forEach(w => allForbiddenSet.add(w));
+    }
+    const compliance = totalWords > 0
+        ? Math.round(((totalWords - totalViolations) / totalWords) * 100)
+        : 100;
+    const withViol = payload.with_violations || 0;
+
     const summary = `
         <div class="batch-summary">
             <div class="summary-stats">
                 <div class="summary-stat">
                     <span class="summary-value">${payload.total || 0}</span>
-                    <span class="summary-label">Всего</span>
+                    <span class="summary-label">Всего ресурсов</span>
                 </div>
                 <div class="summary-stat success">
                     <span class="summary-value">${payload.processed_success || 0}</span>
-                    <span class="summary-label">Успешно</span>
+                    <span class="summary-label">Обработано</span>
+                </div>
+                <div class="summary-stat warning">
+                    <span class="summary-value">${withViol}</span>
+                    <span class="summary-label">С нарушениями</span>
                 </div>
                 <div class="summary-stat error">
                     <span class="summary-value">${payload.processed_error || 0}</span>
-                    <span class="summary-label">Ошибок</span>
-                </div>
-                <div class="summary-stat warning">
-                    <span class="summary-value">${payload.with_violations || 0}</span>
-                    <span class="summary-label">С нарушениями</span>
+                    <span class="summary-label">Ошибок загрузки</span>
                 </div>
             </div>
-            <p class="text-muted">Типы: страниц=${byType.page || 0}, изображений=${byType.image || 0}, PDF=${byType.pdf || 0}</p>
-            <p class="text-muted">Общее время: ${(payload.timings_ms && payload.timings_ms.total) || '-'} мс</p>
+            <div class="summary-stats" style="margin-top:10px">
+                <div class="summary-stat">
+                    <span class="summary-value">${totalWords.toLocaleString('ru-RU')}</span>
+                    <span class="summary-label">Всего слов</span>
+                </div>
+                <div class="summary-stat ${totalViolations > 0 ? 'error' : 'success'}">
+                    <span class="summary-value">${totalViolations}</span>
+                    <span class="summary-label">Нарушений</span>
+                </div>
+                <div class="summary-stat ${totalNenorm > 0 ? 'error' : ''}">
+                    <span class="summary-value">${totalNenorm}</span>
+                    <span class="summary-label">🚫 Ненорм. лексика</span>
+                </div>
+                <div class="summary-stat ${totalLatin > 0 ? 'warning' : ''}">
+                    <span class="summary-value">${totalLatin}</span>
+                    <span class="summary-label">🌍 Латиница</span>
+                </div>
+                <div class="summary-stat ${totalUnknown > 0 ? 'warning' : ''}">
+                    <span class="summary-value">${totalUnknown}</span>
+                    <span class="summary-label">❓ Неизвестные</span>
+                </div>
+                <div class="summary-stat ${compliance < 90 ? 'warning' : 'success'}">
+                    <span class="summary-value">${compliance}%</span>
+                    <span class="summary-label">Соответствие</span>
+                </div>
+            </div>
+            <p class="text-muted" style="margin-top:8px">
+                Типы: страниц=${byType.page||0}, изображений=${byType.image||0}, PDF=${byType.pdf||0} &nbsp;|&nbsp;
+                Уникальных нарушений: ${allForbiddenSet.size} &nbsp;|&nbsp;
+                Время: ${(payload.timings_ms && payload.timings_ms.total) || '-'} мс
+            </p>
         </div>
     `;
 
@@ -2055,6 +2103,42 @@ async function exportReport(type) {
     } catch (error) {
         console.error('❌ Ошибка экспорта:', error);
         alert('Ошибка экспорта: ' + error.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Экспорт отчёта в Word (DOCX)
+async function exportDocx(type) {
+    const result = currentResults[type];
+    if (!result) { alert('Нет данных для экспорта! Сначала выполните проверку.'); return; }
+    try {
+        showLoading();
+        let endpoint, payload, prefix;
+        if (type === 'batch') {
+            endpoint = '/api/export/batch-docx';
+            payload  = { results: result };
+            prefix   = 'lawcheck_batch_';
+        } else {
+            endpoint = '/api/export/docx';
+            const urlVal = type === 'url' ? (document.getElementById('urlInput')?.value || '') : '';
+            payload  = { result, url: urlVal };
+            prefix   = 'lawcheck_';
+        }
+        const resp = await fetch(`${API_BASE}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+        const blob = await resp.blob();
+        const a = document.createElement('a');
+        a.href = window.URL.createObjectURL(blob);
+        a.download = `${prefix}${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.docx`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        window.URL.revokeObjectURL(a.href);
+    } catch (e) {
+        alert('Ошибка экспорта Word: ' + e.message);
     } finally {
         hideLoading();
     }

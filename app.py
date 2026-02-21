@@ -1848,6 +1848,378 @@ def export_multiscan_txt():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ==================== DOCX EXPORT ====================
+
+def _build_docx_single(result, source_url=''):
+    """Строит красивый Word-документ для одиночной проверки."""
+    from docx import Document
+    from docx.shared import Pt, RGBColor, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    doc = Document()
+
+    for section in doc.sections:
+        section.top_margin    = Cm(2)
+        section.bottom_margin = Cm(2)
+        section.left_margin   = Cm(2.5)
+        section.right_margin  = Cm(2.5)
+
+    def set_cell_bg(cell, hex6):
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        shd = OxmlElement('w:shd')
+        shd.set(qn('w:val'),   'clear')
+        shd.set(qn('w:color'), 'auto')
+        shd.set(qn('w:fill'),  hex6)
+        tcPr.append(shd)
+
+    def add_hr(color='CCCCCC'):
+        p = doc.add_paragraph()
+        pPr = p._p.get_or_add_pPr()
+        pBdr = OxmlElement('w:pBdr')
+        bot = OxmlElement('w:bottom')
+        bot.set(qn('w:val'),   'single')
+        bot.set(qn('w:sz'),    '6')
+        bot.set(qn('w:space'), '1')
+        bot.set(qn('w:color'), color)
+        pBdr.append(bot)
+        pPr.append(pBdr)
+
+    # ── Заголовок ──────────────────────────────────────────────────
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run('ОТЧЁТ ПРОВЕРКИ ТЕКСТА')
+    r.font.size = Pt(22); r.font.bold = True
+    r.font.color.rgb = RGBColor(0x1F, 0x38, 0x64)
+
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run('Соответствие Федеральному закону №168-ФЗ «О русском языке»')
+    r.font.size = Pt(11); r.font.color.rgb = RGBColor(0x44, 0x72, 0xC4)
+
+    doc.add_paragraph()
+
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run(f'Дата: {datetime.now().strftime("%d.%m.%Y %H:%M")}     ID: {str(uuid.uuid4())[:8].upper()}')
+    r.font.size = Pt(9); r.font.color.rgb = RGBColor(0x80, 0x80, 0x80)
+
+    if source_url:
+        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run(f'Источник: {source_url}')
+        r.font.size = Pt(9); r.font.color.rgb = RGBColor(0x44, 0x72, 0xC4)
+
+    add_hr()
+
+    # ── Статус ─────────────────────────────────────────────────────
+    law_compliant = bool(result.get('law_compliant', result.get('violations_count', 0) == 0))
+    total      = result.get('total_words', 1) or 1
+    violations = result.get('violations_count', 0)
+    compliance = 100.0 if law_compliant else round(((total - violations) / total) * 100, 1)
+
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if law_compliant:
+        r = p.add_run('ТЕКСТ СООТВЕТСТВУЕТ ТРЕБОВАНИЯМ ЗАКОНА')
+        r.font.color.rgb = RGBColor(0x00, 0xB0, 0x50)
+    else:
+        r = p.add_run(f'ОБНАРУЖЕНО НАРУШЕНИЙ: {violations}')
+        r.font.color.rgb = RGBColor(0xC0, 0x00, 0x00)
+    r.font.bold = True; r.font.size = Pt(16)
+
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    clr = (RGBColor(0x00,0xB0,0x50) if compliance >= 90
+           else RGBColor(0xFF,0xC0,0x00) if compliance >= 70
+           else RGBColor(0xC0,0x00,0x00))
+    r = p.add_run(f'Соответствие закону: {compliance}%')
+    r.font.size = Pt(13); r.font.bold = True; r.font.color.rgb = clr
+
+    doc.add_paragraph()
+
+    # ── Статистика (таблица 4 колонки) ─────────────────────────────
+    p = doc.add_paragraph()
+    r = p.add_run('Статистика проверки')
+    r.font.size = Pt(13); r.font.bold = True; r.font.color.rgb = RGBColor(0x1F, 0x38, 0x64)
+
+    tbl = doc.add_table(rows=2, cols=4); tbl.style = 'Table Grid'
+    hdrs = ['Всего слов', 'Уникальных', 'Нарушений', 'Соответствие']
+    vals = [str(result.get('total_words', 0)), str(result.get('unique_words', 0)),
+            str(violations), f'{compliance}%']
+    for i, (h_txt, v_txt) in enumerate(zip(hdrs, vals)):
+        c = tbl.rows[0].cells[i]
+        set_cell_bg(c, '1F3864')
+        c.text = h_txt
+        c.paragraphs[0].runs[0].font.bold = True
+        c.paragraphs[0].runs[0].font.size = Pt(9)
+        c.paragraphs[0].runs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+        c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        c2 = tbl.rows[1].cells[i]
+        c2.text = v_txt
+        c2.paragraphs[0].runs[0].font.size = Pt(14)
+        c2.paragraphs[0].runs[0].font.bold = True
+        c2.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph()
+
+    # ── Нарушения ──────────────────────────────────────────────────
+    def add_violation_section(title, words, hex6):
+        if not words:
+            return
+        add_hr('E0E0E0')
+        p = doc.add_paragraph()
+        r = p.add_run(f'{title}  —  {len(words)} слов')
+        r.font.size = Pt(13); r.font.bold = True
+        r.font.color.rgb = RGBColor(int(hex6[0:2],16), int(hex6[2:4],16), int(hex6[4:6],16))
+        # 3-колоночная таблица для компактности
+        cols = 3
+        rows = (len(words) + cols - 1) // cols
+        t = doc.add_table(rows=rows, cols=cols); t.style = 'Table Grid'
+        idx = 0
+        for row in t.rows:
+            for cell in row.cells:
+                if idx < len(words):
+                    cell.text = f'{idx+1}. {words[idx]}'
+                    cell.paragraphs[0].runs[0].font.size = Pt(10)
+                idx += 1
+        doc.add_paragraph()
+
+    nenormative = result.get('nenormative_words', [])
+    latin       = result.get('latin_words', [])
+    unknown     = result.get('unknown_cyrillic', [])
+    orfograf    = result.get('orfograf_words', [])
+    orfoep      = result.get('orfoep_words', [])
+
+    add_violation_section('НЕНОРМАТИВНАЯ ЛЕКСИКА',           nenormative, 'C00000')
+    add_violation_section('СЛОВА НА ЛАТИНИЦЕ',               latin,       'E97132')
+    add_violation_section('АНГЛИЦИЗМЫ / НЕИЗВЕСТНЫЕ СЛОВА',  unknown,     'BF8F00')
+    add_violation_section('ОРФОГРАФИЧЕСКИЕ ОШИБКИ',          orfograf,    '7030A0')
+    add_violation_section('ОРФОЭПИЧЕСКИЕ ОШИБКИ',            orfoep,      '0070C0')
+
+    if not any([nenormative, latin, unknown, orfograf, orfoep]):
+        p = doc.add_paragraph()
+        r = p.add_run('Нарушений не обнаружено. Текст полностью соответствует требованиям закона.')
+        r.font.color.rgb = RGBColor(0x00, 0xB0, 0x50); r.font.bold = True
+
+    # ── Рекомендации ───────────────────────────────────────────────
+    recs = result.get('recommendations', [])
+    if recs:
+        add_hr()
+        p = doc.add_paragraph()
+        r = p.add_run('Рекомендации')
+        r.font.size = Pt(13); r.font.bold = True; r.font.color.rgb = RGBColor(0x1F, 0x38, 0x64)
+        for rec in recs:
+            lvl  = rec.get('level', 'info')
+            icon = '[!]' if lvl == 'critical' else '[~]' if lvl == 'warning' else '[+]'
+            p = doc.add_paragraph(style='List Bullet')
+            r1 = p.add_run(f'{icon} {rec.get("title","")}: '); r1.font.bold = True; r1.font.size = Pt(10)
+            r2 = p.add_run(rec.get('message', ''));              r2.font.size = Pt(10)
+            if rec.get('action'):
+                r3 = p.add_run(f'\n    Действие: {rec["action"]}')
+                r3.font.size = Pt(9); r3.font.color.rgb = RGBColor(0x44, 0x72, 0xC4)
+
+    # ── Подвал ─────────────────────────────────────────────────────
+    add_hr()
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run(f'LawChecker Online   |   ФЗ №168-ФЗ «О русском языке»   |   {datetime.now().strftime("%d.%m.%Y")}')
+    r.font.size = Pt(8); r.font.color.rgb = RGBColor(0xA0, 0xA0, 0xA0)
+
+    return doc
+
+
+@app.route('/api/export/docx', methods=['POST'])
+def export_docx():
+    """Экспорт одиночного отчёта в DOCX (Word)"""
+    try:
+        from docx import Document  # noqa: проверяем наличие
+    except ImportError:
+        return jsonify({'error': 'python-docx не установлен на сервере'}), 500
+    try:
+        data       = request.get_json(silent=True) or {}
+        result     = data.get('result', {})
+        source_url = data.get('url', '')
+        doc = _build_docx_single(result, source_url)
+        output = io.BytesIO()
+        doc.save(output); output.seek(0)
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            as_attachment=True,
+            download_name=f'lawcheck_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx'
+        )
+    except Exception as e:
+        logger.error(f'DOCX export error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/export/batch-docx', methods=['POST'])
+def export_batch_docx():
+    """Экспорт пакетного отчёта в DOCX (Word)"""
+    try:
+        from docx import Document
+        from docx.shared import Pt, RGBColor, Cm
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
+    except ImportError:
+        return jsonify({'error': 'python-docx не установлен на сервере'}), 500
+    try:
+        data    = request.get_json(silent=True) or {}
+        results = data.get('results', [])
+        if not results:
+            return jsonify({'error': 'Нет данных для экспорта'}), 400
+
+        doc = Document()
+        for section in doc.sections:
+            section.top_margin    = Cm(2); section.bottom_margin = Cm(2)
+            section.left_margin   = Cm(2.5); section.right_margin = Cm(2.5)
+
+        def set_cell_bg(cell, hex6):
+            tc = cell._tc; tcPr = tc.get_or_add_tcPr()
+            shd = OxmlElement('w:shd')
+            shd.set(qn('w:val'), 'clear'); shd.set(qn('w:color'), 'auto')
+            shd.set(qn('w:fill'), hex6); tcPr.append(shd)
+
+        def add_hr(color='CCCCCC'):
+            p = doc.add_paragraph(); pPr = p._p.get_or_add_pPr()
+            pBdr = OxmlElement('w:pBdr'); bot = OxmlElement('w:bottom')
+            bot.set(qn('w:val'), 'single'); bot.set(qn('w:sz'), '6')
+            bot.set(qn('w:space'), '1'); bot.set(qn('w:color'), color)
+            pBdr.append(bot); pPr.append(pBdr)
+
+        # ── Заголовок ──────────────────────────────────────────────
+        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run('ПАКЕТНЫЙ ОТЧЁТ ПРОВЕРКИ САЙТОВ')
+        r.font.size = Pt(20); r.font.bold = True; r.font.color.rgb = RGBColor(0x1F, 0x38, 0x64)
+
+        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run('Соответствие Федеральному закону №168-ФЗ «О русском языке»')
+        r.font.size = Pt(11); r.font.color.rgb = RGBColor(0x44, 0x72, 0xC4)
+
+        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run(f'Дата: {datetime.now().strftime("%d.%m.%Y %H:%M")}     Проверено URL: {len(results)}')
+        r.font.size = Pt(9); r.font.color.rgb = RGBColor(0x80, 0x80, 0x80)
+
+        add_hr()
+
+        # ── Общая сводка ───────────────────────────────────────────
+        ok  = sum(1 for r in results if r.get('success') and r.get('law_compliant', True))
+        err = sum(1 for r in results if not r.get('success'))
+        viol= len(results) - ok - err
+        all_words = set()
+        for item in results:
+            all_words.update(item.get('forbidden_words') or [])
+
+        p = doc.add_paragraph()
+        r = p.add_run('Общая сводка'); r.font.size = Pt(13); r.font.bold = True
+        r.font.color.rgb = RGBColor(0x1F, 0x38, 0x64)
+
+        tbl = doc.add_table(rows=2, cols=4); tbl.style = 'Table Grid'
+        for i, (h_txt, v_txt) in enumerate(zip(
+                ['Всего URL', 'Без нарушений', 'С нарушениями', 'Ошибки загрузки'],
+                [str(len(results)), str(ok), str(viol), str(err)])):
+            c = tbl.rows[0].cells[i]; set_cell_bg(c, '1F3864')
+            c.text = h_txt
+            c.paragraphs[0].runs[0].font.bold = True; c.paragraphs[0].runs[0].font.size = Pt(9)
+            c.paragraphs[0].runs[0].font.color.rgb = RGBColor(0xFF,0xFF,0xFF)
+            c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            c2 = tbl.rows[1].cells[i]; c2.text = v_txt
+            c2.paragraphs[0].runs[0].font.size = Pt(14)
+            c2.paragraphs[0].runs[0].font.bold = True
+            c2.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        doc.add_paragraph()
+
+        # ── Таблица обзора URL ─────────────────────────────────────
+        add_hr('E0E0E0')
+        p = doc.add_paragraph()
+        r = p.add_run('Обзор результатов по URL')
+        r.font.size = Pt(13); r.font.bold = True; r.font.color.rgb = RGBColor(0x1F, 0x38, 0x64)
+
+        tbl2 = doc.add_table(rows=1 + len(results), cols=4); tbl2.style = 'Table Grid'
+        for i, h_txt in enumerate(['№', 'URL', 'Статус', 'Нарушений']):
+            c = tbl2.rows[0].cells[i]; set_cell_bg(c, '2E4057')
+            c.text = h_txt
+            c.paragraphs[0].runs[0].font.bold = True; c.paragraphs[0].runs[0].font.size = Pt(9)
+            c.paragraphs[0].runs[0].font.color.rgb = RGBColor(0xFF,0xFF,0xFF)
+            c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        for idx, item in enumerate(results, 1):
+            row = tbl2.rows[idx]
+            url_str = item.get('url', '')[:60]
+            if item.get('success'):
+                status_str  = 'OK' if item.get('law_compliant', True) else 'НАРУШЕНИЯ'
+                viol_str    = str(item.get('violations_count', 0))
+                status_color = RGBColor(0x00,0xB0,0x50) if item.get('law_compliant', True) else RGBColor(0xC0,0x00,0x00)
+            else:
+                status_str  = 'ОШИБКА'
+                viol_str    = '—'
+                status_color = RGBColor(0x80,0x80,0x80)
+            for ci, txt in enumerate([str(idx), url_str, status_str, viol_str]):
+                cell = row.cells[ci]; cell.text = txt
+                cell.paragraphs[0].runs[0].font.size = Pt(9)
+                if ci == 2:
+                    cell.paragraphs[0].runs[0].font.color.rgb = status_color
+
+        doc.add_paragraph()
+
+        # ── Детали нарушений по URL ────────────────────────────────
+        violating = [it for it in results if it.get('success') and not it.get('law_compliant', True)]
+        if violating:
+            add_hr('E0E0E0')
+            p = doc.add_paragraph()
+            r = p.add_run('Детали нарушений')
+            r.font.size = Pt(13); r.font.bold = True; r.font.color.rgb = RGBColor(0xC0,0x00,0x00)
+
+            for item in violating:
+                p = doc.add_paragraph()
+                r = p.add_run(item.get('url', '')); r.font.size = Pt(10); r.font.bold = True
+                r.font.color.rgb = RGBColor(0x1F,0x38,0x64)
+                words = item.get('forbidden_words') or []
+                if words:
+                    cols = 3; rows = (len(words) + cols - 1) // cols
+                    t = doc.add_table(rows=rows, cols=cols); t.style = 'Table Grid'
+                    widx = 0
+                    for row in t.rows:
+                        for cell in row.cells:
+                            if widx < len(words):
+                                cell.text = f'{widx+1}. {words[widx]}'
+                                cell.paragraphs[0].runs[0].font.size = Pt(9)
+                            widx += 1
+                doc.add_paragraph()
+
+        # ── Все уникальные слова ───────────────────────────────────
+        if all_words:
+            add_hr()
+            p = doc.add_paragraph()
+            r = p.add_run(f'Все уникальные слова-нарушения — {len(all_words)} слов')
+            r.font.size = Pt(13); r.font.bold = True; r.font.color.rgb = RGBColor(0x1F,0x38,0x64)
+            sorted_words = sorted(all_words)
+            cols = 4; rows = (len(sorted_words) + cols - 1) // cols
+            t = doc.add_table(rows=rows, cols=cols); t.style = 'Table Grid'
+            widx = 0
+            for row in t.rows:
+                for cell in row.cells:
+                    if widx < len(sorted_words):
+                        cell.text = sorted_words[widx]
+                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                    widx += 1
+
+        # ── Подвал ─────────────────────────────────────────────────
+        add_hr()
+        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run(f'LawChecker Online   |   ФЗ №168-ФЗ «О русском языке»   |   {datetime.now().strftime("%d.%m.%Y")}')
+        r.font.size = Pt(8); r.font.color.rgb = RGBColor(0xA0,0xA0,0xA0)
+
+        output = io.BytesIO(); doc.save(output); output.seek(0)
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            as_attachment=True,
+            download_name=f'lawcheck_batch_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx'
+        )
+    except Exception as e:
+        logger.error(f'Batch DOCX export error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 
 def save_to_history(check_type, result, context):
