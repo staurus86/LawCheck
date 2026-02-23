@@ -37,6 +37,14 @@ function escAttr(str) {
         .replace(/>/g, '&gt;');
 }
 
+// Экранирование текстового содержимого HTML (innerHTML)
+function escHtml(str) {
+    return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 // Раскрывающийся список слов со спойлером
 // words — массив, limit — сколько показывать сразу, tagClass — CSS-класс тега, transform — fn(word)→string
 function renderWordList(words, limit, tagClass = '', transform = null) {
@@ -46,11 +54,11 @@ function renderWordList(words, limit, tagClass = '', transform = null) {
     const hidden = words.slice(limit);
     let html = '<div class="word-list">';
     // data-word хранит оригинальное слово; клик обрабатывается делегированием
-    html += shown.map(w => `<span class="word-tag ${tagClass}" data-word="${escAttr(w)}" title="Нажмите, чтобы скопировать">${t(w)}</span>`).join('');
+    html += shown.map(w => `<span class="word-tag ${tagClass}" data-word="${escAttr(w)}" title="Нажмите, чтобы скопировать">${escHtml(t(w))}</span>`).join('');
     if (hidden.length > 0) {
         const uid = 'ws' + Math.random().toString(36).slice(2, 9);
         html += `<span class="word-spoiler-hidden" id="${uid}" style="display:none">`;
-        html += hidden.map(w => `<span class="word-tag ${tagClass}" data-word="${escAttr(w)}" title="Нажмите, чтобы скопировать">${t(w)}</span>`).join('');
+        html += hidden.map(w => `<span class="word-tag ${tagClass}" data-word="${escAttr(w)}" title="Нажмите, чтобы скопировать">${escHtml(t(w))}</span>`).join('');
         html += `</span>`;
         html += `<button class="spoiler-toggle-btn" onclick="toggleWordSpoiler(this,'${uid}',${hidden.length})">▼ Показать ещё ${hidden.length}</button>`;
     }
@@ -661,8 +669,8 @@ function renderRunHistory(items) {
                     <div class="run-main">
                         <span class="run-status-icon">${item.success ? '✅' : '❌'}</span>
                         <span class="run-type-icon" title="${escAttr(item.check_type || '')}">${typeIcon[item.check_type] || '📄'}</span>
-                        <span class="run-type">${item.check_type || '-'}</span>
-                        <span class="run-context" title="${escAttr(item.context_short || '')}">${item.context_short || ''}</span>
+                        <span class="run-type">${escHtml(item.check_type || '-')}</span>
+                        <span class="run-context" title="${escAttr(item.context_short || '')}">${escHtml(item.context_short || '')}</span>
                     </div>
                     <div class="run-meta">
                         ${(item.violations_count ?? 0) > 0 ? `<span class="run-violations">${item.violations_count} нар.</span>` : ''}
@@ -1391,10 +1399,10 @@ function renderMultiItem(item, index) {
             <div class="batch-item error">
                 <div class="batch-item-header">
                     <span class="batch-number">[${index + 1}]</span>
-                    <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
-                    <span class="word-tag invalid">${item.resource_type || 'неизвестно'}</span>
+                    <a href="${escAttr(item.url)}" target="_blank" rel="noopener" class="batch-url">${escHtml(item.url)}</a>
+                    <span class="word-tag invalid">${escHtml(item.resource_type || 'неизвестно')}</span>
                 </div>
-                <div class="batch-item-error">Ошибка: ${item.error || 'Неизвестная ошибка'}</div>
+                <div class="batch-item-error">Ошибка: ${escHtml(item.error || 'Неизвестная ошибка')}</div>
             </div>
         `;
     }
@@ -1407,8 +1415,8 @@ function renderMultiItem(item, index) {
         <div class="batch-item ${statusClass}">
             <div class="batch-item-header">
                 <span class="batch-number">[${index + 1}]</span>
-                <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
-                <span class="word-tag">${item.resource_type || 'неизвестно'}</span>
+                <a href="${escAttr(item.url)}" target="_blank" rel="noopener" class="batch-url">${escHtml(item.url)}</a>
+                <span class="word-tag">${escHtml(item.resource_type || 'неизвестно')}</span>
                 ${hasViol && hasText ? `<button class="batch-details-btn" onclick="toggleMultiHighlight(${index}, this)">🖍 Подсветить</button>` : ''}
             </div>
             <div class="batch-item-stats">
@@ -1770,8 +1778,8 @@ function displayMultiDeepResults(results, deepResults) {
         html += `
             <div class="deep-section batch">
                 <h4>
-                    <a href="${resource.url}" target="_blank" class="batch-url">${resource.url}</a>
-                    <span class="word-tag">${resource.resourceType}</span>
+                    <a href="${escAttr(resource.url)}" target="_blank" rel="noopener" class="batch-url">${escHtml(resource.url)}</a>
+                    <span class="word-tag">${escHtml(resource.resourceType)}</span>
                 </h4>
         `;
 
@@ -1780,12 +1788,7 @@ function displayMultiDeepResults(results, deepResults) {
                 <div class="deep-subsection">
                     <span class="deep-label">📚 Аббревиатуры:</span>
                     <div class="word-list">
-                        ${resource.abbreviations.map(dr => `
-                            <span class="word-tag abbr">
-                                ${dr.word}
-                                <span class="word-translation">→ ${dr.suggestions?.join(', ') || 'перевод неизвестен'}</span>
-                            </span>
-                        `).join('')}
+                        ${resource.abbreviations.map(dr => `<span class="word-tag abbr" data-word="${escAttr(dr.word)}" title="Нажмите, чтобы скопировать">${escHtml(dr.word)}<span class="word-translation">→ ${escHtml((dr.suggestions || []).join(', ') || 'перевод неизвестен')}</span></span>`).join('')}
                     </div>
                 </div>
             `;
@@ -1796,12 +1799,7 @@ function displayMultiDeepResults(results, deepResults) {
                 <div class="deep-subsection">
                     <span class="deep-label">✅ Подтверждено:</span>
                     <div class="word-list">
-                        ${resource.validated.map(dr => `
-                            <span class="word-tag valid">
-                                ${dr.word}
-                                ${dr.normal_form ? `<span class="word-reason">(${dr.normal_form})</span>` : ''}
-                            </span>
-                        `).join('')}
+                        ${resource.validated.map(dr => `<span class="word-tag valid" data-word="${escAttr(dr.word)}" title="Нажмите, чтобы скопировать">${escHtml(dr.word)}${dr.normal_form ? `<span class="word-reason">(${escHtml(dr.normal_form)})</span>` : ''}</span>`).join('')}
                     </div>
                 </div>
             `;
@@ -1812,12 +1810,7 @@ function displayMultiDeepResults(results, deepResults) {
                 <div class="deep-subsection">
                     <span class="deep-label">❌ Требуют замены:</span>
                     <div class="word-list">
-                        ${resource.invalid.map(dr => `
-                            <span class="word-tag invalid">
-                                ${dr.word}
-                                ${dr.suggestions?.length ? `<span class="word-suggestions">→ ${dr.suggestions.join(', ')}</span>` : ''}
-                            </span>
-                        `).join('')}
+                        ${resource.invalid.map(dr => `<span class="word-tag invalid" data-word="${escAttr(dr.word)}" title="Нажмите, чтобы скопировать">${escHtml(dr.word)}${dr.suggestions?.length ? `<span class="word-suggestions">→ ${escHtml(dr.suggestions.join(', '))}</span>` : ''}</span>`).join('')}
                     </div>
                 </div>
             `;
@@ -2093,7 +2086,7 @@ function displayResults(type, result, url = '') {
                     <span class="stat-label">Соответствие</span>
                 </div>
             </div>
-            ${url ? `<p class="url-info"><strong>URL:</strong> <a href="${url}" target="_blank">${url}</a></p>` : ''}
+            ${url ? `<p class="url-info"><strong>URL:</strong> <a href="${escAttr(url)}" target="_blank" rel="noopener">${escHtml(url)}</a></p>` : ''}
         </div>
     `;
     
@@ -2104,12 +2097,12 @@ function displayResults(type, result, url = '') {
                 <h4>💡 Рекомендации</h4>
                 <div class="recommendations-list">
                     ${result.recommendations.map(rec => `
-                        <div class="recommendation ${rec.level}">
-                            <div class="rec-icon">${rec.icon}</div>
+                        <div class="recommendation ${escAttr(rec.level || '')}">
+                            <div class="rec-icon">${escHtml(rec.icon || '')}</div>
                             <div class="rec-content">
-                                <h5>${rec.title}</h5>
-                                <p>${rec.message}</p>
-                                ${rec.action ? `<p class="rec-action">→ ${rec.action}</p>` : ''}
+                                <h5>${escHtml(rec.title || '')}</h5>
+                                <p>${escHtml(rec.message || '')}</p>
+                                ${rec.action ? `<p class="rec-action">→ ${escHtml(rec.action)}</p>` : ''}
                             </div>
                         </div>
                     `).join('')}
@@ -2230,7 +2223,7 @@ function displayBatchResults(results) {
                 <div class="batch-item-header">
                     <span class="batch-icon">${statusIcon}</span>
                     <span class="batch-number">[${index + 1}]</span>
-                    <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
+                    <a href="${escAttr(item.url)}" target="_blank" rel="noopener" class="batch-url">${escHtml(item.url)}</a>
                     <button class="batch-copy-url-btn" data-copy-url="${escAttr(item.url)}" title="Скопировать URL">📋</button>
                     ${hasDetails ? `
                         <button class="batch-details-btn" id="batch-btn-${index}" onclick="toggleBatchDetails(${index})">
@@ -2249,7 +2242,7 @@ function displayBatchResults(results) {
                         ${item.result.nenormative_count > 0 ? `<span class="critical-badge">Ненорматив: ${item.result.nenormative_count}</span>` : ''}
                         <span class="batch-words-count">Всего слов: ${item.result.total_words || 0}</span>
                     </div>
-                ` : `<div class="batch-item-error">Ошибка: ${item.error}</div>`}
+                ` : `<div class="batch-item-error">Ошибка: ${escHtml(item.error || 'Неизвестная ошибка')}</div>`}
                 
                 ${hasDetails ? `
                     <div class="batch-details" id="batch-details-${index}" style="display: none;">
@@ -2308,6 +2301,7 @@ function displayBatchResults(results) {
             <div class="batch-expand-group">
                 <button class="batch-filter-btn" onclick="expandAllBatchDetails(true)">Раскрыть все</button>
                 <button class="batch-filter-btn" onclick="expandAllBatchDetails(false)">Свернуть все</button>
+                ${results.length - successful > 0 ? `<button class="batch-filter-btn error" onclick="retryFailedBatchItems()" title="Повторить проверку ошибочных URL">🔄 Перепроверить (${results.length - successful})</button>` : ''}
             </div>
             <div class="batch-sort-group">
                 <select class="batch-search-input" id="batchSortSelect" onchange="sortBatchItems(this.value)" title="Сортировка">
@@ -2397,6 +2391,41 @@ function expandAllBatchDetails(expand) {
     document.querySelectorAll('[id^="batch-btn-"]').forEach(btn => {
         btn.textContent = expand ? 'Скрыть детали' : 'Показать детали';
     });
+}
+
+// Повторная проверка ошибочных URL в пакетной проверке
+async function retryFailedBatchItems() {
+    const results = currentResults.batch;
+    if (!results) return;
+    const failedIndices = [];
+    const failedUrls = [];
+    results.forEach((item, i) => {
+        if (!item.success) { failedIndices.push(i); failedUrls.push(item.url); }
+    });
+    if (!failedUrls.length) { showToast('Нет ошибочных URL для повторной проверки', 'info'); return; }
+    showToast(`Повторная проверка ${failedUrls.length} URL…`, 'info');
+    try {
+        const response = await fetch(`${API_BASE}/api/batch-check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls: failedUrls })
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Ошибка');
+        (data.results || []).forEach((newItem, i) => {
+            if (failedIndices[i] !== undefined) {
+                currentResults.batch[failedIndices[i]] = newItem;
+            }
+        });
+        displayBatchResults(currentResults.batch);
+        const stillFailed = currentResults.batch.filter(x => !x.success).length;
+        showToast(
+            stillFailed > 0 ? `Готово. Ещё не удалось: ${stillFailed}` : 'Повторная проверка успешна',
+            stillFailed > 0 ? 'warning' : 'success'
+        );
+    } catch (e) {
+        showToast('Ошибка повторной проверки: ' + e.message, 'error');
+    }
 }
 
 // Поделиться ссылкой через Web Share API (с fallback на clipboard)
@@ -3011,7 +3040,7 @@ function displayBatchDeepResults(results, deepResults, urlMap) {
     urlResults.forEach(r => {
         html += `
             <div class="deep-section batch">
-                <h4><a href="${r.url}" target="_blank" class="batch-url">${r.url}</a></h4>
+                <h4><a href="${escAttr(r.url)}" target="_blank" rel="noopener" class="batch-url">${escHtml(r.url)}</a></h4>
         `;
 
         if (r.abbreviations.length > 0) {
@@ -3019,12 +3048,7 @@ function displayBatchDeepResults(results, deepResults, urlMap) {
                 <div class="deep-subsection">
                     <span class="deep-label">📚 Аббревиатуры:</span>
                     <div class="word-list">
-                        ${r.abbreviations.map(dr => `
-                            <span class="word-tag abbr">
-                                ${dr.word}
-                                <span class="word-translation">→ ${dr.suggestions?.join(', ') || 'перевод неизвестен'}</span>
-                            </span>
-                        `).join('')}
+                        ${r.abbreviations.map(dr => `<span class="word-tag abbr" data-word="${escAttr(dr.word)}" title="Нажмите, чтобы скопировать">${escHtml(dr.word)}<span class="word-translation">→ ${escHtml((dr.suggestions || []).join(', ') || 'перевод неизвестен')}</span></span>`).join('')}
                     </div>
                 </div>
             `;
@@ -3035,12 +3059,7 @@ function displayBatchDeepResults(results, deepResults, urlMap) {
                 <div class="deep-subsection">
                     <span class="deep-label">✅ Подтверждено:</span>
                     <div class="word-list">
-                        ${r.validated.map(dr => `
-                            <span class="word-tag valid">
-                                ${dr.word}
-                                ${dr.normal_form ? `<span class="word-reason">(${dr.normal_form})</span>` : ''}
-                            </span>
-                        `).join('')}
+                        ${r.validated.map(dr => `<span class="word-tag valid" data-word="${escAttr(dr.word)}" title="Нажмите, чтобы скопировать">${escHtml(dr.word)}${dr.normal_form ? `<span class="word-reason">(${escHtml(dr.normal_form)})</span>` : ''}</span>`).join('')}
                     </div>
                 </div>
             `;
@@ -3051,12 +3070,7 @@ function displayBatchDeepResults(results, deepResults, urlMap) {
                 <div class="deep-subsection">
                     <span class="deep-label">❌ Требуют замены:</span>
                     <div class="word-list">
-                        ${r.invalid.map(dr => `
-                            <span class="word-tag invalid">
-                                ${dr.word}
-                                ${dr.suggestions?.length > 0 ? `<span class="word-suggestions">→ ${dr.suggestions.join(', ')}</span>` : ''}
-                            </span>
-                        `).join('')}
+                        ${r.invalid.map(dr => `<span class="word-tag invalid" data-word="${escAttr(dr.word)}" title="Нажмите, чтобы скопировать">${escHtml(dr.word)}${dr.suggestions?.length > 0 ? `<span class="word-suggestions">→ ${escHtml(dr.suggestions.join(', '))}</span>` : ''}</span>`).join('')}
                     </div>
                 </div>
             `;
@@ -3107,7 +3121,7 @@ function displayDeepResults(type, results) {
         const tags = abbreviations.map(r => {
             const sug = (r.suggestions || []).join(', ') || 'перевод неизвестен';
             const tip = escAttr(r.reasons.map(deepReasonLabel).join(', '));
-            return `<span class="word-tag abbr" data-word="${escAttr(r.word)}" title="${tip}">${r.word}<span class="word-translation">→ ${sug}</span></span>`;
+            return `<span class="word-tag abbr" data-word="${escAttr(r.word)}" title="${tip}">${escHtml(r.word)}<span class="word-translation">→ ${escHtml(sug)}</span></span>`;
         });
         html += `<div class="deep-section abbreviation"><h4>📚 Аббревиатуры (${abbreviations.length})</h4>${renderDeepTagList(tags, 20)}</div>`;
     }
@@ -3116,8 +3130,8 @@ function displayDeepResults(type, results) {
         const tags = otherValid.map(r => {
             const label = escAttr(r.reasons.map(deepReasonLabel).join(', '));
             const norm  = r.normal_form && r.normal_form !== r.word.toLowerCase()
-                ? `<span class="word-reason">(${r.normal_form})</span>` : '';
-            return `<span class="word-tag valid" data-word="${escAttr(r.word)}" title="${label}">${r.word}${norm}</span>`;
+                ? `<span class="word-reason">(${escHtml(r.normal_form)})</span>` : '';
+            return `<span class="word-tag valid" data-word="${escAttr(r.word)}" title="${label}">${escHtml(r.word)}${norm}</span>`;
         });
         html += `<div class="deep-section valid"><h4>✅ Подтверждено (${otherValid.length})</h4>${renderDeepTagList(tags, 30)}</div>`;
     }
@@ -3125,8 +3139,8 @@ function displayDeepResults(type, results) {
     if (invalidWords.length > 0) {
         const tags = invalidWords.map(r => {
             const sug = r.suggestions?.length
-                ? `<span class="word-suggestions">→ ${r.suggestions.slice(0, 3).join(', ')}</span>` : '';
-            return `<span class="word-tag invalid" data-word="${escAttr(r.word)}" title="Нажмите, чтобы скопировать">${r.word}${sug}</span>`;
+                ? `<span class="word-suggestions">→ ${escHtml(r.suggestions.slice(0, 3).join(', '))}</span>` : '';
+            return `<span class="word-tag invalid" data-word="${escAttr(r.word)}" title="Нажмите, чтобы скопировать">${escHtml(r.word)}${sug}</span>`;
         });
         const copyInvalidBtn = `<button class="btn btn-sm btn-secondary" style="margin-left:auto;font-size:0.8rem" onclick="copyDeepInvalid('${escAttr(type)}')" title="Скопировать все слова, требующие замены">📋 Копировать (${invalidWords.length})</button>`;
         html += `<div class="deep-section invalid"><h4 style="display:flex;align-items:center;gap:0.5rem">❓ Требуют замены (${invalidWords.length})${copyInvalidBtn}</h4>${renderDeepTagList(tags, 30)}</div>`;
