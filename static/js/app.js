@@ -311,6 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
     onMultiProviderChange();
     onMultiModeChange();
     renderWordHistory();
+    initUrlValidation();
     console.log('App loaded');
 });
 
@@ -368,6 +369,32 @@ function initBackToTop() {
     const onScroll = () => btn.classList.toggle('visible', window.scrollY > 400);
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
+}
+
+// Inline-валидация поля URL
+function initUrlValidation() {
+    const urlInput = document.getElementById('urlInput');
+    if (!urlInput) return;
+    const validate = debounce(() => {
+        const val = urlInput.value.trim();
+        const empty = !val || val === 'https://';
+        const valid = empty || /^https?:\/\/.{3,}/.test(val);
+        urlInput.classList.toggle('input-invalid', !valid && val.length > 6);
+        urlInput.classList.toggle('input-valid', valid && !empty);
+    }, 250);
+    urlInput.addEventListener('input', validate);
+    urlInput.addEventListener('blur', validate);
+}
+
+// Печать конкретной карточки результатов
+function printCard(cardId) {
+    document.querySelectorAll('.main .card').forEach(c => {
+        if (c.id !== cardId) c.classList.add('print-hidden');
+    });
+    window.print();
+    setTimeout(() => {
+        document.querySelectorAll('.print-hidden').forEach(c => c.classList.remove('print-hidden'));
+    }, 500);
 }
 
 function initSectionMotion() {
@@ -2252,6 +2279,7 @@ function displayBatchResults(results) {
                 <button class="batch-filter-btn" onclick="expandAllBatchDetails(true)">Раскрыть все</button>
                 <button class="batch-filter-btn" onclick="expandAllBatchDetails(false)">Свернуть все</button>
             </div>
+            <span id="batchVisibleCount" class="batch-visible-count"></span>
         `;
         batchList.insertAdjacentElement('beforebegin', toolbar);
         // Пустое состояние — показывается когда все элементы скрыты фильтром/поиском
@@ -3163,11 +3191,16 @@ function updateMultiEmptyState() {
 
 // === Пустое состояние batch после фильтрации ===
 function updateBatchEmptyState() {
-    const items = document.querySelectorAll('.batch-item');
+    const batchList = document.querySelector('#batchResultsContent .batch-results-list');
+    const items = batchList ? batchList.querySelectorAll('.batch-item') : document.querySelectorAll('#batchResultsContent .batch-item');
     let visible = 0;
     items.forEach(item => { if (item.style.display !== 'none') visible++; });
     const emptyState = document.getElementById('batchEmptyState');
     if (emptyState) emptyState.classList.toggle('visible', items.length > 0 && visible === 0);
+    const countEl = document.getElementById('batchVisibleCount');
+    if (countEl && items.length > 0) {
+        countEl.textContent = visible < items.length ? `Показано: ${visible} из ${items.length}` : '';
+    }
 }
 
 // Горячие клавиши

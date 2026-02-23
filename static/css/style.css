@@ -3608,3 +3608,29 @@ label.text-muted {
     color: #64748B;
     font-size: 0.82rem;
 }
+
+/* URL input: inline валидация */
+.form-input.input-invalid {
+    border-color: #EF4444;
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
+}
+.form-input.input-valid {
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76,175,80,0.1);
+}
+
+/* Batch: счётчик видимых элементов */
+.batch-visible-count {
+    font-size: 0.82rem;
+    color: #64748B;
+    padding: 0.2rem 0.4rem;
+    white-space: nowrap;
+    align-self: center;
+    margin-left: auto;
+}
+
+/* Print: скрытие карточек при печати конкретной */
+@media print {
+    .print-hidden { display: none !important; }
+}
+
