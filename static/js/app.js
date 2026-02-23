@@ -1565,12 +1565,16 @@ function displayMultiResults(payload) {
                 <button class="batch-filter-btn success" data-multifilter="ok" onclick="filterMultiItems('ok', this)">✅ OK (${processedOk})</button>
                 ${(payload.processed_error || 0) > 0 ? `<button class="batch-filter-btn error" data-multifilter="errors" onclick="filterMultiItems('errors', this)">❌ Ошибки (${payload.processed_error || 0})</button>` : ''}
             </div>
+            <div class="batch-search-group">
+                <input type="search" id="multiSearch" class="batch-search-input" placeholder="Поиск по URL…" oninput="searchMultiItems(this.value)">
+            </div>
+            <span id="multiVisibleCount" class="batch-visible-count"></span>
         `;
         multiList.insertAdjacentElement('beforebegin', toolbar);
         const emptyState = document.createElement('div');
         emptyState.id = 'multiEmptyState';
         emptyState.className = 'batch-empty-state';
-        emptyState.textContent = 'Нет результатов по выбранному фильтру.';
+        emptyState.textContent = 'Нет результатов по выбранному фильтру или запросу.';
         multiList.insertAdjacentElement('afterend', emptyState);
     }
 
@@ -3413,13 +3417,35 @@ function copyViolationsList(type) {
 function filterMultiItems(filter, btn) {
     document.querySelectorAll('[data-multifilter]').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
+    const searchInput = document.getElementById('multiSearch');
+    if (searchInput) searchInput.value = '';
     const content = document.getElementById('multiResultsContent');
     if (!content) return;
-    content.querySelectorAll('.batch-item').forEach(item => applyMultiVisibility(item, filter));
+    content.querySelectorAll('.batch-item').forEach(item => {
+        item.dataset.searchHidden = '';
+        applyMultiVisibility(item, filter);
+    });
+    updateMultiEmptyState();
+}
+
+// Поиск по URL в мульти-скане
+function searchMultiItems(query) {
+    const q = (query || '').toLowerCase().trim();
+    const content = document.getElementById('multiResultsContent');
+    if (!content) return;
+    const activeFilter = content.querySelector('[data-multifilter].active');
+    const filter = activeFilter ? activeFilter.dataset.multifilter : 'all';
+    content.querySelectorAll('.batch-item').forEach(item => {
+        const urlEl = item.querySelector('.batch-url');
+        const urlText = urlEl ? (urlEl.textContent || urlEl.href || '').toLowerCase() : '';
+        item.dataset.searchHidden = q && !urlText.includes(q) ? '1' : '';
+        applyMultiVisibility(item, filter);
+    });
     updateMultiEmptyState();
 }
 
 function applyMultiVisibility(item, filter) {
+    if (item.dataset.searchHidden === '1') { item.style.display = 'none'; return; }
     if (filter === 'all') { item.style.display = ''; }
     else if (filter === 'violations') { item.style.display = (item.classList.contains('warning') || item.classList.contains('critical')) ? '' : 'none'; }
     else if (filter === 'ok') { item.style.display = item.classList.contains('success') ? '' : 'none'; }
@@ -3434,6 +3460,10 @@ function updateMultiEmptyState() {
     items.forEach(item => { if (item.style.display !== 'none') visible++; });
     const emptyState = document.getElementById('multiEmptyState');
     if (emptyState) emptyState.classList.toggle('visible', items.length > 0 && visible === 0);
+    const countEl = document.getElementById('multiVisibleCount');
+    if (countEl && items.length > 0) {
+        countEl.textContent = visible < items.length ? `Показано: ${visible} из ${items.length}` : '';
+    }
 }
 
 // === Пустое состояние batch после фильтрации ===
