@@ -2439,6 +2439,65 @@ function downloadUtf8Txt(filename, text) {
     window.URL.revokeObjectURL(url);
 }
 
+// Копировать URL с нарушениями из multiscan
+function copyMultiViolationUrls() {
+    const data = currentResults.multi;
+    if (!data || !(data.results || []).length) {
+        showToast('Нет данных мульти-скана', 'warning');
+        return;
+    }
+    const urls = (data.results || [])
+        .filter(item => item.success && !item.law_compliant)
+        .map(item => item.url);
+    if (!urls.length) {
+        showToast('Нарушений не найдено — все ресурсы соответствуют', 'info');
+        return;
+    }
+    navigator.clipboard.writeText(urls.join('\n')).then(
+        () => showToast(`Скопировано ${urls.length} URL с нарушениями`, 'success'),
+        () => showToast('Не удалось скопировать', 'error')
+    );
+}
+
+// Экспорт multiscan-результатов в CSV
+function exportMultiCsv() {
+    const data = currentResults.multi;
+    if (!data || !(data.results || []).length) {
+        showToast('Нет данных для экспорта!', 'warning');
+        return;
+    }
+    const csvRow = (cells) => cells.map(c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`).join(',');
+    const rows = [
+        csvRow(['URL', 'Тип', 'Статус', 'Нарушений', 'Всего слов', 'Ошибка'])
+    ];
+    (data.results || []).forEach(item => {
+        if (!item.success) {
+            rows.push(csvRow([item.url, item.resource_type || '', 'ошибка', '', '', item.error || '']));
+        } else {
+            const r = item.result || {};
+            rows.push(csvRow([
+                item.url,
+                item.resource_type || '',
+                item.law_compliant ? 'соответствует' : 'нарушения',
+                item.violations_count ?? 0,
+                r.total_words ?? 0,
+                ''
+            ]));
+        }
+    });
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `multiscan_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    showToast(`CSV экспортирован (${(data.results || []).length} строк)`, 'success');
+}
+
 // Экспорт batch-результатов в CSV (с BOM для корректного открытия в Excel)
 function exportBatchCsv() {
     const results = currentResults.batch;
