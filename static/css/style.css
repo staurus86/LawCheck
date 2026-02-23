@@ -2880,3 +2880,100 @@ mark.hl-unknown  { background: #fff9c4; color: #f57f17; border-radius: 3px; padd
 @media (max-width: 768px) {
     .back-to-top { bottom: 4rem; right: 1rem; width: 38px; height: 38px; font-size: 1.1rem; }
 }
+
+/* ═══════════════════════════════════════════════════════
+   ── Аудит тёмной темы — исправления ───────────────────
+   ═══════════════════════════════════════════════════════ */
+
+/* html bg — нет мерцания при скролле за границу */
+[data-theme="dark"] html { background: #0F172A; }
+
+/* 🔴 КРИТИЧНО: Подвал — var(--text-primary) в тёмном = #F1F5F9 (белый!) */
+[data-theme="dark"] .footer { background: #020817; }
+[data-theme="dark"] .footer-section h3 { color: #F1F5F9; }
+[data-theme="dark"] .card:hover { box-shadow: 0 18px 30px -12px rgba(0,0,0,0.45); }
+
+/* FAQ: контейнер + открытый элемент (перекрывает .faq-box details[open]) */
+[data-theme="dark"] .faq-box { background: #1E293B; border-color: #334155; }
+[data-theme="dark"] .faq-box details[open] { background: #243050; border-color: #3B82F6; }
+[data-theme="dark"] .faq-box summary { color: #F1F5F9; }
+[data-theme="dark"] .faq-box details p { color: #94A3B8; }
+
+/* Тарифные карточки */
+[data-theme="dark"] .pricing-card { background: #1E293B; border-color: #334155; }
+[data-theme="dark"] .pricing-card.active { border-color: #3B82F6; box-shadow: 0 6px 20px rgba(59,130,246,0.22); }
+[data-theme="dark"] .pricing-meta { color: #94A3B8; }
+
+/* Таблица */
+[data-theme="dark"] .simple-table { border-color: #334155; }
+[data-theme="dark"] .simple-table th { background: #162032; color: #93C5FD; }
+[data-theme="dark"] .simple-table th,
+[data-theme="dark"] .simple-table td { border-bottom-color: #334155; }
+[data-theme="dark"] .simple-table td { color: #CBD5E1; }
+[data-theme="dark"] .simple-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+/* code-inline */
+[data-theme="dark"] .content-page code { background: #162032; color: #93C5FD; }
+
+/* step-list карточки */
+[data-theme="dark"] .step-list li { background: #1E293B; border-color: #334155; color: #CBD5E1; }
+
+/* legal-note */
+[data-theme="dark"] .legal-note { background: #2D0F0F; color: #FCA5A5; border-left-color: #EF4444; }
+
+/* formats-box */
+[data-theme="dark"] .formats-box { background: #1E293B; border-color: #334155; }
+[data-theme="dark"] .formats-box h3 { color: #93C5FD; }
+
+/* batch-violation-category */
+[data-theme="dark"] .batch-violation-category { background: #1E293B; border-left-color: #FB923C; }
+[data-theme="dark"] .batch-violation-category.critical { background: #2D0F0F; border-left-color: #EF4444; }
+[data-theme="dark"] .batch-violation-category h5 { color: #F1F5F9; }
+
+/* recommendation */
+[data-theme="dark"] .recommendation            { background: #1E293B; }
+[data-theme="dark"] .recommendation.critical   { background: #2D0F0F; border-left-color: #EF4444; }
+[data-theme="dark"] .recommendation.warning    { background: #2A1A00; border-left-color: #FB923C; }
+[data-theme="dark"] .recommendation.success    { background: #052e16; border-left-color: #4CAF50; }
+[data-theme="dark"] .recommendation.info       { background: #0c1e3a; border-left-color: #3B82F6; }
+[data-theme="dark"] .rec-content h5 { color: #F1F5F9; }
+
+/* alert-info */
+[data-theme="dark"] .alert-info { background: #0c1e3a; color: #93C5FD; border-left-color: #3B82F6; }
+
+/* word-detail separator */
+[data-theme="dark"] .word-detail { border-bottom-color: #334155; }
+
+/* deep-check мелкий текст */
+[data-theme="dark"] .word-reason      { color: #64748B; }
+[data-theme="dark"] .word-suggestions { color: #4CAF50; }
+
+/* run-history детали */
+[data-theme="dark"] .run-type     { color: #93C5FD; }
+[data-theme="dark"] .run-context  { color: #94A3B8; }
+[data-theme="dark"] .run-meta     { color: #64748B; }
+[data-theme="dark"] .run-endpoint { color: #CBD5E1; }
+
+/* trend */
+[data-theme="dark"] .trend-block              { border-top-color: #334155; }
+[data-theme="dark"] .trend-block h3           { color: #93C5FD; }
+[data-theme="dark"] .trend-day,
+[data-theme="dark"] .trend-val                { color: #94A3B8; }
+[data-theme="dark"] .trend-bar-wrap           { background: #334155; }
+
+/* timeline — соединительная линия */
+[data-theme="dark"] .timeline-list > li:not(:last-child)::after {
+    background: linear-gradient(to bottom, #3B82F6, #1E293B);
+}
+
+/* violation h3 */
+[data-theme="dark"] .violation-section h3 { color: #FDBA74; }
+[data-theme="dark"] .violation-section.critical {
+    background: linear-gradient(135deg,#2D0F0F,#3D1A1A);
+    border-left-color: #EF4444;
+}
+
+/* shadows in dark mode */
+[data-theme="dark"] .knowledge-card:hover,
+[data-theme="dark"] .workflow-step:hover,
+[data-theme="dark"] .audience-card:hover { box-shadow: 0 18px 28px -12px rgba(0,0,0,0.5); }
