@@ -2456,12 +2456,14 @@ function displayBatchResults(results) {
 // Поиск batch-элементов по URL
 function searchBatchItems(query) {
     const q = (query || '').toLowerCase().trim();
-    document.querySelectorAll('.batch-item').forEach(item => {
+    const batchContent = document.getElementById('batchResultsContent');
+    if (!batchContent) return;
+    const activeFilter = batchContent.querySelector('[data-filter].active');
+    const filter = activeFilter ? activeFilter.dataset.filter : 'all';
+    batchContent.querySelectorAll('.batch-item').forEach(item => {
         const urlEl = item.querySelector('.batch-url');
         const urlText = urlEl ? (urlEl.textContent || urlEl.href || '').toLowerCase() : '';
         item.dataset.searchHidden = q && !urlText.includes(q) ? '1' : '';
-        const activeFilter = document.querySelector('.batch-filter-btn.active');
-        const filter = activeFilter ? activeFilter.dataset.filter : 'all';
         applyBatchVisibility(item, filter);
     });
     updateBatchEmptyState();
@@ -2469,12 +2471,14 @@ function searchBatchItems(query) {
 
 // Фильтрация batch-элементов по статусу
 function filterBatchItems(filter, btn) {
-    document.querySelectorAll('.batch-filter-btn').forEach(b => b.classList.remove('active'));
+    const batchContent = document.getElementById('batchResultsContent');
+    if (!batchContent) return;
+    batchContent.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
     // Сбрасываем поиск при смене фильтра
     const searchInput = document.getElementById('batchSearch');
     if (searchInput) searchInput.value = '';
-    document.querySelectorAll('.batch-item').forEach(item => {
+    batchContent.querySelectorAll('.batch-item').forEach(item => {
         item.dataset.searchHidden = '';
         applyBatchVisibility(item, filter);
     });
