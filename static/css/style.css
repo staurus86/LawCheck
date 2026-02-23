@@ -3027,3 +3027,109 @@ mark.hl-unknown  { background: #fff9c4; color: #f57f17; border-radius: 3px; padd
 [data-theme="dark"] .hl-critical-badge { background: #7F1D1D; color: #FCA5A5; }
 [data-theme="dark"] .hl-latin-badge    { background: #78350F; color: #FED7AA; }
 [data-theme="dark"] .hl-unknown-badge  { background: #713F12; color: #FEF08A; }
+
+/* ═══════════════════════════════════════════════════════
+   ── Профессиональный финишный слой ────────────────────
+   ═══════════════════════════════════════════════════════ */
+
+/* Кастомный скроллбар */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #334155; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* Выделение текста */
+::selection { background: rgba(59,130,246,0.22); color: inherit; }
+[data-theme="dark"] ::selection { background: rgba(96,165,250,0.3); color: inherit; }
+
+/* Hero badge */
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.28);
+    border-radius: 20px;
+    padding: 0.3rem 0.9rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.92);
+    margin-bottom: 1rem;
+    backdrop-filter: blur(6px);
+}
+
+/* card-header: subtitle (p.text-muted) — на отдельную строку */
+.card-header { flex-wrap: wrap; }
+.card-header > p.text-muted {
+    width: 100%;
+    order: 9;
+    margin: 0.15rem 0 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    flex-shrink: 0;
+}
+
+/* Form labels */
+label.text-muted {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #64748B;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+    display: block;
+}
+[data-theme="dark"] label.text-muted { color: #64748B; }
+
+/* field-meta — пилюля с счётчиком */
+.field-meta {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 0.45rem;
+    padding: 0.18rem 0.65rem;
+    background: #F1F5F9;
+    border-radius: 20px;
+    border: 1px solid #E2E8F0;
+    font-size: 0.76rem;
+    color: #64748B;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    transition: background 0.2s;
+}
+[data-theme="dark"] .field-meta { background: #1E293B; border-color: #334155; color: #64748B; }
+
+/* Textarea: лучшая читаемость */
+.form-textarea { line-height: 1.7; }
+
+/* Knowledge cards: цветные топ-акценты */
+.knowledge-card:nth-child(1) { border-top: 3px solid #3B82F6; }
+.knowledge-card:nth-child(2) { border-top: 3px solid #8B5CF6; }
+.knowledge-card:nth-child(3) { border-top: 3px solid #10B981; }
+
+/* Tab content: плавный fade при переключении */
+.tab-content.active {
+    animation: tabFadeIn 0.22s ease-out both;
+}
+@keyframes tabFadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .tab-content.active { animation: none; }
+}
+
+/* Loading overlay: blur backdrop */
+.loading-overlay { backdrop-filter: blur(4px); }
+
+/* Stat card: разделитель под иконкой */
+.stat-icon { border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 0.45rem; margin-bottom: 0.65rem; width: 100%; }
+
+/* Hero title: чуть крупнее на широких экранах */
+@media (min-width: 900px) {
+    .hero-title { font-size: 2.85rem; }
+    .hero-subtitle { font-size: 1.15rem; }
+}
