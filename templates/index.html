@@ -31,6 +31,9 @@
 						<a href="/payment" class="nav-link">Тарифы</a>
 						<a href="/api/stats" class="nav-link" target="_blank">Статистика</a>
 					</nav>
+					<button class="dark-toggle" id="darkModeToggle" onclick="toggleDarkMode()" title="Тёмная тема">
+						<i class="fas fa-moon" id="darkModeIcon"></i>
+					</button>
             </div>
         </div>
     </header>
@@ -800,6 +803,7 @@
         <p>Проверяю...</p>
     </div>
 
+    <div id="toastContainer"></div>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

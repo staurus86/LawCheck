@@ -2309,3 +2309,112 @@ mark.hl-unknown  { background: #fff9c4; color: #f57f17; border-radius: 3px; padd
 .word-tag.abbr     { background: #e3f2fd; color: #0d47a1; }
 .word-reason  { font-size: 0.75rem; color: #888; margin-left: 3px; }
 .word-suggestions { font-size: 0.78rem; color: #2e7d32; margin-left: 4px; }
+
+/* ── Dark Mode Toggle Button ─────────────────────────────────── */
+.dark-toggle {
+    background: rgba(255,255,255,0.12); border: none; border-radius: 8px;
+    color: white; cursor: pointer; padding: 0.5rem 0.65rem; font-size: 1rem;
+    transition: background 0.2s; margin-left: 1rem; line-height: 1;
+}
+.dark-toggle:hover { background: rgba(255,255,255,0.22); }
+
+/* ── Dark Mode ───────────────────────────────────────────────── */
+[data-theme="dark"] {
+    --text-primary: #F1F5F9; --text-secondary: #94A3B8;
+    --background: #0F172A; --surface: #1E293B; --divider: #334155;
+}
+[data-theme="dark"] body { background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%); color: #F1F5F9; }
+[data-theme="dark"] .card { background: var(--surface); border-color: var(--divider); }
+[data-theme="dark"] .card-header { border-color: var(--divider); }
+[data-theme="dark"] .form-input,
+[data-theme="dark"] .form-textarea { background: #0F172A; color: var(--text-primary); border-color: var(--divider); }
+[data-theme="dark"] .tab-btn { background: var(--surface); color: var(--text-primary); }
+[data-theme="dark"] .batch-item { background: #0F172A; }
+[data-theme="dark"] .batch-item.critical,
+[data-theme="dark"] .batch-item.error { background: #2D0F0F; }
+[data-theme="dark"] .batch-summary { background: linear-gradient(135deg,#1E293B,#162032); }
+[data-theme="dark"] .summary-item, [data-theme="dark"] .summary-stat { background: #0F172A; }
+[data-theme="dark"] .result-status.success { background:linear-gradient(135deg,#14532D,#166534); color:#86EFAC; }
+[data-theme="dark"] .result-status.error   { background:linear-gradient(135deg,#7F1D1D,#991B1B); color:#FCA5A5; }
+[data-theme="dark"] .result-status.warning { background:linear-gradient(135deg,#7C2D12,#92400E); color:#FDBA74; }
+[data-theme="dark"] .word-tag          { background:#78350F; color:#FED7AA; }
+[data-theme="dark"] .word-tag.critical { background:#7F1D1D; color:#FCA5A5; }
+[data-theme="dark"] .word-tag.valid    { background:#14532D; color:#86EFAC; border-color:#166534; }
+[data-theme="dark"] .word-tag.invalid  { background:#7F1D1D; color:#FCA5A5; border-color:#991B1B; }
+[data-theme="dark"] .word-tag.abbr     { background:#4A1D96; color:#C4B5FD; border-color:#6D28D9; }
+[data-theme="dark"] .highlight-overlay { background:#1E293B; border-color:#334155; }
+[data-theme="dark"] .highlight-text    { color:#CBD5E1; }
+[data-theme="dark"] .knowledge-card, [data-theme="dark"] .workflow-step,
+[data-theme="dark"] .audience-card     { background:var(--surface); border-color:var(--divider); color:var(--text-primary); }
+[data-theme="dark"] .faq-box details   { background:var(--surface); border-color:var(--divider); }
+[data-theme="dark"] .run-history-item  { background:var(--surface); border-color:var(--divider); }
+[data-theme="dark"] .progress          { background:#334155; }
+[data-theme="dark"] .batch-global-violations,
+[data-theme="dark"] .batch-detail-section { background:#0F172A; border-color:#334155; }
+[data-theme="dark"] .batch-details { background:#1a2234; }
+[data-theme="dark"] select.form-input option { background:#1E293B; }
+[data-theme="dark"] .stats-summary { background:#1E293B; border-color:#334155; }
+[data-theme="dark"] .stat-item { background:#0F172A; }
+[data-theme="dark"] .stat-card { background:#1E293B; }
+[data-theme="dark"] .violation-section { background:#1E293B; border-color:#334155; }
+[data-theme="dark"] .recommendations { background:#1E293B; }
+[data-theme="dark"] .word-spoiler-hidden .word-tag { opacity:0.9; }
+[data-theme="dark"] .deep-section { color:var(--text-primary); }
+[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3,
+[data-theme="dark"] h4, [data-theme="dark"] h5, [data-theme="dark"] h6 { color:var(--text-primary); }
+[data-theme="dark"] p, [data-theme="dark"] label { color:var(--text-secondary); }
+[data-theme="dark"] .nav-link { color:rgba(255,255,255,0.8); }
+[data-theme="dark"] .nav-link:hover { color:#fff; }
+[data-theme="dark"] .tab-btn.active { background:#3B82F6; color:#fff; }
+[data-theme="dark"] .spoiler-toggle-btn { background:#1E293B; color:#94A3B8; border-color:#334155; }
+[data-theme="dark"] .spoiler-toggle-btn:hover { background:#334155; }
+[data-theme="dark"] .run-history-item .stat-value { color:var(--text-primary); }
+[data-theme="dark"] .run-history-item .stat-label { color:var(--text-secondary); }
+
+/* ── Toasts ──────────────────────────────────────────────────── */
+#toastContainer {
+    position:fixed; bottom:1.5rem; right:1.5rem; z-index:10000;
+    display:flex; flex-direction:column; gap:0.5rem;
+    max-width:380px; pointer-events:none;
+}
+.toast {
+    display:flex; align-items:center; gap:0.75rem;
+    padding:0.875rem 1rem; border-radius:12px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.2);
+    background:#1E293B; color:#F1F5F9;
+    font-size:0.9rem; font-weight:500;
+    opacity:0; transform:translateX(20px);
+    transition:opacity 0.3s ease, transform 0.3s ease;
+    pointer-events:auto; max-width:100%;
+}
+.toast.toast-visible { opacity:1; transform:translateX(0); }
+.toast-info    { border-left:4px solid #3B82F6; }
+.toast-success { border-left:4px solid #4CAF50; }
+.toast-error   { border-left:4px solid #EF4444; }
+.toast-warning { border-left:4px solid #FF9800; }
+.toast-icon { font-size:1.1rem; flex-shrink:0; }
+.toast-message { flex:1; line-height:1.4; word-break:break-word; }
+.toast-close {
+    background:none; border:none; color:#94A3B8;
+    cursor:pointer; padding:0 0.2rem; font-size:1rem; flex-shrink:0;
+}
+.toast-close:hover { color:#F1F5F9; }
+
+/* ── Compliance Gauge ────────────────────────────────────────── */
+.stat-gauge { display:flex; align-items:center; justify-content:center; }
+
+/* ── Status Badge Animation ──────────────────────────────────── */
+.result-status {
+    animation: fadeScaleIn 0.45s ease-out both;
+}
+@keyframes fadeScaleIn {
+    from { opacity:0; transform:scale(0.96) translateY(8px); }
+    to   { opacity:1; transform:scale(1) translateY(0); }
+}
+.status-icon {
+    animation: iconPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.15s both;
+}
+@keyframes iconPop {
+    from { transform:scale(0); }
+    to   { transform:scale(1); }
+}

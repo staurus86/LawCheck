@@ -70,7 +70,7 @@ function toggleHighlight(type, btn) {
     if (type === 'text') source = document.getElementById('textInput')?.value || '';
     else if (type === 'url') source = overlay.dataset.source || '';
     else if (type === 'images') source = currentResults.images?.extracted_text || '';
-    if (!source) { alert('Исходный текст недоступен'); return; }
+    if (!source) { showToast('Исходный текст недоступен', 'warning'); return; }
 
     const latinSet   = new Set((result.latin_words     || []).map(w => w.toLowerCase()));
     const unknownSet = new Set((result.unknown_cyrillic || []).map(w => w.toLowerCase()));
@@ -107,7 +107,7 @@ function toggleBatchHighlight(index, btn) {
     const item = (currentResults.batch || [])[index];
     if (!item) return;
     const source = item.source_text || '';
-    if (!source) { alert('Исходный текст недоступен'); return; }
+    if (!source) { showToast('Исходный текст недоступен', 'warning'); return; }
     const result = item.result || {};
     const latinSet   = new Set((result.latin_words     || []).map(w => w.toLowerCase()));
     const unknownSet = new Set((result.unknown_cyrillic || []).map(w => w.toLowerCase()));
@@ -150,7 +150,7 @@ function toggleMultiHighlight(index, btn) {
     const item = results[index];
     if (!item) return;
     const source = item.source_text || '';
-    if (!source) { alert('Исходный текст недоступен'); return; }
+    if (!source) { showToast('Исходный текст недоступен', 'warning'); return; }
     const result = item.result || {};
     const latinSet   = new Set((result.latin_words     || []).map(w => w.toLowerCase()));
     const unknownSet = new Set((result.unknown_cyrillic || []).map(w => w.toLowerCase()));
@@ -180,6 +180,76 @@ function toggleMultiHighlight(index, btn) {
     btn.textContent = '✖ Скрыть';
 }
 
+// ── Dark Mode ──────────────────────────────────────────────────
+function toggleDarkMode() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const next = isDark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('lawchecker.theme', next);
+    const icon = document.getElementById('darkModeIcon');
+    if (icon) icon.className = next === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+}
+function initTheme() {
+    const saved = localStorage.getItem('lawchecker.theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved);
+    const icon = document.getElementById('darkModeIcon');
+    if (icon) icon.className = saved === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+}
+
+// ── Toast уведомления ──────────────────────────────────────────
+function showToast(message, type = 'info', duration = 4500) {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        document.body.appendChild(container);
+    }
+    const icons = { info: 'ℹ️', success: '✅', error: '❌', warning: '⚠️' };
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span>
+        <span class="toast-message">${message}</span>
+        <button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
+    container.appendChild(toast);
+    requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('toast-visible')));
+    setTimeout(() => {
+        toast.classList.remove('toast-visible');
+        setTimeout(() => toast.remove(), 350);
+    }, duration);
+}
+
+// ── Count-up анимация ─────────────────────────────────────────
+function countUpAnimate(el, target, duration = 1600) {
+    const numTarget = typeof target === 'number' ? target
+        : parseInt(String(target).replace(/\D/g, ''), 10) || 0;
+    if (numTarget === 0) { el.textContent = '0'; return; }
+    const startTime = performance.now();
+    function update(now) {
+        const p = Math.min((now - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(numTarget * eased).toLocaleString('ru-RU');
+        if (p < 1) requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+}
+
+// ── Compliance Gauge (SVG donut) ──────────────────────────────
+function renderGauge(percent, size = 88) {
+    const r = size / 2 - 9;
+    const circ = 2 * Math.PI * r;
+    const pct = Math.min(Math.max(percent, 0), 100);
+    const offset = circ * (1 - pct / 100);
+    const color = pct >= 90 ? '#4CAF50' : pct >= 70 ? '#FF9800' : '#EF4444';
+    const cx = size / 2, cy = size / 2;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#E0E0E0" stroke-width="9"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="9"
+        stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"
+        stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>
+      <text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="15" font-weight="700" fill="${color}">${pct}%</text>
+    </svg>`;
+}
+
 // Global variables
 let currentResults = {
     text: null,
@@ -200,6 +270,7 @@ const ACTIVE_TAB_KEY = 'lawchecker.activeTab';
 
 // App bootstrap
 document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
     initTabs();
     initSectionMotion();
     initFieldMetrics();
@@ -380,19 +451,19 @@ async function loadStats() {
         const abbrEl = document.getElementById('statAbbreviations');
         
         if (normativeEl && data.normative !== undefined) {
-            normativeEl.textContent = data.normative.toLocaleString('ru-RU');
+            countUpAnimate(normativeEl, data.normative);
         }
-        
+
         if (foreignEl && data.foreign !== undefined) {
-            foreignEl.textContent = data.foreign.toLocaleString('ru-RU');
+            countUpAnimate(foreignEl, data.foreign);
         }
-        
+
         if (nenormativeEl && data.nenormative !== undefined) {
-            nenormativeEl.textContent = data.nenormative.toLocaleString('ru-RU');
+            countUpAnimate(nenormativeEl, data.nenormative);
         }
-        
+
         if (abbrEl && data.abbreviations !== undefined) {
-            abbrEl.textContent = data.abbreviations.toLocaleString('ru-RU');
+            countUpAnimate(abbrEl, data.abbreviations);
         }
         
     } catch (error) {
@@ -457,7 +528,7 @@ async function checkText() {
     const text = document.getElementById('textInput').value.trim();
     
     if (!text) {
-        alert('Введите текст для проверки!');
+        showToast('Введите текст для проверки!', 'warning');
         return;
     }
     
@@ -480,10 +551,10 @@ async function checkText() {
             displayResults('text', data.result);
             console.log('✅ Текст проверен:', data.result);
         } else {
-            alert('Ошибка: ' + data.error);
+            showToast('Ошибка: ' + data.error, 'error');
         }
     } catch (error) {
-        alert('Ошибка проверки: ' + error.message);
+        showToast('Ошибка проверки: ' + error.message, 'error');
     } finally {
         hideLoading();
     }
@@ -494,7 +565,7 @@ async function checkUrl() {
     const url = document.getElementById('urlInput').value.trim();
     
     if (!url || !url.startsWith('http')) {
-        alert('Введите корректный URL!');
+        showToast('Введите корректный URL!', 'warning');
         return;
     }
     
@@ -521,10 +592,10 @@ async function checkUrl() {
             if (urlOverlay) urlOverlay.dataset.source = data.source_text || '';
             console.log('✅ URL проверен:', data.result);
         } else {
-            alert('Ошибка: ' + data.error);
+            showToast('Ошибка: ' + data.error, 'error');
         }
     } catch (error) {
-        alert('Ошибка загрузки: ' + error.message);
+        showToast('Ошибка загрузки: ' + error.message, 'error');
     } finally {
         hideLoading();
         document.getElementById('urlProgress').style.display = 'none';
@@ -537,7 +608,7 @@ async function checkBatch() {
     const urls = input.split('\n').filter(u => u.trim() && u.startsWith('http'));
     
     if (urls.length === 0) {
-        alert('Введите хотя бы один URL!');
+        showToast('Введите хотя бы один URL!', 'warning');
         return;
     }
     
@@ -572,7 +643,7 @@ async function checkBatch() {
         displayBatchResults(results);
         console.log('✅ Пакетная проверка завершена:', results);
     } catch (error) {
-        alert('Ошибка пакетной проверки: ' + error.message);
+        showToast('Ошибка пакетной проверки: ' + error.message, 'error');
     }
 }
 
@@ -663,7 +734,7 @@ async function saveImageApiToken() {
     const provider = getImagesProvider();
     const token = input.value.trim();
     if (!token) {
-        alert('Введите API токен');
+        showToast('Введите API токен', 'warning');
         return;
     }
     try {
@@ -704,17 +775,17 @@ async function buildImagesPayload() {
     const file = fileInput && fileInput.files ? fileInput.files[0] : null;
 
     if (!imageUrl && !file) {
-        alert('Укажите URL изображения или загрузите файл');
+        showToast('Укажите URL изображения или загрузите файл', 'warning');
         return;
     }
 
     if (file) {
         if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-            alert('Поддерживаются только форматы jpg/png/webp');
+            showToast('Поддерживаются только форматы jpg/png/webp', 'warning');
             return;
         }
         if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
-            alert('Файл слишком большой. Максимум 8 МБ');
+            showToast('Файл слишком большой. Максимум 8 МБ', 'warning');
             return;
         }
     }
@@ -791,7 +862,7 @@ async function scrapTextFromImageAndCheck() {
 
         await runStandardCheckForImageText(extractedText, data.source_url || '', data.ocr || null);
     } catch (e) {
-        alert('Ошибка распознавания изображения: ' + e.message);
+        showToast('Ошибка распознавания изображения: ' + e.message, 'error');
     } finally {
         hideLoading();
     }
@@ -801,7 +872,7 @@ async function checkExtractedImageText() {
     const extractedTextArea = document.getElementById('imagesInput');
     const text = extractedTextArea ? extractedTextArea.value.trim() : '';
     if (!text) {
-        alert('Нет извлечённого текста для проверки');
+        showToast('Нет извлечённого текста для проверки', 'warning');
         return;
     }
 
@@ -811,7 +882,7 @@ async function checkExtractedImageText() {
     try {
         await runStandardCheckForImageText(text, sourceUrl, ocr);
     } catch (e) {
-        alert('Ошибка проверки текста: ' + e.message);
+        showToast('Ошибка проверки текста: ' + e.message, 'error');
     } finally {
         hideLoading();
     }
@@ -843,7 +914,7 @@ async function checkImagesByDatabase() {
         const resultsContent = document.getElementById('imagesResultsContent');
         appendImageOcrSummary(data.result.ocr, resultsContent);
     } catch (e) {
-        alert('Ошибка проверки изображения: ' + e.message);
+        showToast('Ошибка проверки изображения: ' + e.message, 'error');
     } finally {
         hideLoading();
     }
@@ -939,7 +1010,7 @@ async function checkImagesBatchQueue() {
         .map(v => v.trim())
         .filter(v => v.startsWith('http'));
     if (!urls.length) {
-        alert('Укажите хотя бы одну ссылку на изображение');
+        showToast('Укажите хотя бы одну ссылку на изображение', 'warning');
         return;
     }
 
@@ -1073,7 +1144,7 @@ async function saveMultiApiToken() {
     if (!input || !statusEl) return;
     const token = input.value.trim();
     if (!token) {
-        alert('Введите API токен');
+        showToast('Введите API токен', 'warning');
         return;
     }
     try {
@@ -1124,7 +1195,7 @@ async function loadMultiUrlsFromFile(event) {
         input.value = unique.join('\n');
         updateMultiUrlsInputMeta();
     } catch (e) {
-        alert('Ошибка чтения файла: ' + e.message);
+        showToast('Ошибка чтения файла: ' + e.message, 'error');
     }
 }
 
@@ -1286,11 +1357,11 @@ async function runMultiScan() {
     const payload = buildMultiPayload();
     if (payload.mode === 'site') {
         if (!/^https?:\/\//i.test(payload.site_url)) {
-            alert('Введите корректный URL сайта');
+            showToast('Введите корректный URL сайта', 'warning');
             return;
         }
     } else if (!payload.urls.length) {
-        alert('Введите хотя бы одну ссылку в списке');
+        showToast('Введите хотя бы одну ссылку в списке', 'warning');
         return;
     }
 
@@ -1321,7 +1392,7 @@ async function runMultiScan() {
         if (tokenInput) tokenInput.value = '';
         await loadMultiTokenStatus();
     } catch (e) {
-        alert('Ошибка мульти-скана: ' + e.message);
+        showToast('Ошибка мульти-скана: ' + e.message, 'error');
     } finally {
         hideLoading();
         if (progress) progress.style.display = 'none';
@@ -1358,7 +1429,7 @@ async function deepCheckMultiScan() {
     const payload = currentResults.multi;
     const results = payload && Array.isArray(payload.results) ? payload.results : [];
     if (!results.length) {
-        alert('Нет результатов мульти-скана для глубокой проверки');
+        showToast('Нет результатов мульти-скана для глубокой проверки', 'warning');
         return;
     }
 
@@ -1384,7 +1455,7 @@ async function deepCheckMultiScan() {
     });
 
     if (!urlMap.length) {
-        alert('Нет слов для глубокой проверки в результатах мульти-скана');
+        showToast('Нет слов для глубокой проверки в результатах мульти-скана', 'warning');
         return;
     }
 
@@ -1418,7 +1489,7 @@ async function deepCheckMultiScan() {
         };
         displayMultiDeepResults(results, deepResults);
     } catch (e) {
-        alert('Ошибка глубокой проверки: ' + e.message);
+        showToast('Ошибка глубокой проверки: ' + e.message, 'error');
     } finally {
         hideLoading();
     }
@@ -1549,12 +1620,12 @@ async function checkWord() {
     inputEl.value = word;
     
     if (!word) {
-        alert('Введите слово для проверки!');
+        showToast('Введите слово для проверки!', 'warning');
         return;
     }
     
     if (word.length < 2) {
-        alert('Слово должно содержать минимум 2 символа!');
+        showToast('Слово должно содержать минимум 2 символа!', 'warning');
         return;
     }
     
@@ -1579,11 +1650,11 @@ async function checkWord() {
             displayWordResult(data.result);
             console.log('✅ Слово проверено:', data.result);
         } else {
-            alert('Ошибка: ' + data.error);
+            showToast('Ошибка: ' + data.error, 'error');
         }
     } catch (error) {
         hideLoading();
-        alert('Ошибка проверки: ' + error.message);
+        showToast('Ошибка проверки: ' + error.message, 'error');
     }
 }
 
@@ -1789,7 +1860,7 @@ function displayResults(type, result, url = '') {
                     <span class="stat-label">Нарушений</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-number">${result.law_compliant ? '100%' : Math.round(((result.total_words - result.violations_count) / result.total_words) * 100) + '%'}</span>
+                    <div class="stat-gauge">${renderGauge(result.law_compliant ? 100 : Math.round(((result.total_words - result.violations_count) / Math.max(result.total_words, 1)) * 100))}</div>
                     <span class="stat-label">Соответствие</span>
                 </div>
             </div>
@@ -2137,7 +2208,7 @@ function buildDeepExportText(type) {
 async function exportReport(type) {
     const result = currentResults[type];
     if (!result) {
-        alert('Нет данных для экспорта! Сначала выполните проверку.');
+        showToast('Нет данных для экспорта! Сначала выполните проверку.', 'warning');
         return;
     }
     
@@ -2193,7 +2264,7 @@ async function exportReport(type) {
         
     } catch (error) {
         console.error('❌ Ошибка экспорта:', error);
-        alert('Ошибка экспорта: ' + error.message);
+        showToast('Ошибка экспорта: ' + error.message, 'error');
     } finally {
         hideLoading();
     }
@@ -2202,7 +2273,7 @@ async function exportReport(type) {
 // Экспорт отчёта в Word (DOCX)
 async function exportDocx(type) {
     const result = currentResults[type];
-    if (!result) { alert('Нет данных для экспорта! Сначала выполните проверку.'); return; }
+    if (!result) { showToast('Нет данных для экспорта! Сначала выполните проверку.', 'warning'); return; }
     try {
         showLoading();
         let endpoint, payload, prefix;
@@ -2233,7 +2304,7 @@ async function exportDocx(type) {
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         window.URL.revokeObjectURL(a.href);
     } catch (e) {
-        alert('Ошибка экспорта Word: ' + e.message);
+        showToast('Ошибка экспорта Word: ' + e.message, 'error');
     } finally {
         hideLoading();
     }
@@ -2243,7 +2314,7 @@ async function exportDocx(type) {
 async function deepCheck(type) {
     const result = currentResults[type];
     if (!result) {
-        alert('Нет данных для проверки! Сначала выполните проверку.');
+        showToast('Нет данных для проверки! Сначала выполните проверку.', 'warning');
         return;
     }
 
@@ -2255,7 +2326,7 @@ async function deepCheck(type) {
         ];
 
     if (wordsToCheck.length === 0) {
-        alert('Нет слов для глубокой проверки!');
+        showToast('Нет слов для глубокой проверки!', 'warning');
         return;
     }
 
@@ -2290,15 +2361,15 @@ async function deepCheck(type) {
             };
             displayDeepResults(type, data.results);
             if (skippedCount > 0) {
-                alert(`Показаны результаты для первых ${maxWords} слов. Ещё ${skippedCount} слов пропущено.`);
+                showToast(`Показаны результаты для первых ${maxWords} слов. Ещё ${skippedCount} слов пропущено.`, 'info');
             }
             console.log('✅ Глубокая проверка завершена:', data.results.length, 'слов');
         } else {
-            alert('Ошибка: ' + data.error);
+            showToast('Ошибка: ' + data.error, 'error');
         }
     } catch (error) {
         hideLoading();
-        alert('Ошибка глубокой проверки: ' + error.message);
+        showToast('Ошибка глубокой проверки: ' + error.message, 'error');
     }
 }
 
@@ -2306,7 +2377,7 @@ async function deepCheck(type) {
 async function deepCheckBatch() {
     const results = currentResults.batch;
     if (!results || !Array.isArray(results)) {
-        alert('Нет данных для проверки! Сначала выполните пакетную проверку.');
+        showToast('Нет данных для проверки! Сначала выполните пакетную проверку.', 'warning');
         return;
     }
 
@@ -2331,7 +2402,7 @@ async function deepCheckBatch() {
     });
 
     if (allWords.size === 0) {
-        alert('Нет слов для глубокой проверки!');
+        showToast('Нет слов для глубокой проверки!', 'warning');
         return;
     }
 
@@ -2386,13 +2457,13 @@ async function deepCheckBatch() {
             displayBatchDeepResults(results, allDeepResults, urlMap);
             console.log('✅ Глубокая проверка batch завершена:', allDeepResults.length, 'слов');
         } else {
-            alert('Не удалось получить результаты глубокой проверки');
+            showToast('Не удалось получить результаты глубокой проверки', 'error');
         }
 
     } catch (error) {
         hideLoading();
         console.error('❌ Ошибка глубокой проверки:', error);
-        alert('Ошибка глубокой проверки: ' + error.message);
+        showToast('Ошибка глубокой проверки: ' + error.message, 'error');
     }
 }
 
@@ -2631,7 +2702,7 @@ function loadSample() {
 async function copyExtractedImageText() {
     const input = document.getElementById('imagesInput');
     if (!input || !input.value.trim()) {
-        alert('Нет извлечённого текста для копирования');
+        showToast('Нет извлечённого текста для копирования', 'warning');
         return;
     }
     try {
