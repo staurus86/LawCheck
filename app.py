@@ -26,6 +26,8 @@ from concurrent.futures import ThreadPoolExecutor
 from collections import deque
 from urllib.parse import urljoin, urldefrag, urlparse
 from sqlalchemy import text
+import socket
+import ipaddress
 
 # Импорты новых модулей
 from config import get_config
@@ -158,7 +160,7 @@ def upsert_violation_words(words):
         if db_manager:
             db_manager.upsert_violation_words(words)
     except Exception as e:
-        logger.warning(f"upsert_violation_words skipped: {e}")
+        app.logger.warning(f"upsert_violation_words skipped: {e}")
 
 
 def cleanup_analytics_db(force=False):
@@ -221,7 +223,26 @@ def _same_domain(url_a, url_b):
         return False
 
 
+def _is_safe_url(url: str) -> bool:
+    """SSRF-защита: блокирует URL на приватные/loopback/reserved адреса."""
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        addr_infos = socket.getaddrinfo(hostname, None, 0, socket.SOCK_STREAM)
+        for _, _, _, _, sockaddr in addr_infos:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_unspecified:
+                return False
+        return True
+    except Exception:
+        return False
+
+
 def _fetch_url_bytes(url, timeout_sec=15, max_bytes=MULTISCAN_MAX_DOWNLOAD_BYTES):
+    if not _is_safe_url(url):
+        raise ValueError(f'Недопустимый URL (приватный или зарезервированный адрес): {url}')
     response = requests.get(
         url,
         timeout=timeout_sec,
@@ -390,7 +411,9 @@ def check_url():
         
         if not url or not url.startswith('http'):
             return jsonify({'error': 'Некорректный URL'}), 400
-        
+        if not _is_safe_url(url):
+            return jsonify({'error': 'Недопустимый URL (приватный или зарезервированный адрес)'}), 400
+
         # Загрузка страницы
         try:
             response = requests.get(url, timeout=15, headers={
@@ -480,11 +503,11 @@ def batch_check():
         max_workers = int(os.getenv('BATCH_MAX_WORKERS', '8'))
         max_workers = max(1, min(max_workers, 32))
 
-        # Нормализуем и ограничиваем список URL
+        # Нормализуем и ограничиваем список URL (SSRF-фильтрация)
         clean_urls = []
         for raw in urls:
             url = (raw or '').strip()
-            if url and url.startswith('http'):
+            if url and url.startswith('http') and _is_safe_url(url):
                 clean_urls.append(url)
             if len(clean_urls) >= max_urls:
                 break
@@ -649,10 +672,7 @@ def cleanup_metrics():
         simple_password = "CLEANUP_DB"
 
         if secret != valid_secret and secret != simple_password:
-            return jsonify({
-                'error': 'Неверный пароль',
-                'hint': 'Используйте "CLEANUP_DB" или первые 16 символов SECRET_KEY'
-            }), 401
+            return jsonify({'error': 'Неверный пароль'}), 401
 
         if db_manager:
             result = db_manager.cleanup_all_metrics()
@@ -2045,7 +2065,7 @@ def export_docx():
             download_name=f'lawcheck_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx'
         )
     except Exception as e:
-        logger.error(f'DOCX export error: {e}')
+        app.logger.error(f'DOCX export error: {e}')
         return jsonify({'error': str(e)}), 500
 
 
@@ -2216,7 +2236,7 @@ def export_batch_docx():
             download_name=f'lawcheck_batch_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx'
         )
     except Exception as e:
-        logger.error(f'Batch DOCX export error: {e}')
+        app.logger.error(f'Batch DOCX export error: {e}')
         return jsonify({'error': str(e)}), 500
 
 

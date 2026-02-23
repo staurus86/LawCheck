@@ -23,6 +23,24 @@ _RE_PHONE = re.compile(r'\+?\d[\d\s\-\(\)]{7,}')
 _RE_LATIN = re.compile(r'[a-zA-Z]')
 _RE_WORD = re.compile(r'\b[а-яёА-ЯЁa-zA-Z][а-яёА-ЯЁa-zA-Z\-]*\b')
 
+
+class _BoundedDict(dict):
+    """Dict с ограниченным размером — вытесняет старые записи (LRU-like) при заполнении."""
+    __slots__ = ('_maxsize',)
+
+    def __init__(self, maxsize=50_000):
+        super().__init__()
+        self._maxsize = maxsize
+
+    def __setitem__(self, key, value):
+        if key not in self and len(self) >= self._maxsize:
+            # Удаляем старейшие 5% записей пачкой (amortized cost)
+            to_remove = max(1, self._maxsize // 20)
+            old_keys = list(self)[:to_remove]
+            for k in old_keys:
+                dict.__delitem__(self, k)
+        super().__setitem__(key, value)
+
 class RussianLanguageChecker:
     __slots__ = ('normative_words', 'foreign_allowed', 'nenormative_words',
                  'speller_cache', 'forms_cache', 'all_forms', 'morph', 'speller',
@@ -33,12 +51,12 @@ class RussianLanguageChecker:
         self.normative_words = set()
         self.foreign_allowed = set()
         self.nenormative_words = set()
-        self.speller_cache = {}
-        self.forms_cache = {}
+        self.speller_cache = _BoundedDict(maxsize=50_000)
+        self.forms_cache = _BoundedDict(maxsize=50_000)
         self.all_forms = set()
         self.abbreviations = {}
-        self._normal_form_cache = {}   # Кэш нормальных форм (str → str или dict)
-        self._nenormative_cache = {}   # Кэш результатов is_nenormative (str → bool)
+        self._normal_form_cache = _BoundedDict(maxsize=50_000)  # Кэш нормальных форм (str → str или dict)
+        self._nenormative_cache = _BoundedDict(maxsize=50_000)  # Кэш результатов is_nenormative (str → bool)
 
         print("\n" + "="*60)
         print("INIT RussianLanguageChecker (OPTIMIZED)")
@@ -682,14 +700,14 @@ class RussianLanguageChecker:
             if not is_correct:
                 try:
                     variants = self.speller.suggest(word_lower)[:5]
-                except:
+                except Exception:
                     pass
 
             speller_result = {'correct': is_correct, 'variants': variants}
             self.speller_cache[word_lower] = speller_result
             return speller_result
 
-        except:
+        except Exception:
             return None
 
     def load_dictionaries(self):
