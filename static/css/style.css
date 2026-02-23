@@ -3634,3 +3634,35 @@ label.text-muted {
     .print-hidden { display: none !important; }
 }
 
+/* Фильтр истории запусков */
+.run-history-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+.run-filter-btn {
+    padding: 0.2rem 0.6rem;
+    border: 1px solid #CBD5E1;
+    border-radius: 20px;
+    background: white;
+    color: #475569;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.run-filter-btn:hover { background: #F1F5F9; border-color: #94A3B8; }
+.run-filter-btn.active {
+    background: #3B82F6;
+    border-color: #3B82F6;
+    color: white;
+}
+[data-theme="dark"] .run-filter-btn {
+    background: #1E293B;
+    border-color: #334155;
+    color: #CBD5E1;
+}
+[data-theme="dark"] .run-filter-btn:hover { background: #334155; }
+[data-theme="dark"] .run-filter-btn.active { background: #3B82F6; border-color: #3B82F6; color: white; }
+
+

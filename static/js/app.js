@@ -638,15 +638,24 @@ function renderRunHistory(items) {
         if (h < 24) return `${h} ч назад`;
         return new Date(ts).toLocaleDateString('ru-RU');
     };
-    container.innerHTML = `
+    // Уникальные типы для фильтра
+    const types = [...new Set(items.map(i => i.check_type).filter(Boolean))];
+    const filterBar = types.length > 1 ? `
+        <div class="run-history-filter">
+            <button class="run-filter-btn active" data-rfilter="all" onclick="filterRunHistory('all',this)">Все</button>
+            ${types.map(t => `<button class="run-filter-btn" data-rfilter="${escAttr(t)}" onclick="filterRunHistory('${escAttr(t)}',this)">${typeIcon[t] || '📄'} ${t}</button>`).join('')}
+        </div>
+    ` : '';
+
+    container.innerHTML = filterBar + `
         <div class="run-history-list">
             ${items.map(item => `
-                <div class="run-history-item ${item.success ? 'ok' : 'fail'}">
+                <div class="run-history-item ${item.success ? 'ok' : 'fail'}" data-rtype="${escAttr(item.check_type || '')}">
                     <div class="run-main">
                         <span class="run-status-icon">${item.success ? '✅' : '❌'}</span>
-                        <span class="run-type-icon" title="${item.check_type || ''}">${typeIcon[item.check_type] || '📄'}</span>
+                        <span class="run-type-icon" title="${escAttr(item.check_type || '')}">${typeIcon[item.check_type] || '📄'}</span>
                         <span class="run-type">${item.check_type || '-'}</span>
-                        <span class="run-context" title="${item.context_short || ''}">${item.context_short || ''}</span>
+                        <span class="run-context" title="${escAttr(item.context_short || '')}">${item.context_short || ''}</span>
                     </div>
                     <div class="run-meta">
                         ${(item.violations_count ?? 0) > 0 ? `<span class="run-violations">${item.violations_count} нар.</span>` : ''}
@@ -657,6 +666,14 @@ function renderRunHistory(items) {
             `).join('')}
         </div>
     `;
+}
+
+function filterRunHistory(type, btn) {
+    document.querySelectorAll('.run-filter-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    document.querySelectorAll('.run-history-item[data-rtype]').forEach(item => {
+        item.style.display = (type === 'all' || item.dataset.rtype === type) ? '' : 'none';
+    });
 }
 
 async function loadRunHistory() {
@@ -2373,6 +2390,47 @@ function downloadUtf8Txt(filename, text) {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+}
+
+// Экспорт batch-результатов в CSV (с BOM для корректного открытия в Excel)
+function exportBatchCsv() {
+    const results = currentResults.batch;
+    if (!results || !results.length) {
+        showToast('Нет данных для экспорта! Сначала выполните проверку.', 'warning');
+        return;
+    }
+    const csvRow = (cells) => cells.map(c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`).join(',');
+    const rows = [
+        csvRow(['URL', 'Статус', 'Нарушений', 'Латиница', 'Англицизмы', 'Ненорматив', 'Всего слов', 'Ошибка'])
+    ];
+    results.forEach(item => {
+        if (!item.success) {
+            rows.push(csvRow([item.url, 'ошибка', '', '', '', '', '', item.error || '']));
+        } else {
+            const r = item.result || {};
+            rows.push(csvRow([
+                item.url,
+                r.law_compliant ? 'соответствует' : 'нарушения',
+                r.violations_count ?? 0,
+                r.latin_count ?? 0,
+                r.unknown_count ?? 0,
+                r.nenormative_count ?? 0,
+                r.total_words ?? 0,
+                ''
+            ]));
+        }
+    });
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `batch_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    showToast(`CSV экспортирован (${results.length} строк)`, 'success');
 }
 
 function deepSummaryFromList(deepResults) {
