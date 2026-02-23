@@ -2426,6 +2426,19 @@ mark.hl-unknown  { background: #fff9c4; color: #f57f17; border-radius: 3px; padd
     cursor:pointer; padding:0 0.2rem; font-size:1rem; flex-shrink:0;
 }
 .toast-close:hover { color:#F1F5F9; }
+.toast-undo-btn {
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.28);
+    border-radius: 6px;
+    color: #F1F5F9;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.18rem 0.65rem;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+.toast-undo-btn:hover { background: rgba(255,255,255,0.26); }
 
 /* ── Compliance Gauge ────────────────────────────────────────── */
 .stat-gauge { display:flex; align-items:center; justify-content:center; }

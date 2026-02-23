@@ -253,6 +253,34 @@ function showToast(message, type = 'info', duration = 4500) {
     }, duration);
 }
 
+// Toast с кнопкой «Отменить» (для soft-delete операций)
+function showToastWithUndo(message, undoCallback, duration = 7000) {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-info';
+    toast.innerHTML = `<span class="toast-icon">ℹ️</span>
+        <span class="toast-message">${message}</span>
+        <button class="toast-undo-btn">Отменить</button>
+        <button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
+    let done = false;
+    const undoBtn = toast.querySelector('.toast-undo-btn');
+    undoBtn.onclick = () => {
+        if (!done) { done = true; undoCallback(); toast.remove(); }
+    };
+    container.appendChild(toast);
+    requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('toast-visible')));
+    const tid = setTimeout(() => {
+        toast.classList.remove('toast-visible');
+        setTimeout(() => toast.remove(), 350);
+    }, duration);
+    undoBtn.addEventListener('click', () => clearTimeout(tid));
+}
+
 // ── Count-up анимация ─────────────────────────────────────────
 function countUpAnimate(el, target, duration = 1600) {
     const numTarget = typeof target === 'number' ? target
@@ -1124,9 +1152,9 @@ function renderImageBatchItem(item, index) {
             <div class="batch-item error">
                 <div class="batch-item-header">
                     <span class="batch-number">[${index + 1}]</span>
-                    <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
+                    <a href="${escAttr(item.url)}" target="_blank" rel="noopener" class="batch-url">${escHtml(item.url)}</a>
                 </div>
-                <div class="batch-item-error">Ошибка: ${item.error || 'Неизвестная ошибка'}</div>
+                <div class="batch-item-error">Ошибка: ${escHtml(item.error || 'Неизвестная ошибка')}</div>
             </div>
         `;
     }
@@ -1139,7 +1167,7 @@ function renderImageBatchItem(item, index) {
             <div class="batch-item-header">
                 <span class="batch-icon">${statusIcon}</span>
                 <span class="batch-number">[${index + 1}]</span>
-                <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
+                <a href="${escAttr(item.url)}" target="_blank" rel="noopener" class="batch-url">${escHtml(item.url)}</a>
             </div>
             <div class="batch-item-stats">
                 <span class="batch-violations-count">${statusText}</span>
@@ -1914,7 +1942,7 @@ function displayWordResult(result) {
                 <div class="status-icon">📚</div>
                 <div class="status-text">
                     <h3>АББРЕВИАТУРА</h3>
-                    <p>Расшифровка: ${(result.abbreviation_translation || []).join(', ') || 'не указана'}</p>
+                    <p>Расшифровка: ${escHtml((result.abbreviation_translation || []).join(', ') || 'не указана')}</p>
                 </div>
             </div>
         `;
@@ -1933,7 +1961,7 @@ function displayWordResult(result) {
     html += `
         <div class="word-detail">
             <div class="word-label">Проверяемое слово:</div>
-            <div class="word-value">"${result.word}"</div>
+            <div class="word-value">"${escHtml(result.word)}"</div>
         </div>
     `;
     
@@ -3188,16 +3216,22 @@ async function pasteFromClipboard() {
 
 function clearText() {
     const el = document.getElementById('textInput');
-    // Запрашиваем подтверждение только если текст длиннее 100 символов
-    if (el && el.value.length > 100) {
-        if (!confirm('Очистить поле? Текст будет удалён.')) return;
-    }
-    if (el) el.value = '';
+    if (!el) return;
+    const backup = el.value;
+    el.value = '';
     document.getElementById('textResults').style.display = 'none';
     currentResults.text = null;
     currentDeepResults.text = null;
     localStorage.removeItem(TEXT_AUTOSAVE_KEY);
     updateTextInputMeta();
+    if (backup.trim()) {
+        showToastWithUndo('Текст очищен', () => {
+            el.value = backup;
+            localStorage.setItem(TEXT_AUTOSAVE_KEY, backup);
+            updateTextInputMeta();
+            el.focus();
+        });
+    }
 }
 
 function loadSample() {
