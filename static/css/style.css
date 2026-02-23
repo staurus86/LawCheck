@@ -272,6 +272,12 @@ p, li, .text-muted { font-size: var(--text-sm); }
 
 .tab-content.active {
     display: block;
+    animation: tabFadeIn 0.22s ease-out both;
+}
+
+@keyframes tabFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 /* Card */
@@ -3664,5 +3670,14 @@ label.text-muted {
 }
 [data-theme="dark"] .run-filter-btn:hover { background: #334155; }
 [data-theme="dark"] .run-filter-btn.active { background: #3B82F6; border-color: #3B82F6; color: white; }
+
+/* Batch sort group */
+.batch-sort-group { display: flex; align-items: center; }
+.batch-sort-group select.batch-search-input {
+    max-width: 160px;
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+}
+
 
 

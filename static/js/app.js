@@ -2296,6 +2296,14 @@ function displayBatchResults(results) {
                 <button class="batch-filter-btn" onclick="expandAllBatchDetails(true)">Раскрыть все</button>
                 <button class="batch-filter-btn" onclick="expandAllBatchDetails(false)">Свернуть все</button>
             </div>
+            <div class="batch-sort-group">
+                <select class="batch-search-input" id="batchSortSelect" onchange="sortBatchItems(this.value)" title="Сортировка">
+                    <option value="default">↕ Порядок</option>
+                    <option value="violations-desc">↓ Нарушения</option>
+                    <option value="violations-asc">↑ Нарушения</option>
+                    <option value="url-asc">A→Я URL</option>
+                </select>
+            </div>
             <span id="batchVisibleCount" class="batch-visible-count"></span>
         `;
         batchList.insertAdjacentElement('beforebegin', toolbar);
@@ -2351,6 +2359,23 @@ function applyBatchVisibility(item, filter) {
     }
 }
 
+// Сортировка batch-элементов
+function sortBatchItems(order) {
+    const batchList = document.querySelector('#batchResultsContent .batch-results-list');
+    if (!batchList) return;
+    const items = Array.from(batchList.querySelectorAll('.batch-item'));
+    if (!items.length) return;
+    const getViolations = el => parseInt(el.querySelector('.batch-item-stats span')?.textContent?.match(/\d+/) || '0', 10) || 0;
+    const getUrl = el => (el.querySelector('.batch-url')?.textContent || '').toLowerCase();
+    items.sort((a, b) => {
+        if (order === 'violations-desc') return getViolations(b) - getViolations(a);
+        if (order === 'violations-asc')  return getViolations(a) - getViolations(b);
+        if (order === 'url-asc')         return getUrl(a).localeCompare(getUrl(b));
+        return 0; // default: no change
+    });
+    items.forEach(item => batchList.appendChild(item));
+}
+
 // Раскрыть/свернуть все детали batch
 function expandAllBatchDetails(expand) {
     document.querySelectorAll('[id^="batch-details-"]').forEach(el => {
@@ -2361,9 +2386,18 @@ function expandAllBatchDetails(expand) {
     });
 }
 
-// Скопировать текущий URL (с хешем активной вкладки) в буфер
+// Поделиться ссылкой через Web Share API (с fallback на clipboard)
 async function shareCurrentUrl() {
     const url = window.location.href;
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: 'LawChecker Online', url });
+            return;
+        } catch (e) {
+            if (e.name === 'AbortError') return; // пользователь отменил
+        }
+    }
+    // Fallback: copy to clipboard
     try {
         await navigator.clipboard.writeText(url);
         showToast('Ссылка скопирована в буфер обмена', 'success');
