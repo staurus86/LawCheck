@@ -1225,6 +1225,8 @@ def multiscan_run():
             site_url = _normalize_http_url(data.get('site_url') or '')
             if not site_url:
                 return jsonify({'error': 'Provide valid site_url'}), 400
+            if not _is_safe_url(site_url):
+                return jsonify({'error': 'Недопустимый URL (приватный или зарезервированный адрес)'}), 400
 
             page_queue = deque([site_url])
             discovered_images = deque()
@@ -1334,6 +1336,10 @@ def multiscan_run():
                 return jsonify({'error': 'No valid URLs provided'}), 400
 
             for item_url in normalized_urls:
+                if not _is_safe_url(item_url):
+                    add_result({'url': item_url, 'resource_type': 'unknown', 'success': False,
+                                'error': 'Недопустимый URL (приватный или зарезервированный адрес)'})
+                    continue
                 try:
                     if _is_image_url(item_url):
                         process_image_resource(item_url)
