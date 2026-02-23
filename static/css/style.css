@@ -759,6 +759,11 @@ p, li, .text-muted { font-size: var(--text-sm); }
     flex: 1;
 }
 
+.url-input-group .url-field-wrap {
+    flex: 1;
+    min-width: 0;
+}
+
 .field-meta {
     margin-top: 0.5rem;
     font-size: 0.85rem;
@@ -1803,10 +1808,19 @@ p, li, .text-muted { font-size: var(--text-sm); }
         gap: 0.55rem;
         width: 100%;
     }
-    
+
     .btn {
         width: 100%;
         justify-content: center;
+    }
+
+    /* Маленькие кнопки в шапке результатов не растягиваем */
+    .card-header .btn-group {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    .card-header .btn {
+        width: auto;
     }
     
     .result-status {
@@ -2596,7 +2610,18 @@ mark.hl-unknown  { background: #fff9c4; color: #f57f17; border-radius: 3px; padd
 .pricing-card:nth-child(3) { border-top-color: #8B5CF6; }
 .pricing-card:nth-child(4) { border-top-color: #10B981; }
 
-/* FAQ — стрелка + подсветка открытого */
+/* FAQ — плавное раскрытие + стрелка + подсветка открытого */
+.faq-box details { overflow: hidden; }
+.faq-box details p {
+    animation: faqSlideDown 0.22s ease-out both;
+}
+@keyframes faqSlideDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .faq-box details p { animation: none; }
+}
 .faq-box summary { list-style: none; padding-right: 2.2rem; position: relative; user-select: none; }
 .faq-box summary::-webkit-details-marker { display: none; }
 .faq-box summary::after {
@@ -3132,4 +3157,73 @@ label.text-muted {
 @media (min-width: 900px) {
     .hero-title { font-size: 2.85rem; }
     .hero-subtitle { font-size: 1.15rem; }
+}
+
+/* Progress: indeterminate анимация для batch-запроса */
+@keyframes progress-indeterminate {
+    0%   { opacity: 0.7; width: 45%; }
+    50%  { opacity: 1;   width: 75%; }
+    100% { opacity: 0.7; width: 45%; }
+}
+
+/* Drag-and-drop: визуальный отклик при перетаскивании файла в textarea */
+.form-textarea.drag-over {
+    border-color: #3B82F6;
+    background: rgba(59,130,246,0.06);
+    outline: 2px dashed #3B82F6;
+    outline-offset: -2px;
+    box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+}
+[data-theme="dark"] .form-textarea.drag-over {
+    background: rgba(59,130,246,0.1);
+}
+
+/* URL поле с кнопкой очистки */
+.url-field-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+.url-field-wrap .form-input {
+    padding-right: 2.2rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+.url-clear-btn {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #94A3B8;
+    font-size: 0.85rem;
+    padding: 0.15rem 0.25rem;
+    line-height: 1;
+    border-radius: 4px;
+    transition: color 0.15s;
+}
+.url-clear-btn:hover { color: #EF4444; }
+[data-theme="dark"] .url-clear-btn { color: #64748B; }
+[data-theme="dark"] .url-clear-btn:hover { color: #FCA5A5; }
+
+/* Подсказка горячей клавиши рядом с кнопкой проверки */
+.kbd-hint {
+    display: inline-block;
+    font-size: 0.72rem;
+    color: #94A3B8;
+    background: rgba(0,0,0,0.06);
+    border: 1px solid #CBD5E1;
+    border-radius: 5px;
+    padding: 0.1rem 0.4rem;
+    vertical-align: middle;
+    margin-left: 0.35rem;
+    letter-spacing: 0.02em;
+    font-family: monospace;
+}
+[data-theme="dark"] .kbd-hint {
+    color: #64748B;
+    background: rgba(255,255,255,0.06);
+    border-color: #334155;
 }

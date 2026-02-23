@@ -274,6 +274,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initSectionMotion();
     initFieldMetrics();
+    initKeyboardShortcuts();
+    initDragDrop();
     loadStats();
     loadRunHistory();
     onImagesProviderChange();
@@ -282,6 +284,54 @@ document.addEventListener('DOMContentLoaded', () => {
     onMultiModeChange();
     console.log('App loaded');
 });
+
+// ── Горячие клавиши ────────────────────────────────────────────
+// Ctrl+Enter (Cmd+Enter на Mac) запускает проверку в активной вкладке
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            const tab = getActiveTabName();
+            if (tab === 'text')  checkText();
+            else if (tab === 'url')   checkUrl();
+            else if (tab === 'batch') checkBatch();
+            else if (tab === 'word')  checkWord();
+        }
+    });
+}
+
+// ── Drag & Drop для текстового поля ───────────────────────────
+// Перетаскивание текстового файла (.txt) прямо в поле текста
+function initDragDrop() {
+    const textInput = document.getElementById('textInput');
+    if (!textInput) return;
+
+    textInput.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        textInput.classList.add('drag-over');
+    });
+    textInput.addEventListener('dragleave', () => {
+        textInput.classList.remove('drag-over');
+    });
+    textInput.addEventListener('drop', (e) => {
+        e.preventDefault();
+        textInput.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('text/') && !file.name.endsWith('.txt')) {
+            showToast('Поддерживаются только .txt-файлы', 'warning');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            textInput.value = ev.target.result || '';
+            updateTextInputMeta();
+            localStorage.setItem(TEXT_AUTOSAVE_KEY, textInput.value);
+            showToast('Файл загружен — нажмите «Проверить текст»', 'success');
+        };
+        reader.readAsText(file, 'UTF-8');
+    });
+}
 
 function initSectionMotion() {
     const items = document.querySelectorAll(
@@ -335,6 +385,17 @@ function switchTab(tabName) {
     localStorage.setItem(ACTIVE_TAB_KEY, tabName);
     if (window.location.hash !== `#${tabName}`) {
         history.replaceState(null, '', `#${tabName}`);
+    }
+
+    // Фокус на главное поле ввода вкладки для удобства
+    const focusMap = {
+        text: 'textInput', url: 'urlInput',
+        batch: 'batchInput', word: 'wordInput'
+    };
+    const focusId = focusMap[tabName];
+    if (focusId) {
+        const el = document.getElementById(focusId);
+        if (el) setTimeout(() => el.focus(), 80);
     }
 }
 
@@ -423,7 +484,11 @@ function initFieldMetrics() {
         });
     }
 
-    if (batchInput) batchInput.addEventListener('input', debounce(updateBatchInputMeta, 200));
+    if (batchInput) {
+        // &#10; в placeholder HTML-атрибуте — ненадёжно в Safari; задаём через JS
+        batchInput.placeholder = 'https://example1.com\nhttps://example2.com\nhttps://example3.com';
+        batchInput.addEventListener('input', debounce(updateBatchInputMeta, 200));
+    }
     if (imagesInput) imagesInput.addEventListener('input', debounce(updateImagesInputMeta, 200));
     if (imagesBatchInput) imagesBatchInput.addEventListener('input', debounce(updateImagesBatchInputMeta, 200));
     if (multiUrlsInput) multiUrlsInput.addEventListener('input', debounce(updateMultiUrlsInputMeta, 200));
@@ -563,26 +628,28 @@ async function checkText() {
 // Проверка URL
 async function checkUrl() {
     const url = document.getElementById('urlInput').value.trim();
-    
+
     if (!url || !url.startsWith('http')) {
         showToast('Введите корректный URL!', 'warning');
         return;
     }
-    
+
     showLoading();
     document.getElementById('urlProgress').style.display = 'block';
-    
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     try {
         const response = await fetch(`${API_BASE}/api/check-url`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ url })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+            signal: controller.signal
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             currentResults.url = data.result;
             currentDeepResults.url = null;
@@ -595,8 +662,13 @@ async function checkUrl() {
             showToast('Ошибка: ' + data.error, 'error');
         }
     } catch (error) {
-        showToast('Ошибка загрузки: ' + error.message, 'error');
+        if (error.name === 'AbortError') {
+            showToast('Превышено время ожидания (30 с). Сайт не отвечает или недоступен.', 'error');
+        } else {
+            showToast('Ошибка загрузки: ' + error.message, 'error');
+        }
     } finally {
+        clearTimeout(timeoutId);
         hideLoading();
         document.getElementById('urlProgress').style.display = 'none';
     }
@@ -617,16 +689,15 @@ async function checkBatch() {
     const progressText = document.getElementById('batchProgressText');
     
     progressBar.style.display = 'block';
-    progressFill.style.width = '0%';
-    progressFill.style.animation = 'none';
-    progressText.textContent = `0 / ${urls.length}`;
+    // Indeterminate анимация во время ожидания ответа сервера
+    progressFill.style.width = '60%';
+    progressFill.style.animation = 'progress-indeterminate 1.4s ease-in-out infinite';
+    progressText.textContent = `Проверяю ${urls.length} ссылок…`;
 
     try {
         const response = await fetch(`${API_BASE}/api/batch-check`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ urls })
         });
 
@@ -636,14 +707,18 @@ async function checkBatch() {
         }
 
         const results = data.results || [];
+        progressFill.style.animation = 'none';
         progressFill.style.width = '100%';
-        progressText.textContent = `${results.length} / ${results.length}`;
+        progressText.textContent = `Готово: ${results.length} из ${urls.length}`;
         currentResults.batch = results;
         currentDeepResults.batch = null;
         displayBatchResults(results);
         console.log('✅ Пакетная проверка завершена:', results);
     } catch (error) {
+        progressFill.style.animation = 'none';
         showToast('Ошибка пакетной проверки: ' + error.message, 'error');
+    } finally {
+        setTimeout(() => { progressBar.style.display = 'none'; }, 2000);
     }
 }
 

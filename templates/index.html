@@ -118,11 +118,13 @@
                             rows="12"
                         ></textarea>
                         <div class="field-meta" id="textInputMeta">0 символов | 0 слов</div>
+                        <p class="text-muted" style="font-size:0.78rem;margin-top:0.3rem;">Или перетащите .txt-файл прямо в поле выше</p>
                         
                         <div class="btn-group">
-                            <button class="btn btn-primary" onclick="checkText()">
+                            <button class="btn btn-primary" onclick="checkText()" title="Проверить текст (Ctrl+Enter)">
                                 <i class="fas fa-search"></i>
                                 Проверить текст
+                                <span class="kbd-hint">Ctrl+Enter</span>
                             </button>
                             <button class="btn btn-secondary" onclick="clearText()">
                                 <i class="fas fa-trash"></i>
@@ -141,11 +143,11 @@
                     <div class="card-header">
                         <h2>Результаты проверки</h2>
                         <div class="btn-group">
-                            <button class="btn btn-info" onclick="deepCheck('text')">
+                            <button class="btn btn-info" onclick="deepCheck('text')" title="Морфологический анализ каждого нарушения: словарные формы, варианты замены, тип слова">
                                 <i class="fas fa-microscope"></i>
                                 Глубокая проверка
                             </button>
-                            <button class="btn btn-sm btn-success" onclick="exportReport('text')">
+                            <button class="btn btn-sm btn-success" onclick="exportReport('text')" title="Скачать текстовый отчёт (.txt)">
                                 <i class="fas fa-download"></i>
                                 Скачать отчёт
                             </button>
@@ -170,16 +172,20 @@
                     </div>
                     <div class="card-body">
                         <div class="url-input-group">
-                            <input 
-                                type="url" 
-                                id="urlInput" 
-                                class="form-input" 
-                                placeholder="https://example.com"
-                                value="https://"
-                            >
-                            <button class="btn btn-primary" onclick="checkUrl()">
+                            <div class="url-field-wrap">
+                                <input 
+                                    type="url" 
+                                    id="urlInput" 
+                                    class="form-input" 
+                                    placeholder="https://example.com"
+                                    value="https://"
+                                >
+                                <button class="url-clear-btn" onclick="document.getElementById('urlInput').value='https://'; document.getElementById('urlInput').focus()" title="Очистить поле">&#x2715;</button>
+                            </div>
+                            <button class="btn btn-primary" onclick="checkUrl()" title="Загрузить страницу и проверить текст (Ctrl+Enter)">
                                 <i class="fas fa-search"></i>
                                 Проверить сайт
+                                <span class="kbd-hint">Ctrl+Enter</span>
                             </button>
                         </div>
                         
@@ -197,7 +203,7 @@
                     <div class="card-header">
                         <h2>Результаты проверки сайта</h2>
                         <div class="btn-group">
-                            <button class="btn btn-info" onclick="deepCheck('url')">
+                            <button class="btn btn-info" onclick="deepCheck('url')" title="Морфологический анализ нарушений со страницы сайта">
                                 <i class="fas fa-microscope"></i>
                                 Глубокая проверка
                             </button>
@@ -233,9 +239,10 @@
                         ></textarea>
                         <div class="field-meta" id="batchInputMeta">0 ссылок (0 уникальных)</div>
                         
-                        <button class="btn btn-primary" onclick="checkBatch()">
+                        <button class="btn btn-primary" onclick="checkBatch()" title="Запустить проверку всех ссылок из списка (Ctrl+Enter)">
                             <i class="fas fa-list-check"></i>
                             Проверить все
+                            <span class="kbd-hint">Ctrl+Enter</span>
                         </button>
                         
                         <div class="progress-container" id="batchProgress" style="display: none;">
@@ -253,7 +260,7 @@
                     <div class="card-header">
                         <h2>Результаты пакетной проверки</h2>
                         <div class="btn-group">
-                            <button class="btn btn-info" onclick="deepCheckBatch()">
+                            <button class="btn btn-info" onclick="deepCheckBatch()" title="Запустить глубокую проверку по всем ссылкам из batch-результатов">
                                 <i class="fas fa-microscope"></i>
                                 Глубокая проверка всех ссылок
                             </button>
@@ -289,7 +296,7 @@
                                 placeholder="Введите одно слово, например: маркетинг"
                                 onkeypress="if(event.key==='Enter')checkWord()"
                             >
-                            <button class="btn btn-primary" onclick="checkWord()">
+                            <button class="btn btn-primary" onclick="checkWord()" title="Проверить слово (Enter или Ctrl+Enter)">
                                 <i class="fas fa-search"></i>
                                 Проверить
                             </button>
@@ -302,7 +309,7 @@
                     <div class="card-header">
                         <h2>Результат проверки</h2>
                         <div class="btn-group">
-                            <button class="btn btn-info btn-sm" onclick="deepCheck('word')">
+                            <button class="btn btn-info btn-sm" onclick="deepCheck('word')" title="Подробный морфологический анализ: словарные формы, варианты">
                                 <i class="fas fa-microscope"></i>
                                 Глубокая проверка
                             </button>
@@ -432,7 +439,7 @@
                     <div class="card-header">
                         <h2>Результаты проверки изображения</h2>
                         <div class="btn-group">
-                            <button class="btn btn-info" onclick="deepCheck('images')">
+                            <button class="btn btn-info" onclick="deepCheck('images')" title="Морфологический анализ нарушений в тексте изображения">
                                 <i class="fas fa-microscope"></i>
                                 Глубокая проверка
                             </button>
