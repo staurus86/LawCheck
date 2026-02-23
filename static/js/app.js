@@ -11,6 +11,14 @@ function debounce(fn, delay) {
     };
 }
 
+// Копирование слова по клику на тег
+function copyWordTag(word) {
+    navigator.clipboard.writeText(word).then(
+        () => showToast(`Скопировано: «${word}»`, 'success'),
+        () => {}
+    );
+}
+
 // Раскрывающийся список слов со спойлером
 // words — массив, limit — сколько показывать сразу, tagClass — CSS-класс тега, transform — fn(word)→string
 function renderWordList(words, limit, tagClass = '', transform = null) {
@@ -19,11 +27,12 @@ function renderWordList(words, limit, tagClass = '', transform = null) {
     const shown = words.slice(0, limit);
     const hidden = words.slice(limit);
     let html = '<div class="word-list">';
-    html += shown.map(w => `<span class="word-tag ${tagClass}">${t(w)}</span>`).join('');
+    // Клик по тегу копирует оригинальное слово в буфер
+    html += shown.map(w => `<span class="word-tag ${tagClass}" onclick="copyWordTag('${w.replace(/'/g,"\\'")}') " title="Нажмите, чтобы скопировать">${t(w)}</span>`).join('');
     if (hidden.length > 0) {
         const uid = 'ws' + Math.random().toString(36).slice(2, 9);
         html += `<span class="word-spoiler-hidden" id="${uid}" style="display:none">`;
-        html += hidden.map(w => `<span class="word-tag ${tagClass}">${t(w)}</span>`).join('');
+        html += hidden.map(w => `<span class="word-tag ${tagClass}" onclick="copyWordTag('${w.replace(/'/g,"\\'")}') " title="Нажмите, чтобы скопировать">${t(w)}</span>`).join('');
         html += `</span>`;
         html += `<button class="spoiler-toggle-btn" onclick="toggleWordSpoiler(this,'${uid}',${hidden.length})">▼ Показать ещё ${hidden.length}</button>`;
     }
@@ -418,7 +427,14 @@ function updateTextInputMeta() {
     const text = input.value || '';
     const chars = text.length;
     const words = (text.trim().match(/\S+/g) || []).length;
-    meta.textContent = `${chars} символов | ${words} слов`;
+    let label = `${chars.toLocaleString('ru-RU')} символов | ${words.toLocaleString('ru-RU')} слов`;
+    if (chars > 50000) {
+        label += ' ⚠️ текст очень длинный, проверка может занять время';
+        meta.classList.add('field-meta-warn');
+    } else {
+        meta.classList.remove('field-meta-warn');
+    }
+    meta.textContent = label;
 }
 
 function updateBatchInputMeta() {
@@ -2123,6 +2139,12 @@ function displayBatchResults(results) {
     
     resultsContent.innerHTML = html;
     resultsCard.style.display = 'block';
+    // Обновляем заголовок карточки: краткая сводка
+    const batchH2 = resultsCard.querySelector('.card-header h2');
+    if (batchH2) {
+        const ok = successful - totalViolations;
+        batchH2.innerHTML = `Пакетная проверка: <span style="color:#4CAF50">${ok} ✅</span> / <span style="color:#FF9800">${totalViolations} ⚠️</span> из ${results.length}`;
+    }
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -2750,8 +2772,31 @@ function toggleBatchDetails(index) {
 }
 
 // Вспомогательные функции
+
+// Вставка текста из буфера обмена в поле textInput
+async function pasteFromClipboard() {
+    try {
+        const text = await navigator.clipboard.readText();
+        if (!text) { showToast('Буфер обмена пуст', 'warning'); return; }
+        const el = document.getElementById('textInput');
+        if (!el) return;
+        el.value = text;
+        updateTextInputMeta();
+        localStorage.setItem(TEXT_AUTOSAVE_KEY, text);
+        el.focus();
+        showToast('Текст вставлен из буфера обмена', 'success');
+    } catch (_e) {
+        showToast('Нет доступа к буферу — нажмите Ctrl+V в поле текста', 'info');
+    }
+}
+
 function clearText() {
-    document.getElementById('textInput').value = '';
+    const el = document.getElementById('textInput');
+    // Запрашиваем подтверждение только если текст длиннее 100 символов
+    if (el && el.value.length > 100) {
+        if (!confirm('Очистить поле? Текст будет удалён.')) return;
+    }
+    if (el) el.value = '';
     document.getElementById('textResults').style.display = 'none';
     currentResults.text = null;
     currentDeepResults.text = null;

@@ -3227,3 +3227,90 @@ label.text-muted {
     background: rgba(255,255,255,0.06);
     border-color: #334155;
 }
+
+/* Ghost button — прозрачный, только рамка */
+.btn-ghost {
+    background: transparent;
+    border: 1px solid #CBD5E1;
+    color: #64748B;
+    box-shadow: none;
+}
+.btn-ghost:hover {
+    background: #F1F5F9;
+    border-color: #94A3B8;
+    color: #334155;
+}
+[data-theme="dark"] .btn-ghost {
+    border-color: #334155;
+    color: #64748B;
+}
+[data-theme="dark"] .btn-ghost:hover {
+    background: #1E293B;
+    border-color: #475569;
+    color: #94A3B8;
+}
+
+/* Images tab: логические группы действий */
+.images-action-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin-top: 1rem;
+}
+.images-action-groups .btn-group {
+    margin-top: 0;
+}
+.images-step-group {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+.images-step-label {
+    font-size: 0.8rem;
+    color: #94A3B8;
+    font-style: italic;
+    white-space: nowrap;
+}
+.images-util-group {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding-top: 0.25rem;
+    border-top: 1px solid #E2E8F0;
+    margin-top: 0.15rem;
+}
+[data-theme="dark"] .images-util-group { border-color: #334155; }
+[data-theme="dark"] .images-step-label { color: #475569; }
+
+/* Empty state hint в карточках результатов */
+.empty-state-hint {
+    color: #94A3B8;
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 1.5rem 0;
+    font-style: italic;
+}
+[data-theme="dark"] .empty-state-hint { color: #475569; }
+
+/* field-meta с предупреждением о длинном тексте */
+.field-meta.field-meta-warn {
+    background: #FEF3C7;
+    border-color: #F59E0B;
+    color: #92400E;
+}
+[data-theme="dark"] .field-meta.field-meta-warn {
+    background: #451A03;
+    border-color: #92400E;
+    color: #FCD34D;
+}
+
+/* Word-tag: кликабельные — показываем указатель и hover эффект */
+.word-tag {
+    cursor: pointer;
+}
+.word-tag:hover {
+    filter: brightness(0.9) saturate(1.2);
+    transform: translateY(-1px);
+    transition: filter 0.15s, transform 0.15s;
+}

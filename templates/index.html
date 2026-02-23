@@ -126,13 +126,17 @@
                                 Проверить текст
                                 <span class="kbd-hint">Ctrl+Enter</span>
                             </button>
-                            <button class="btn btn-secondary" onclick="clearText()">
+                            <button class="btn btn-secondary" onclick="pasteFromClipboard()" title="Вставить текст из буфера обмена">
+                                <i class="fas fa-paste"></i>
+                                Вставить
+                            </button>
+                            <button class="btn btn-secondary" onclick="clearText()" title="Очистить поле и результаты">
                                 <i class="fas fa-trash"></i>
                                 Очистить
                             </button>
-                            <button class="btn btn-info" onclick="loadSample()">
+                            <button class="btn btn-ghost btn-sm" onclick="loadSample()" title="Загрузить тестовый текст с нарушениями">
                                 <i class="fas fa-file-import"></i>
-                                Загрузить пример
+                                Пример
                             </button>
                         </div>
                     </div>
@@ -158,7 +162,7 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div id="textResultsContent"></div>
+                        <div id="textResultsContent"><p class="empty-state-hint">Нажмите «Проверить текст» — результаты появятся здесь.</p></div>
                     </div>
                 </div>
             </div>
@@ -275,7 +279,7 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div id="batchResultsContent"></div>
+                        <div id="batchResultsContent"><p class="empty-state-hint">Результаты пакетной проверки появятся здесь.</p></div>
                     </div>
                 </div>
             </div>
@@ -383,27 +387,37 @@
                         <textarea id="imagesInput" class="form-textarea" placeholder="Извлеченный текст" rows="10"></textarea>
                         <div class="field-meta" id="imagesInputMeta">0 символов | 0 слов</div>
 
-                        <div class="btn-group">
-                            <button class="btn btn-primary" onclick="checkImagesByDatabase()">
-                                <i class="fas fa-database"></i>
-                                Распознать и проверить
-                            </button>
-                            <button class="btn btn-secondary" onclick="scrapTextFromImageAndCheck()">
-                                <i class="fas fa-file-alt"></i>
-                                Извлечь текст с изображения
-                            </button>
-                            <button class="btn btn-info" onclick="checkExtractedImageText()">
-                                <i class="fas fa-spell-check"></i>
-                                Проверить извлеченный текст
-                            </button>
-                            <button class="btn btn-secondary" onclick="copyExtractedImageText()">
-                                <i class="fas fa-copy"></i>
-                                Скопировать извлеченный текст
-                            </button>
-                            <button class="btn btn-secondary" onclick="clearImageInputs()">
-                                <i class="fas fa-eraser"></i>
-                                Очистить поля изображения
-                            </button>
+                        <div class="images-action-groups">
+                            <!-- Основное действие -->
+                            <div class="btn-group">
+                                <button class="btn btn-primary" onclick="checkImagesByDatabase()" title="OCR изображения и языковая проверка в один клик">
+                                    <i class="fas fa-magic"></i>
+                                    Распознать и проверить
+                                </button>
+                            </div>
+                            <!-- Разделённые шаги: сначала OCR, потом проверка -->
+                            <div class="images-step-group">
+                                <span class="images-step-label">или по шагам:</span>
+                                <button class="btn btn-secondary btn-sm" onclick="scrapTextFromImageAndCheck()" title="Только OCR — распознать текст и показать в поле ниже">
+                                    <i class="fas fa-file-alt"></i>
+                                    1. Извлечь текст
+                                </button>
+                                <button class="btn btn-info btn-sm" onclick="checkExtractedImageText()" title="Проверить текст, который уже находится в поле ниже">
+                                    <i class="fas fa-spell-check"></i>
+                                    2. Проверить текст
+                                </button>
+                            </div>
+                            <!-- Утилиты -->
+                            <div class="images-util-group">
+                                <button class="btn btn-ghost btn-sm" onclick="copyExtractedImageText()" title="Скопировать текст из поля в буфер обмена">
+                                    <i class="fas fa-copy"></i>
+                                    Копировать
+                                </button>
+                                <button class="btn btn-ghost btn-sm" onclick="clearImageInputs()" title="Очистить все поля вкладки">
+                                    <i class="fas fa-eraser"></i>
+                                    Очистить
+                                </button>
+                            </div>
                         </div>
 
                         <div class="images-batch-section">
@@ -565,7 +579,7 @@
                         </div>
 
                         <div class="btn-group">
-                            <button class="btn btn-primary" onclick="runMultiScan()">
+                            <button class="btn btn-primary" onclick="runMultiScan()" title="Запустить сканирование всех ресурсов и языковую проверку">
                                 <i class="fas fa-layer-group"></i>
                                 Запустить мульти-скан
                             </button>
@@ -589,7 +603,7 @@
                     <div class="card-header">
                         <h2>Результаты мульти-скана</h2>
                         <div class="btn-group">
-                            <button class="btn btn-info" onclick="deepCheckMultiScan()">
+                            <button class="btn btn-info" onclick="deepCheckMultiScan()" title="Морфологический анализ нарушений по всем ресурсам скана">
                                 <i class="fas fa-microscope"></i>
                                 Глубокая проверка
                             </button>
