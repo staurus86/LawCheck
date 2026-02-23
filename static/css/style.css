@@ -209,12 +209,19 @@ p, li, .text-muted { font-size: var(--text-sm); }
     position: sticky;
     top: var(--tabs-sticky-top);
     z-index: 900;
-    background: transparent;
+    background: rgba(248,250,252,0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     padding: 0.5rem 0 0.6rem;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
+    border-bottom: 1px solid rgba(203,213,225,0.4);
+}
+[data-theme="dark"] .tabs {
+    background: rgba(15,23,42,0.85);
+    border-bottom-color: rgba(51,65,85,0.5);
 }
 
 .tab-btn {
@@ -3343,4 +3350,106 @@ label.text-muted {
 /* Step-group label */
 .images-step-label {
     font-size: 0.78rem;
+}
+
+/* ── Batch toolbar: фильтры + expand/collapse ─────────────────── */
+.batch-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+    padding: 0.65rem 0.85rem;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+}
+[data-theme="dark"] .batch-toolbar {
+    background: #0F172A;
+    border-color: #334155;
+}
+.batch-filter-group,
+.batch-expand-group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+.batch-filter-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-right: 0.2rem;
+}
+.batch-filter-btn {
+    background: white;
+    border: 1px solid #CBD5E1;
+    border-radius: 20px;
+    padding: 0.28rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #475569;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.batch-filter-btn:hover {
+    background: #F1F5F9;
+    border-color: #94A3B8;
+}
+.batch-filter-btn.active {
+    background: #3B82F6;
+    border-color: #3B82F6;
+    color: white;
+}
+.batch-filter-btn.success { border-color: #4CAF50; color: #166534; }
+.batch-filter-btn.success.active { background: #4CAF50; color: white; }
+.batch-filter-btn.error { border-color: #EF4444; color: #991B1B; }
+.batch-filter-btn.error.active { background: #EF4444; color: white; }
+[data-theme="dark"] .batch-filter-btn {
+    background: #1E293B;
+    border-color: #334155;
+    color: #94A3B8;
+}
+[data-theme="dark"] .batch-filter-btn:hover {
+    background: #243050;
+}
+[data-theme="dark"] .batch-filter-btn.active {
+    background: #3B82F6;
+    border-color: #3B82F6;
+    color: white;
+}
+
+/* ── Print стили ──────────────────────────────────────────────── */
+@media print {
+    .header, .hero, .tabs, .btn-group, .batch-toolbar,
+    .loading-overlay, #toastContainer, .back-to-top,
+    .reveal-item:not(.is-visible), footer, .field-meta,
+    .progress-container, .images-action-groups,
+    .deep-check-trigger, nav, .quick-links {
+        display: none !important;
+    }
+    body {
+        background: white;
+        color: #0F172A;
+        font-size: 11pt;
+    }
+    .container { max-width: 100%; padding: 0; }
+    .card {
+        border: 1px solid #CBD5E1;
+        box-shadow: none;
+        break-inside: avoid;
+        page-break-inside: avoid;
+        margin-bottom: 1rem;
+    }
+    .card-header { background: #F8FAFC !important; }
+    .result-status { break-inside: avoid; }
+    .batch-item { break-inside: avoid; border: 1px solid #E2E8F0; }
+    .word-tag { border: 1px solid #CBD5E1; background: #F1F5F9; color: #334155; }
+    .result-stats-grid { grid-template-columns: repeat(3, 1fr); }
+    a[href]::after { content: " (" attr(href) ")"; font-size: 0.75em; color: #64748B; }
+    a.batch-url::after { content: ""; }
 }

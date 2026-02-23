@@ -406,6 +406,10 @@ function switchTab(tabName) {
         const el = document.getElementById(focusId);
         if (el) setTimeout(() => el.focus(), 80);
     }
+
+    // На мобильных — прокрутить активную кнопку вкладки в видимую область
+    const activeBtn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+    if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 }
 
 function getActiveTabName() {
@@ -1412,6 +1416,14 @@ function displayMultiResults(payload) {
         </div>
     `;
     card.style.display = 'block';
+
+    // Обновляем заголовок multiscan
+    const multiH2 = card.querySelector('.card-header h2');
+    if (multiH2) {
+        const ok = (payload.processed_success || 0) - (payload.with_violations || 0);
+        multiH2.innerHTML = `Мульти-скан: <span style="color:#4CAF50">${ok} ✅</span> / <span style="color:#FF9800">${payload.with_violations || 0} ⚠️</span> из ${payload.total || results.length}`;
+    }
+
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -2139,13 +2151,80 @@ function displayBatchResults(results) {
     
     resultsContent.innerHTML = html;
     resultsCard.style.display = 'block';
+
     // Обновляем заголовок карточки: краткая сводка
     const batchH2 = resultsCard.querySelector('.card-header h2');
     if (batchH2) {
         const ok = successful - totalViolations;
         batchH2.innerHTML = `Пакетная проверка: <span style="color:#4CAF50">${ok} ✅</span> / <span style="color:#FF9800">${totalViolations} ⚠️</span> из ${results.length}`;
     }
+
+    // Добавляем панель фильтров и expand/collapse
+    const batchList = resultsContent.querySelector('.batch-results-list');
+    if (batchList) {
+        const toolbar = document.createElement('div');
+        toolbar.className = 'batch-toolbar';
+        toolbar.innerHTML = `
+            <div class="batch-filter-group">
+                <span class="batch-filter-label">Показать:</span>
+                <button class="batch-filter-btn active" data-filter="all" onclick="filterBatchItems('all', this)">Все (${results.length})</button>
+                <button class="batch-filter-btn" data-filter="violations" onclick="filterBatchItems('violations', this)">⚠️ Нарушения (${totalViolations})</button>
+                <button class="batch-filter-btn success" data-filter="ok" onclick="filterBatchItems('ok', this)">✅ OK (${successful - totalViolations})</button>
+                ${results.length - successful > 0 ? `<button class="batch-filter-btn error" data-filter="errors" onclick="filterBatchItems('errors', this)">❌ Ошибки (${results.length - successful})</button>` : ''}
+            </div>
+            <div class="batch-expand-group">
+                <button class="batch-filter-btn" onclick="expandAllBatchDetails(true)">Раскрыть все</button>
+                <button class="batch-filter-btn" onclick="expandAllBatchDetails(false)">Свернуть все</button>
+            </div>
+        `;
+        batchList.insertAdjacentElement('beforebegin', toolbar);
+    }
+
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Фильтрация batch-элементов по статусу
+function filterBatchItems(filter, btn) {
+    document.querySelectorAll('.batch-filter-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    document.querySelectorAll('.batch-item').forEach(item => {
+        if (filter === 'all') {
+            item.style.display = '';
+        } else if (filter === 'violations') {
+            item.style.display = (item.classList.contains('warning') || item.classList.contains('critical')) ? '' : 'none';
+        } else if (filter === 'ok') {
+            item.style.display = item.classList.contains('success') ? '' : 'none';
+        } else if (filter === 'errors') {
+            item.style.display = item.classList.contains('error') ? '' : 'none';
+        }
+    });
+}
+
+// Раскрыть/свернуть все детали batch
+function expandAllBatchDetails(expand) {
+    document.querySelectorAll('[id^="batch-details-"]').forEach(el => {
+        el.style.display = expand ? 'block' : 'none';
+    });
+    document.querySelectorAll('[id^="batch-btn-"]').forEach(btn => {
+        btn.textContent = expand ? 'Скрыть детали' : 'Показать детали';
+    });
+}
+
+// Скопировать текущий URL (с хешем активной вкладки) в буфер
+async function shareCurrentUrl() {
+    const url = window.location.href;
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast('Ссылка скопирована в буфер обмена', 'success');
+    } catch (_e) {
+        showToast('Не удалось скопировать ссылку', 'warning');
+    }
+}
+
+// Подсветить активную кнопку вкладки при прокрутке к ней
+function scrollTabIntoView(tabName) {
+    const btn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+    if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 }
 
 // Экспорт отчета
