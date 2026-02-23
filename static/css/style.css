@@ -3580,3 +3580,31 @@ label.text-muted {
     font-size: 0.95rem;
 }
 .batch-empty-state.visible { display: block; }
+
+/* Кнопка «Очистить» в истории слов */
+.word-history-clear {
+    background: none;
+    border: none;
+    color: #94A3B8;
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 0.15rem 0.3rem;
+    text-decoration: underline;
+    transition: color 0.15s;
+}
+.word-history-clear:hover { color: #EF4444; }
+
+/* История запусков — улучшенный вид */
+.run-status-icon { font-size: 0.85rem; flex-shrink: 0; }
+.run-type-icon   { font-size: 0.95rem; margin-right: 0.15rem; }
+.run-violations  { color: #EF4444; font-weight: 600; font-size: 0.8rem; }
+.run-date        { color: #94A3B8; font-size: 0.78rem; white-space: nowrap; }
+.run-time        { color: #64748B; font-size: 0.78rem; }
+.run-context     {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #64748B;
+    font-size: 0.82rem;
+}

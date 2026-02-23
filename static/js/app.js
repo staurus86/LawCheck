@@ -600,20 +600,31 @@ function renderRunHistory(items) {
         container.innerHTML = '<div class="text-muted">История пока пуста.</div>';
         return;
     }
+    const typeIcon = { text:'📝', url:'🌐', batch:'📦', image:'🖼️', word:'🔤', multiscan:'🔬' };
+    const relTime = (ts) => {
+        if (!ts) return '';
+        const diff = Date.now() - new Date(ts).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return 'только что';
+        if (mins < 60) return `${mins} мин назад`;
+        const h = Math.floor(mins / 60);
+        if (h < 24) return `${h} ч назад`;
+        return new Date(ts).toLocaleDateString('ru-RU');
+    };
     container.innerHTML = `
         <div class="run-history-list">
             ${items.map(item => `
                 <div class="run-history-item ${item.success ? 'ok' : 'fail'}">
                     <div class="run-main">
+                        <span class="run-status-icon">${item.success ? '✅' : '❌'}</span>
+                        <span class="run-type-icon" title="${item.check_type || ''}">${typeIcon[item.check_type] || '📄'}</span>
                         <span class="run-type">${item.check_type || '-'}</span>
-                        <span class="run-endpoint">${item.endpoint || '-'}</span>
-                        <span class="run-context">${item.context_short || ''}</span>
+                        <span class="run-context" title="${item.context_short || ''}">${item.context_short || ''}</span>
                     </div>
                     <div class="run-meta">
-                        <span>${item.success ? 'ok' : 'error'}</span>
-                        <span>violations: ${item.violations_count ?? 0}</span>
-                        <span>${item.duration_ms ?? 0} ms</span>
-                        <span>${item.created_at ? new Date(item.created_at).toLocaleString() : ''}</span>
+                        ${(item.violations_count ?? 0) > 0 ? `<span class="run-violations">${item.violations_count} нар.</span>` : ''}
+                        <span class="run-time">${item.duration_ms ?? 0} мс</span>
+                        <span class="run-date" title="${item.created_at ? new Date(item.created_at).toLocaleString() : ''}">${relTime(item.created_at)}</span>
                     </div>
                 </div>
             `).join('')}
@@ -1450,6 +1461,29 @@ function displayMultiResults(payload) {
     if (multiH2) {
         const ok = (payload.processed_success || 0) - (payload.with_violations || 0);
         multiH2.innerHTML = `Мульти-скан: <span style="color:#4CAF50">${ok} ✅</span> / <span style="color:#FF9800">${payload.with_violations || 0} ⚠️</span> из ${payload.total || results.length}`;
+    }
+
+    // Панель фильтров для мульти-скана
+    const multiList = content.querySelector('.batch-results-list');
+    if (multiList && results.length > 1) {
+        const processedOk = (payload.processed_success || 0) - withViol;
+        const toolbar = document.createElement('div');
+        toolbar.className = 'batch-toolbar';
+        toolbar.innerHTML = `
+            <div class="batch-filter-group">
+                <span class="batch-filter-label">Показать:</span>
+                <button class="batch-filter-btn active" data-multifilter="all" onclick="filterMultiItems('all', this)">Все (${results.length})</button>
+                <button class="batch-filter-btn" data-multifilter="violations" onclick="filterMultiItems('violations', this)">⚠️ Нарушения (${withViol})</button>
+                <button class="batch-filter-btn success" data-multifilter="ok" onclick="filterMultiItems('ok', this)">✅ OK (${processedOk})</button>
+                ${(payload.processed_error || 0) > 0 ? `<button class="batch-filter-btn error" data-multifilter="errors" onclick="filterMultiItems('errors', this)">❌ Ошибки (${payload.processed_error || 0})</button>` : ''}
+            </div>
+        `;
+        multiList.insertAdjacentElement('beforebegin', toolbar);
+        const emptyState = document.createElement('div');
+        emptyState.id = 'multiEmptyState';
+        emptyState.className = 'batch-empty-state';
+        emptyState.textContent = 'Нет результатов по выбранному фильтру.';
+        multiList.insertAdjacentElement('afterend', emptyState);
     }
 
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -3057,8 +3091,14 @@ function renderWordHistory() {
         const hist = JSON.parse(localStorage.getItem(WORD_HISTORY_KEY) || '[]');
         if (!hist.length) { container.innerHTML = ''; return; }
         container.innerHTML = `<span class="word-history-label">Недавние:</span>` +
-            hist.map(w => `<span class="word-history-chip" data-recheck="${escAttr(w)}">${escAttr(w)}<button class="chip-remove" data-remove="${escAttr(w)}" title="Удалить из истории">×</button></span>`).join('');
+            hist.map(w => `<span class="word-history-chip" data-recheck="${escAttr(w)}">${escAttr(w)}<button class="chip-remove" data-remove="${escAttr(w)}" title="Удалить из истории">×</button></span>`).join('') +
+            `<button class="word-history-clear" onclick="clearWordHistory()" title="Очистить всю историю">Очистить</button>`;
     } catch(e) { container.innerHTML = ''; }
+}
+
+function clearWordHistory() {
+    localStorage.removeItem(WORD_HISTORY_KEY);
+    renderWordHistory();
 }
 
 // Делегирование кликов для word history
@@ -3092,6 +3132,33 @@ function copyViolationsList(type) {
         () => showToast(`Скопировано ${words.length} слов`, 'success'),
         () => showToast('Не удалось скопировать', 'error')
     );
+}
+
+// === Фильтр мульти-скана ===
+function filterMultiItems(filter, btn) {
+    document.querySelectorAll('[data-multifilter]').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    const content = document.getElementById('multiResultsContent');
+    if (!content) return;
+    content.querySelectorAll('.batch-item').forEach(item => applyMultiVisibility(item, filter));
+    updateMultiEmptyState();
+}
+
+function applyMultiVisibility(item, filter) {
+    if (filter === 'all') { item.style.display = ''; }
+    else if (filter === 'violations') { item.style.display = (item.classList.contains('warning') || item.classList.contains('critical')) ? '' : 'none'; }
+    else if (filter === 'ok') { item.style.display = item.classList.contains('success') ? '' : 'none'; }
+    else if (filter === 'errors') { item.style.display = item.classList.contains('error') ? '' : 'none'; }
+}
+
+function updateMultiEmptyState() {
+    const content = document.getElementById('multiResultsContent');
+    if (!content) return;
+    const items = content.querySelectorAll('.batch-item');
+    let visible = 0;
+    items.forEach(item => { if (item.style.display !== 'none') visible++; });
+    const emptyState = document.getElementById('multiEmptyState');
+    if (emptyState) emptyState.classList.toggle('visible', items.length > 0 && visible === 0);
 }
 
 // === Пустое состояние batch после фильтрации ===
