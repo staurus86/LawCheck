@@ -1316,6 +1316,10 @@ function updateImagesBatchEmptyState() {
 }
 
 async function checkImagesBatchQueue() {
+    if (checkImagesBatchQueue._running) {
+        showToast('Пакетная обработка уже запущена, дождитесь завершения', 'warning');
+        return;
+    }
     const batchInput = document.getElementById('imagesBatchInput');
     const delayInput = document.getElementById('imagesBatchDelayMs');
     const progress = document.getElementById('imagesBatchProgress');
@@ -1337,6 +1341,7 @@ async function checkImagesBatchQueue() {
     const delayMsRaw = parseInt(delayInput ? delayInput.value : '400', 10);
     const delayMs = Number.isFinite(delayMsRaw) ? Math.max(0, Math.min(delayMsRaw, 10000)) : 400;
 
+    checkImagesBatchQueue._running = true;
     if (progress) progress.style.display = 'block';
     if (progressBar) {
         progressBar.style.animation = 'none';
@@ -1345,39 +1350,43 @@ async function checkImagesBatchQueue() {
     if (progressText) progressText.textContent = `0 / ${urls.length}`;
 
     const results = [];
-    for (let i = 0; i < urls.length; i += 1) {
-        const imageUrl = urls[i];
-        try {
-            const response = await fetch(`${API_BASE}/api/images/check`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'same-origin',
-                body: JSON.stringify({
-                    provider,
-                    model,
-                    image_url: imageUrl,
-                    image_data_url: null
-                })
-            });
-            const data = await response.json();
-            if (!data.success) {
-                results.push({ url: imageUrl, success: false, error: data.error || 'Request failed' });
-                if (response.status === 401) {
-                    throw new Error(data.error || 'Set API token first');
+    try {
+        for (let i = 0; i < urls.length; i += 1) {
+            const imageUrl = urls[i];
+            try {
+                const response = await fetch(`${API_BASE}/api/images/check`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        provider,
+                        model,
+                        image_url: imageUrl,
+                        image_data_url: null
+                    })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    results.push({ url: imageUrl, success: false, error: data.error || 'Request failed' });
+                    if (response.status === 401) {
+                        throw new Error(data.error || 'Set API token first');
+                    }
+                } else {
+                    results.push({ url: imageUrl, success: true, result: data.result });
                 }
-            } else {
-                results.push({ url: imageUrl, success: true, result: data.result });
+            } catch (error) {
+                results.push({ url: imageUrl, success: false, error: error.message });
             }
-        } catch (error) {
-            results.push({ url: imageUrl, success: false, error: error.message });
-        }
 
-        const completed = i + 1;
-        if (progressBar) progressBar.style.width = `${Math.round((completed / urls.length) * 100)}%`;
-        if (progressText) progressText.textContent = `${completed} / ${urls.length}`;
-        if (completed < urls.length && delayMs > 0) {
-            await sleepMs(delayMs);
+            const completed = i + 1;
+            if (progressBar) progressBar.style.width = `${Math.round((completed / urls.length) * 100)}%`;
+            if (progressText) progressText.textContent = `${completed} / ${urls.length}`;
+            if (completed < urls.length && delayMs > 0) {
+                await sleepMs(delayMs);
+            }
         }
+    } finally {
+        checkImagesBatchQueue._running = false;
     }
 
     currentResults.imagesBatch = results;
