@@ -358,10 +358,12 @@ function initKeyboardShortcuts() {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             e.preventDefault();
             const tab = getActiveTabName();
-            if (tab === 'text')  checkText();
-            else if (tab === 'url')   checkUrl();
-            else if (tab === 'batch') checkBatch();
-            else if (tab === 'word')  checkWord();
+            if (tab === 'text')    checkText();
+            else if (tab === 'url')    checkUrl();
+            else if (tab === 'batch')  checkBatch();
+            else if (tab === 'word')   checkWord();
+            else if (tab === 'images') checkImagesByDatabase();
+            else if (tab === 'multi')  runMultiScan();
         }
     });
 }
