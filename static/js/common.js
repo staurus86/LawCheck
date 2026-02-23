@@ -23,14 +23,17 @@ document.addEventListener('DOMContentLoaded', function () {
     var icon = document.getElementById('darkModeIcon');
     if (icon) icon.textContent = saved === 'dark' ? '☀️' : '🌙';
 
-    // ─── Кнопка «Вернуться наверх» ─────────────────────────────────────────
-    var topBtn = document.createElement('button');
-    topBtn.className = 'back-to-top';
-    topBtn.textContent = '↑';
-    topBtn.title = 'Наверх';
-    topBtn.setAttribute('aria-label', 'Вернуться наверх');
-    topBtn.onclick = function () { window.scrollTo({ top: 0, behavior: 'smooth' }); };
-    document.body.appendChild(topBtn);
+    // ─── Кнопка «Вернуться наверх» (создаём только если нет статичной #backToTop) ──
+    var topBtn = document.getElementById('backToTop');
+    if (!topBtn) {
+        topBtn = document.createElement('button');
+        topBtn.className = 'back-to-top';
+        topBtn.textContent = '↑';
+        topBtn.title = 'Наверх';
+        topBtn.setAttribute('aria-label', 'Вернуться наверх');
+        topBtn.onclick = function () { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        document.body.appendChild(topBtn);
+    }
     window.addEventListener('scroll', function () {
         topBtn.classList.toggle('visible', window.scrollY > 350);
     }, { passive: true });
