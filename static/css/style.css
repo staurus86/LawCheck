@@ -2977,3 +2977,53 @@ mark.hl-unknown  { background: #fff9c4; color: #f57f17; border-radius: 3px; padd
 [data-theme="dark"] .knowledge-card:hover,
 [data-theme="dark"] .workflow-step:hover,
 [data-theme="dark"] .audience-card:hover { box-shadow: 0 18px 28px -12px rgba(0,0,0,0.5); }
+
+/* ─── Раунд 2: card-header, deep-check, highlight, misc ─── */
+
+/* card-header: добавлен белый градиент в визуальном слое — переопределяем */
+[data-theme="dark"] .card-header {
+    background: linear-gradient(180deg, #1E293B 0%, #162032 100%);
+    border-color: var(--divider);
+}
+
+/* tab-btn: аналогично — визуальный слой добавил белый градиент */
+[data-theme="dark"] .tab-btn {
+    background: linear-gradient(180deg, #1E293B 0%, #162032 100%);
+    border-color: #334155;
+    color: var(--text-primary);
+}
+
+/* result-box */
+[data-theme="dark"] .result-box { background: #162032; }
+
+/* Deep check */
+[data-theme="dark"] .deep-check-results {
+    background: linear-gradient(135deg, #0c1e3a 0%, #162032 100%);
+    border-left-color: #3B82F6;
+}
+[data-theme="dark"] .deep-check-results h3 { color: #93C5FD; }
+[data-theme="dark"] .deep-valid   { background: #052e16; color: #86EFAC; }
+[data-theme="dark"] .deep-abbr    { background: #2e1065; color: #C4B5FD; }
+[data-theme="dark"] .deep-invalid { background: #2D0F0F; color: #FCA5A5; }
+[data-theme="dark"] .deep-section { background: #162032; }
+[data-theme="dark"] .deep-section.abbreviation { background: #2e1065; border-left-color: #8B5CF6; }
+[data-theme="dark"] .deep-section.batch { background: #0c1e3a; border-left-color: #3B82F6; }
+[data-theme="dark"] .deep-subsection { border-bottom-color: #334155; }
+
+/* Image db summary */
+[data-theme="dark"] .image-db-summary { background: #1E293B; border-color: #334155; }
+
+/* Задизейбленные поля в мультискане */
+[data-theme="dark"] #multiscan-tab .form-textarea:disabled,
+[data-theme="dark"] #multiscan-tab .form-input:disabled { background: #162032; color: #64748B; }
+
+/* Highlight overlay legend */
+[data-theme="dark"] .highlight-legend { border-bottom-color: #334155; }
+
+/* Inline highlight marks в тёмной теме */
+[data-theme="dark"] mark.hl-critical { background: #7F1D1D; color: #FCA5A5; }
+[data-theme="dark"] mark.hl-latin    { background: #78350F; color: #FED7AA; }
+[data-theme="dark"] mark.hl-unknown  { background: #713F12; color: #FEF08A; }
+[data-theme="dark"] .hl-critical-badge { background: #7F1D1D; color: #FCA5A5; }
+[data-theme="dark"] .hl-latin-badge    { background: #78350F; color: #FED7AA; }
+[data-theme="dark"] .hl-unknown-badge  { background: #713F12; color: #FEF08A; }
