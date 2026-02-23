@@ -2638,3 +2638,164 @@ mark.hl-unknown  { background: #fff9c4; color: #f57f17; border-radius: 3px; padd
 [data-theme="dark"] .cta-box p  { color: #60A5FA; }
 [data-theme="dark"] .pricing-card h3 { color: #93C5FD; }
 [data-theme="dark"] .audience-card { border-left-width: 4px; }
+
+/* ═══════════════════════════════════════════════════════
+   ── Визуальный редизайн — второй слой ─────────────────
+   ═══════════════════════════════════════════════════════ */
+
+/* Stat-cards — иконки + выравнивание */
+.stat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+.stat-icon {
+    font-size: 1.75rem;
+    margin-bottom: 0.5rem;
+    line-height: 1;
+    opacity: 0.92;
+}
+
+/* Page-hero — радиальный гlow + лучше subtitle */
+.page-hero {
+    background: linear-gradient(135deg, #0D3A8C 0%, #1557C0 55%, #1565C0 100%);
+    position: relative;
+    overflow: hidden;
+}
+.page-hero::before {
+    content: '';
+    position: absolute;
+    top: -60%; right: -10%;
+    width: 520px; height: 520px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.09), transparent 68%);
+    pointer-events: none;
+}
+.page-hero::after {
+    content: '';
+    position: absolute;
+    bottom: -40%; left: -5%;
+    width: 380px; height: 380px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(96,165,250,0.12), transparent 68%);
+    pointer-events: none;
+}
+.page-hero .container { position: relative; z-index: 1; }
+.page-hero-title { text-shadow: 0 2px 16px rgba(0,0,0,0.25); }
+.page-hero-subtitle { opacity: 0.88; max-width: 680px; }
+
+/* content-page h2 — акцентная полоска слева */
+.content-page h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    border-bottom: 1px solid #EEF2FF;
+    padding-bottom: 0.45rem;
+    color: #0F172A;
+}
+.content-page h2::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 1.15em;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #3B82F6, #2563EB);
+    flex-shrink: 0;
+}
+
+/* API — endpoint карточки */
+.endpoint-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin: 0.75rem 0 1.25rem;
+}
+.endpoint-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 0.65rem 1rem;
+    transition: background 0.15s, border-color 0.15s;
+}
+.endpoint-item:hover { background: #EFF6FF; border-color: #BFDBFE; }
+.method-badge {
+    flex-shrink: 0;
+    width: 50px;
+    text-align: center;
+    padding: 0.22rem 0;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    font-family: Consolas, monospace;
+}
+.method-post { background: #DBEAFE; color: #1D4ED8; }
+.method-get  { background: #DCFCE7; color: #166534; }
+.endpoint-path {
+    font-family: Consolas, monospace;
+    font-size: 0.88rem;
+    color: #0D47A1;
+    flex-shrink: 0;
+    min-width: 200px;
+}
+.endpoint-desc { color: #475569; font-size: 0.88rem; line-height: 1.4; }
+
+/* 404 / 500 — декоративный большой код */
+.error-visual {
+    text-align: center;
+    margin-bottom: 1.75rem;
+    padding-top: 0.5rem;
+}
+.error-code {
+    display: block;
+    font-size: clamp(4rem, 12vw, 7rem);
+    font-weight: 900;
+    line-height: 1;
+    background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.25rem;
+    letter-spacing: -0.02em;
+}
+.error-emoji { font-size: 2.25rem; display: block; margin-bottom: 0.5rem; }
+.error-visual + p { text-align: center; font-size: 1.05rem; color: #475569; }
+
+/* Formats-box — цветные теги */
+.formats-box .word-tag {
+    background: linear-gradient(135deg, #EFF6FF, #E8F4FD);
+    border-color: #BFDBFE;
+    color: #1D4ED8;
+    font-weight: 500;
+}
+.formats-box .word-tag:hover { background: #DBEAFE; border-color: #93C5FD; }
+
+/* Pricing badge */
+.pricing-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #3B82F6, #2563EB);
+    color: white;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    margin-bottom: 0.25rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* Dark mode для нового слоя */
+[data-theme="dark"] .endpoint-item { background: #1E293B; border-color: #334155; }
+[data-theme="dark"] .endpoint-item:hover { background: #243050; border-color: #3B82F6; }
+[data-theme="dark"] .endpoint-path { color: #93C5FD; }
+[data-theme="dark"] .endpoint-desc { color: #94A3B8; }
+[data-theme="dark"] .method-post { background: #1e3a8a; color: #93C5FD; }
+[data-theme="dark"] .method-get  { background: #14532d; color: #86EFAC; }
+[data-theme="dark"] .error-code { background: linear-gradient(135deg, #60A5FA, #A78BFA); -webkit-background-clip: text; background-clip: text; }
+[data-theme="dark"] .error-visual + p { color: #94A3B8; }
+[data-theme="dark"] .content-page h2 { color: #F1F5F9; border-bottom-color: #334155; }
+[data-theme="dark"] .formats-box .word-tag { background: #1e3a8a; border-color: #2563EB; color: #93C5FD; }

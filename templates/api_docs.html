@@ -69,17 +69,53 @@
                     </ol>
 
                     <h2>Endpoints</h2>
-                    <ul class="feature-list">
-                        <li><code>POST /api/check</code> — проверка текста, возвращает нарушения и статистику.</li>
-                        <li><code>POST /api/check-url</code> — загружает страницу по URL и проверяет её текст.</li>
-                        <li><code>POST /api/batch-check</code> — пакетная проверка списка URL (до 500).</li>
-                        <li><code>POST /api/deep-check</code> — детальный анализ слов: формы, типы, замены.</li>
-                        <li><code>POST /api/images/ocr</code> — OCR изображения через выбранного провайдера.</li>
-                        <li><code>POST /api/images/check</code> — OCR + языковая проверка за один запрос.</li>
-                        <li><code>POST /api/multiscan/run</code> — сканирует сайт или список URL (HTML/PDF/изображения).</li>
-                        <li><code>GET /api/metrics</code> — счётчики событий и ошибок сервиса.</li>
-                        <li><code>GET /api/run-history</code> — история последних запусков проверок.</li>
-                    </ul>
+                    <div class="endpoint-list">
+                        <div class="endpoint-item">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="endpoint-path">/api/check</code>
+                            <span class="endpoint-desc">проверка текста — возвращает нарушения и статистику</span>
+                        </div>
+                        <div class="endpoint-item">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="endpoint-path">/api/check-url</code>
+                            <span class="endpoint-desc">загружает страницу по URL и проверяет её текст</span>
+                        </div>
+                        <div class="endpoint-item">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="endpoint-path">/api/batch-check</code>
+                            <span class="endpoint-desc">пакетная проверка списка URL (до 500)</span>
+                        </div>
+                        <div class="endpoint-item">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="endpoint-path">/api/deep-check</code>
+                            <span class="endpoint-desc">детальный анализ слов: формы, типы, замены</span>
+                        </div>
+                        <div class="endpoint-item">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="endpoint-path">/api/images/ocr</code>
+                            <span class="endpoint-desc">OCR изображения через выбранного провайдера</span>
+                        </div>
+                        <div class="endpoint-item">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="endpoint-path">/api/images/check</code>
+                            <span class="endpoint-desc">OCR + языковая проверка за один запрос</span>
+                        </div>
+                        <div class="endpoint-item">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="endpoint-path">/api/multiscan/run</code>
+                            <span class="endpoint-desc">сканирует сайт или список URL (HTML/PDF/изображения)</span>
+                        </div>
+                        <div class="endpoint-item">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="endpoint-path">/api/metrics</code>
+                            <span class="endpoint-desc">счётчики событий и ошибок сервиса</span>
+                        </div>
+                        <div class="endpoint-item">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="endpoint-path">/api/run-history</code>
+                            <span class="endpoint-desc">история последних запусков проверок</span>
+                        </div>
+                    </div>
 
                     <h2>Пример запроса</h2>
                     <pre class="api-code">curl -X POST "https://lawcheck-production.up.railway.app/api/check" \
