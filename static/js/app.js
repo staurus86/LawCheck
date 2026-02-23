@@ -816,6 +816,7 @@ async function checkBatch() {
         currentResults.batch = results;
         currentDeepResults.batch = null;
         displayBatchResults(results);
+        notifyCheckComplete('Пакетная проверка завершена', `Проверено ${results.length} сайтов`);
         console.log('✅ Пакетная проверка завершена:', results);
     } catch (error) {
         progressFill.style.animation = 'none';
@@ -1597,6 +1598,7 @@ async function runMultiScan() {
         currentResults.multi = data;
         currentDeepResults.multi = null;
         displayMultiResults(data);
+        notifyCheckComplete('Мульти-скан завершён', `Проверено ${data.total || 0} ресурсов`);
         const tokenInput = document.getElementById('multiTokenInput');
         if (tokenInput) tokenInput.value = '';
         await loadMultiTokenStatus();
@@ -2111,6 +2113,9 @@ function displayResults(type, result, url = '') {
     
     resultsContent.innerHTML = html;
     resultsCard.style.display = 'block';
+    // Метка времени последней проверки в заголовке карточки
+    const tsEl = resultsCard.querySelector('.card-header .check-timestamp');
+    if (tsEl) tsEl.textContent = `Проверено: ${new Date().toLocaleTimeString('ru-RU')}`;
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -2219,6 +2224,7 @@ function displayBatchResults(results) {
                     <span class="batch-icon">${statusIcon}</span>
                     <span class="batch-number">[${index + 1}]</span>
                     <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
+                    <button class="batch-copy-url-btn" data-copy-url="${escAttr(item.url)}" title="Скопировать URL">📋</button>
                     ${hasDetails ? `
                         <button class="batch-details-btn" id="batch-btn-${index}" onclick="toggleBatchDetails(${index})">
                             Показать детали
@@ -3182,6 +3188,18 @@ function hideLoading() {
     }
 }
 
+// === Browser notifications для долгих проверок ===
+function notifyCheckComplete(title, body) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+        new Notification(title, { body, icon: '/favicon.ico' });
+    } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(perm => {
+            if (perm === 'granted') new Notification(title, { body });
+        });
+    }
+}
+
 // === История недавних слов (word-tab) ===
 const WORD_HISTORY_KEY = 'lawchecker.wordHistory';
 const WORD_HISTORY_MAX = 10;
@@ -3221,7 +3239,7 @@ function clearWordHistory() {
     renderWordHistory();
 }
 
-// Делегирование кликов для word history
+// Делегирование кликов для word history + batch copy url
 document.addEventListener('click', (e) => {
     const removeBtn = e.target.closest('.chip-remove[data-remove]');
     if (removeBtn) {
@@ -3234,6 +3252,15 @@ document.addEventListener('click', (e) => {
         const word = chip.dataset.recheck;
         const inp = document.getElementById('wordInput');
         if (inp) { inp.value = word; checkWord(); }
+        return;
+    }
+    const copyUrlBtn = e.target.closest('.batch-copy-url-btn[data-copy-url]');
+    if (copyUrlBtn) {
+        const url = copyUrlBtn.dataset.copyUrl;
+        navigator.clipboard.writeText(url).then(
+            () => showToast('URL скопирован', 'success', 2000),
+            () => showToast('Не удалось скопировать', 'error')
+        );
         return;
     }
 });
