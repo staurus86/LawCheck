@@ -3324,6 +3324,17 @@ function updateBatchEmptyState() {
 
 // Горячие клавиши
 document.addEventListener('keydown', (e) => {
+    // ? — показать подсказки горячих клавиш (только если не в поле ввода)
+    if (e.key === '?' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const active = document.activeElement;
+        const inInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
+        if (!inInput) { e.preventDefault(); toggleKeyboardHelpModal(); return; }
+    }
+    // Escape — закрыть модальные окна
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('keyboardHelpModal');
+        if (modal && modal.style.display !== 'none') { closeKeyboardHelpModal(); return; }
+    }
     if (!(e.ctrlKey && e.key === 'Enter')) return;
 
     const activeTab = getActiveTabName();
@@ -3333,3 +3344,46 @@ document.addEventListener('keydown', (e) => {
     if (activeTab === 'word') return checkWord();
     if (activeTab === 'images') return checkExtractedImageText();
 });
+
+// Модальное окно с горячими клавишами
+function toggleKeyboardHelpModal() {
+    const modal = document.getElementById('keyboardHelpModal');
+    if (!modal) return;
+    const isVisible = modal.style.display !== 'none';
+    if (isVisible) closeKeyboardHelpModal(); else openKeyboardHelpModal();
+}
+function openKeyboardHelpModal() {
+    let modal = document.getElementById('keyboardHelpModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'keyboardHelpModal';
+        modal.className = 'kb-modal-overlay';
+        modal.innerHTML = `
+            <div class="kb-modal" role="dialog" aria-modal="true" aria-label="Горячие клавиши">
+                <div class="kb-modal-header">
+                    <h3>⌨️ Горячие клавиши</h3>
+                    <button class="kb-modal-close" onclick="closeKeyboardHelpModal()" title="Закрыть">✕</button>
+                </div>
+                <div class="kb-modal-body">
+                    <table class="kb-table">
+                        <tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>Запустить проверку (активная вкладка)</td></tr>
+                        <tr><td><kbd>?</kbd></td><td>Показать это окно</td></tr>
+                        <tr><td><kbd>Esc</kbd></td><td>Закрыть это окно</td></tr>
+                        <tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Вставить текст (кнопка «Вставить»)</td></tr>
+                    </table>
+                    <p class="kb-modal-hint">Вкладки: Текст, URL, Пакетная, Слово, Изображения, Мульти</p>
+                </div>
+            </div>
+        `;
+        modal.addEventListener('click', e => { if (e.target === modal) closeKeyboardHelpModal(); });
+        document.body.appendChild(modal);
+    }
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => modal.classList.add('kb-visible'));
+}
+function closeKeyboardHelpModal() {
+    const modal = document.getElementById('keyboardHelpModal');
+    if (!modal) return;
+    modal.classList.remove('kb-visible');
+    setTimeout(() => { if (modal) modal.style.display = 'none'; }, 220);
+}

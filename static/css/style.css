@@ -3703,6 +3703,73 @@ label.text-muted {
     margin-top: 0.1rem;
 }
 
+/* Модальное окно горячих клавиш */
+.kb-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 20000;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.22s ease;
+}
+.kb-modal-overlay.kb-visible { opacity: 1; }
+.kb-modal {
+    background: var(--surface, white);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    max-width: 480px;
+    width: 92%;
+    overflow: hidden;
+    transform: scale(0.96) translateY(8px);
+    transition: transform 0.22s ease;
+}
+.kb-modal-overlay.kb-visible .kb-modal { transform: scale(1) translateY(0); }
+.kb-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem 0.75rem;
+    border-bottom: 1px solid #E2E8F0;
+}
+.kb-modal-header h3 { margin: 0; font-size: 1.05rem; }
+.kb-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    cursor: pointer;
+    color: #64748B;
+    padding: 0.2rem 0.4rem;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+.kb-modal-close:hover { background: #F1F5F9; }
+.kb-modal-body { padding: 1rem 1.25rem 1.25rem; }
+.kb-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.kb-table td { padding: 0.45rem 0.5rem; vertical-align: middle; }
+.kb-table td:first-child { white-space: nowrap; padding-right: 1.25rem; }
+.kb-table tr:nth-child(even) td { background: #F8FAFC; border-radius: 6px; }
+.kb-table kbd {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    background: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    border-radius: 5px;
+    font-size: 0.82rem;
+    font-family: monospace;
+    color: #334155;
+    box-shadow: 0 1px 0 #CBD5E1;
+}
+.kb-modal-hint { font-size: 0.8rem; color: #94A3B8; margin: 0.75rem 0 0; }
+[data-theme="dark"] .kb-modal { background: #1E293B; }
+[data-theme="dark"] .kb-modal-header { border-color: #334155; }
+[data-theme="dark"] .kb-table tr:nth-child(even) td { background: #0F172A; }
+[data-theme="dark"] .kb-table kbd { background: #334155; border-color: #475569; color: #CBD5E1; box-shadow: 0 1px 0 #475569; }
+[data-theme="dark"] .kb-modal-close:hover { background: #334155; }
+
+
 
 
 
