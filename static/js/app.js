@@ -371,7 +371,7 @@ function initBackToTop() {
     onScroll();
 }
 
-// Inline-валидация поля URL
+// Inline-валидация поля URL + автодобавление https://
 function initUrlValidation() {
     const urlInput = document.getElementById('urlInput');
     if (!urlInput) return;
@@ -383,7 +383,14 @@ function initUrlValidation() {
         urlInput.classList.toggle('input-valid', valid && !empty);
     }, 250);
     urlInput.addEventListener('input', validate);
-    urlInput.addEventListener('blur', validate);
+    urlInput.addEventListener('blur', () => {
+        let val = urlInput.value.trim();
+        // Автодобавление https:// если введён домен без протокола
+        if (val && val !== 'https://' && !/^https?:\/\//.test(val) && /\.[a-z]{2,}/.test(val)) {
+            urlInput.value = 'https://' + val;
+        }
+        validate();
+    });
 }
 
 // Печать конкретной карточки результатов
