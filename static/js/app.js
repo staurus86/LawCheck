@@ -3062,7 +3062,8 @@ function displayDeepResults(type, results) {
                 ? `<span class="word-suggestions">→ ${r.suggestions.slice(0, 3).join(', ')}</span>` : '';
             return `<span class="word-tag invalid" data-word="${escAttr(r.word)}" title="Нажмите, чтобы скопировать">${r.word}${sug}</span>`;
         });
-        html += `<div class="deep-section invalid"><h4>❓ Требуют замены (${invalidWords.length})</h4>${renderDeepTagList(tags, 30)}</div>`;
+        const copyInvalidBtn = `<button class="btn btn-sm btn-secondary" style="margin-left:auto;font-size:0.8rem" onclick="copyDeepInvalid('${escAttr(type)}')" title="Скопировать все слова, требующие замены">📋 Копировать (${invalidWords.length})</button>`;
+        html += `<div class="deep-section invalid"><h4 style="display:flex;align-items:center;gap:0.5rem">❓ Требуют замены (${invalidWords.length})${copyInvalidBtn}</h4>${renderDeepTagList(tags, 30)}</div>`;
     }
 
     html += '</div>';
@@ -3265,6 +3266,19 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// === Копирование невалидных слов из deep check ===
+function copyDeepInvalid(type) {
+    const deep = currentDeepResults[type];
+    if (!deep) { showToast('Нет данных', 'warning'); return; }
+    const deepResults = (deep.deepResults) || (Array.isArray(deep) ? deep : []);
+    const invalid = deepResults.filter(r => !r.is_valid).map(r => r.word);
+    if (!invalid.length) { showToast('Нет слов для копирования', 'info'); return; }
+    navigator.clipboard.writeText(invalid.join(', ')).then(
+        () => showToast(`Скопировано ${invalid.length} слов`, 'success'),
+        () => showToast('Не удалось скопировать', 'error')
+    );
+}
+
 // === Копирование всех нарушений в буфер ===
 function copyViolationsList(type) {
     const result = currentResults[type];
@@ -3324,6 +3338,12 @@ function updateBatchEmptyState() {
 
 // Горячие клавиши
 document.addEventListener('keydown', (e) => {
+    // Alt+1-6 — переключение вкладок
+    if (e.altKey && !e.ctrlKey && !e.metaKey) {
+        const tabMap = { '1':'text', '2':'url', '3':'batch', '4':'word', '5':'images', '6':'multi' };
+        const tabName = tabMap[e.key];
+        if (tabName) { e.preventDefault(); switchTab(tabName); return; }
+    }
     // ? — показать подсказки горячих клавиш (только если не в поле ввода)
     if (e.key === '?' && !e.ctrlKey && !e.altKey && !e.metaKey) {
         const active = document.activeElement;
@@ -3367,11 +3387,11 @@ function openKeyboardHelpModal() {
                 <div class="kb-modal-body">
                     <table class="kb-table">
                         <tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>Запустить проверку (активная вкладка)</td></tr>
+                        <tr><td><kbd>Alt</kbd>+<kbd>1</kbd>…<kbd>6</kbd></td><td>Переключить вкладку (Текст/URL/Пакет/Слово/Фото/Мульти)</td></tr>
                         <tr><td><kbd>?</kbd></td><td>Показать это окно</td></tr>
                         <tr><td><kbd>Esc</kbd></td><td>Закрыть это окно</td></tr>
-                        <tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Вставить текст (кнопка «Вставить»)</td></tr>
                     </table>
-                    <p class="kb-modal-hint">Вкладки: Текст, URL, Пакетная, Слово, Изображения, Мульти</p>
+                    <p class="kb-modal-hint">Горячие клавиши не работают когда фокус в поле ввода</p>
                 </div>
             </div>
         `;

@@ -3370,6 +3370,11 @@ label.text-muted {
     background: #F8FAFC;
     border: 1px solid #E2E8F0;
     border-radius: 10px;
+    position: sticky;
+    top: 72px;
+    z-index: 50;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 [data-theme="dark"] .batch-toolbar {
     background: #0F172A;
