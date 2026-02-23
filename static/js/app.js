@@ -11,12 +11,30 @@ function debounce(fn, delay) {
     };
 }
 
-// Копирование слова по клику на тег
+// Копирование слова по клику на тег (вызывается через делегирование)
 function copyWordTag(word) {
     navigator.clipboard.writeText(word).then(
         () => showToast(`Скопировано: «${word}»`, 'success'),
         () => {}
     );
+}
+
+// Делегированный обработчик кликов по word-tag (безопасно — без inline JS с аргументом)
+document.addEventListener('click', (e) => {
+    const tag = e.target.closest('.word-tag[data-word]');
+    if (!tag) return;
+    const word = tag.dataset.word;
+    if (word) copyWordTag(word);
+});
+
+// Вспомогательная функция: экранирование для HTML-атрибута
+function escAttr(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
 
 // Раскрывающийся список слов со спойлером
@@ -27,12 +45,12 @@ function renderWordList(words, limit, tagClass = '', transform = null) {
     const shown = words.slice(0, limit);
     const hidden = words.slice(limit);
     let html = '<div class="word-list">';
-    // Клик по тегу копирует оригинальное слово в буфер
-    html += shown.map(w => `<span class="word-tag ${tagClass}" onclick="copyWordTag('${w.replace(/'/g,"\\'")}') " title="Нажмите, чтобы скопировать">${t(w)}</span>`).join('');
+    // data-word хранит оригинальное слово; клик обрабатывается делегированием
+    html += shown.map(w => `<span class="word-tag ${tagClass}" data-word="${escAttr(w)}" title="Нажмите, чтобы скопировать">${t(w)}</span>`).join('');
     if (hidden.length > 0) {
         const uid = 'ws' + Math.random().toString(36).slice(2, 9);
         html += `<span class="word-spoiler-hidden" id="${uid}" style="display:none">`;
-        html += hidden.map(w => `<span class="word-tag ${tagClass}" onclick="copyWordTag('${w.replace(/'/g,"\\'")}') " title="Нажмите, чтобы скопировать">${t(w)}</span>`).join('');
+        html += hidden.map(w => `<span class="word-tag ${tagClass}" data-word="${escAttr(w)}" title="Нажмите, чтобы скопировать">${t(w)}</span>`).join('');
         html += `</span>`;
         html += `<button class="spoiler-toggle-btn" onclick="toggleWordSpoiler(this,'${uid}',${hidden.length})">▼ Показать ещё ${hidden.length}</button>`;
     }
@@ -2172,6 +2190,9 @@ function displayBatchResults(results) {
                 <button class="batch-filter-btn success" data-filter="ok" onclick="filterBatchItems('ok', this)">✅ OK (${successful - totalViolations})</button>
                 ${results.length - successful > 0 ? `<button class="batch-filter-btn error" data-filter="errors" onclick="filterBatchItems('errors', this)">❌ Ошибки (${results.length - successful})</button>` : ''}
             </div>
+            <div class="batch-search-group">
+                <input type="search" id="batchSearch" class="batch-search-input" placeholder="Поиск по URL…" oninput="searchBatchItems(this.value)">
+            </div>
             <div class="batch-expand-group">
                 <button class="batch-filter-btn" onclick="expandAllBatchDetails(true)">Раскрыть все</button>
                 <button class="batch-filter-btn" onclick="expandAllBatchDetails(false)">Свернуть все</button>
@@ -2183,21 +2204,44 @@ function displayBatchResults(results) {
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+// Поиск batch-элементов по URL
+function searchBatchItems(query) {
+    const q = (query || '').toLowerCase().trim();
+    document.querySelectorAll('.batch-item').forEach(item => {
+        const urlEl = item.querySelector('.batch-url');
+        const urlText = urlEl ? (urlEl.textContent || urlEl.href || '').toLowerCase() : '';
+        item.dataset.searchHidden = q && !urlText.includes(q) ? '1' : '';
+        // Переприменяем текущий фильтр
+        const activeFilter = document.querySelector('.batch-filter-btn.active');
+        const filter = activeFilter ? activeFilter.dataset.filter : 'all';
+        applyBatchVisibility(item, filter);
+    });
+}
+
 // Фильтрация batch-элементов по статусу
 function filterBatchItems(filter, btn) {
     document.querySelectorAll('.batch-filter-btn').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
+    // Сбрасываем поиск при смене фильтра
+    const searchInput = document.getElementById('batchSearch');
+    if (searchInput) searchInput.value = '';
     document.querySelectorAll('.batch-item').forEach(item => {
-        if (filter === 'all') {
-            item.style.display = '';
-        } else if (filter === 'violations') {
-            item.style.display = (item.classList.contains('warning') || item.classList.contains('critical')) ? '' : 'none';
-        } else if (filter === 'ok') {
-            item.style.display = item.classList.contains('success') ? '' : 'none';
-        } else if (filter === 'errors') {
-            item.style.display = item.classList.contains('error') ? '' : 'none';
-        }
+        item.dataset.searchHidden = '';
+        applyBatchVisibility(item, filter);
     });
+}
+
+function applyBatchVisibility(item, filter) {
+    if (item.dataset.searchHidden === '1') { item.style.display = 'none'; return; }
+    if (filter === 'all') {
+        item.style.display = '';
+    } else if (filter === 'violations') {
+        item.style.display = (item.classList.contains('warning') || item.classList.contains('critical')) ? '' : 'none';
+    } else if (filter === 'ok') {
+        item.style.display = item.classList.contains('success') ? '' : 'none';
+    } else if (filter === 'errors') {
+        item.style.display = item.classList.contains('error') ? '' : 'none';
+    }
 }
 
 // Раскрыть/свернуть все детали batch
@@ -2774,12 +2818,26 @@ function displayBatchDeepResults(results, deepResults, urlMap) {
 }
 
 // Отображение результатов глубокой проверки
+// Рендер списка deep-check тегов (НЕ использует renderWordList — теги уже HTML)
+function renderDeepTagList(items, limit) {
+    if (!items.length) return '<div class="word-list"></div>';
+    const shown = items.slice(0, limit);
+    const rest  = items.slice(limit);
+    let html = '<div class="word-list">' + shown.join('');
+    if (rest.length > 0) {
+        const uid = 'ws' + Math.random().toString(36).slice(2, 9);
+        html += `<span class="word-spoiler-hidden" id="${uid}" style="display:none">${rest.join('')}</span>`;
+        html += `<button class="spoiler-toggle-btn" onclick="toggleWordSpoiler(this,'${uid}',${rest.length})">▼ Показать ещё ${rest.length}</button>`;
+    }
+    return html + '</div>';
+}
+
 function displayDeepResults(type, results) {
     const resultsContent = document.getElementById(`${type}ResultsContent`);
 
     const abbreviations = results.filter(r => r.reasons.includes('abbreviation'));
-    const otherValid = results.filter(r => r.is_valid && !r.reasons.includes('abbreviation'));
-    const invalidWords = results.filter(r => !r.is_valid);
+    const otherValid    = results.filter(r => r.is_valid && !r.reasons.includes('abbreviation'));
+    const invalidWords  = results.filter(r => !r.is_valid);
 
     let html = `
         <div class="deep-check-results">
@@ -2792,41 +2850,31 @@ function displayDeepResults(type, results) {
     `;
 
     if (abbreviations.length > 0) {
-        const abbrHtml = abbreviations.map(r => `
-            <span class="word-tag abbr" title="${r.reasons.map(deepReasonLabel).join(', ')}">
-                ${r.word}
-                <span class="word-translation">→ ${r.suggestions?.join(', ') || 'перевод неизвестен'}</span>
-            </span>
-        `).join('');
-        const abbrWrap = abbreviations.length > 20
-            ? (() => { const uid='ws'+Math.random().toString(36).slice(2,9); const shownH=abbreviations.slice(0,20).map(r=>`<span class="word-tag abbr">${r.word}<span class="word-translation">→${r.suggestions?.join(', ')||'?'}</span></span>`).join(''); const hidH=abbreviations.slice(20).map(r=>`<span class="word-tag abbr" style="display:none" id="">  ${r.word}</span>`).join(''); return `<div class="word-list">${shownH}<span class="word-spoiler-hidden" id="${uid}" style="display:none">${hidH}</span><button class="spoiler-toggle-btn" onclick="toggleWordSpoiler(this,'${uid}',${abbreviations.length-20})">▼ Показать ещё ${abbreviations.length-20}</button></div>`; })()
-            : `<div class="word-list">${abbrHtml}</div>`;
-        html += `<div class="deep-section abbreviation"><h4>📚 Аббревиатуры (${abbreviations.length})</h4>${abbrWrap}</div>`;
+        const tags = abbreviations.map(r => {
+            const sug = (r.suggestions || []).join(', ') || 'перевод неизвестен';
+            const tip = escAttr(r.reasons.map(deepReasonLabel).join(', '));
+            return `<span class="word-tag abbr" data-word="${escAttr(r.word)}" title="${tip}">${r.word}<span class="word-translation">→ ${sug}</span></span>`;
+        });
+        html += `<div class="deep-section abbreviation"><h4>📚 Аббревиатуры (${abbreviations.length})</h4>${renderDeepTagList(tags, 20)}</div>`;
     }
 
     if (otherValid.length > 0) {
-        const validTags = otherValid.map(r => {
-            const label = r.reasons.map(deepReasonLabel).join(', ');
-            return `<span class="word-tag valid" title="${label}">${r.word}${r.normal_form && r.normal_form !== r.word.toLowerCase() ? `<span class="word-reason">(${r.normal_form})</span>` : ''}</span>`;
+        const tags = otherValid.map(r => {
+            const label = escAttr(r.reasons.map(deepReasonLabel).join(', '));
+            const norm  = r.normal_form && r.normal_form !== r.word.toLowerCase()
+                ? `<span class="word-reason">(${r.normal_form})</span>` : '';
+            return `<span class="word-tag valid" data-word="${escAttr(r.word)}" title="${label}">${r.word}${norm}</span>`;
         });
-        html += `
-            <div class="deep-section valid">
-                <h4>✅ Подтверждено (${otherValid.length})</h4>
-                ${renderWordList(validTags, 30, '', x => x)}
-            </div>
-        `;
+        html += `<div class="deep-section valid"><h4>✅ Подтверждено (${otherValid.length})</h4>${renderDeepTagList(tags, 30)}</div>`;
     }
 
     if (invalidWords.length > 0) {
-        const invalidTags = invalidWords.map(r =>
-            `<span class="word-tag invalid">${r.word}${r.suggestions?.length ? `<span class="word-suggestions">→ ${r.suggestions.slice(0,3).join(', ')}</span>` : ''}</span>`
-        );
-        html += `
-            <div class="deep-section invalid">
-                <h4>❓ Требуют замены (${invalidWords.length})</h4>
-                ${renderWordList(invalidTags, 30, '', x => x)}
-            </div>
-        `;
+        const tags = invalidWords.map(r => {
+            const sug = r.suggestions?.length
+                ? `<span class="word-suggestions">→ ${r.suggestions.slice(0, 3).join(', ')}</span>` : '';
+            return `<span class="word-tag invalid" data-word="${escAttr(r.word)}" title="Нажмите, чтобы скопировать">${r.word}${sug}</span>`;
+        });
+        html += `<div class="deep-section invalid"><h4>❓ Требуют замены (${invalidWords.length})</h4>${renderDeepTagList(tags, 30)}</div>`;
     }
 
     html += '</div>';

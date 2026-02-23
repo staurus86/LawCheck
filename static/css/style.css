@@ -3453,3 +3453,43 @@ label.text-muted {
     a[href]::after { content: " (" attr(href) ")"; font-size: 0.75em; color: #64748B; }
     a.batch-url::after { content: ""; }
 }
+
+/* chip-row теги в knowledge-cards — не кликабельные */
+.chip-row .word-tag {
+    cursor: default;
+    pointer-events: none;
+}
+.chip-row .word-tag:hover {
+    filter: none;
+    transform: none;
+}
+
+/* Batch search input в toolbar */
+.batch-search-group {
+    flex: 1;
+    min-width: 140px;
+    max-width: 280px;
+}
+.batch-search-input {
+    width: 100%;
+    padding: 0.3rem 0.75rem;
+    border: 1px solid #CBD5E1;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    background: white;
+    color: #334155;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.batch-search-input:focus {
+    border-color: #3B82F6;
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.12);
+}
+[data-theme="dark"] .batch-search-input {
+    background: #1E293B;
+    border-color: #334155;
+    color: #F1F5F9;
+}
+[data-theme="dark"] .batch-search-input:focus {
+    border-color: #3B82F6;
+}
