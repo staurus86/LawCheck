@@ -2799,3 +2799,84 @@ mark.hl-unknown  { background: #fff9c4; color: #f57f17; border-radius: 3px; padd
 [data-theme="dark"] .error-visual + p { color: #94A3B8; }
 [data-theme="dark"] .content-page h2 { color: #F1F5F9; border-bottom-color: #334155; }
 [data-theme="dark"] .formats-box .word-tag { background: #1e3a8a; border-color: #2563EB; color: #93C5FD; }
+
+/* ═══════════════════════════════════════════════════════
+   ── Визуальный редизайн — третий слой ─────────────────
+   ═══════════════════════════════════════════════════════ */
+
+/* «Вернуться наверх» */
+.back-to-top {
+    position: fixed;
+    bottom: 5.5rem; right: 1.5rem;
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 4px 14px rgba(59,130,246,0.45);
+    opacity: 0;
+    transform: translateY(12px) scale(0.88);
+    transition: opacity 0.3s ease, transform 0.3s ease, background 0.2s;
+    z-index: 997;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+.back-to-top.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+.back-to-top:hover {
+    background: var(--primary-dark);
+    transform: translateY(-3px) scale(1.08) !important;
+    box-shadow: 0 8px 22px rgba(59,130,246,0.6);
+}
+[data-theme="dark"] .back-to-top { box-shadow: 0 4px 14px rgba(37,99,235,0.65); }
+
+/* Кнопка копирования кода */
+.api-code-wrapper { position: relative; }
+.api-code-wrapper .api-code { margin-top: 0; }
+.copy-code-btn {
+    position: absolute;
+    top: 0.55rem; right: 0.55rem;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 6px;
+    color: #93C5FD;
+    font-size: 0.72rem;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    padding: 0.22rem 0.65rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    line-height: 1.7;
+    letter-spacing: 0.02em;
+}
+.copy-code-btn:hover { background: rgba(255,255,255,0.22); color: #fff; }
+.copy-code-btn.copied { color: #4CAF50; border-color: rgba(76,175,80,0.55); }
+
+/* Усиленное кольцо фокуса */
+.form-textarea:focus,
+.form-input:focus {
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.18);
+}
+[data-theme="dark"] .form-textarea:focus,
+[data-theme="dark"] .form-input:focus {
+    box-shadow: 0 0 0 3px rgba(96,165,250,0.28);
+}
+
+/* Акцентная линия подвала */
+.footer { border-top: 3px solid var(--primary); }
+.footer-section ul li { margin-bottom: 0.4rem; }
+.footer-section p { margin-bottom: 0.4rem; font-size: 0.9rem; color: rgba(255,255,255,0.72); }
+
+/* Адаптив для back-to-top */
+@media (max-width: 768px) {
+    .back-to-top { bottom: 4rem; right: 1rem; width: 38px; height: 38px; font-size: 1.1rem; }
+}

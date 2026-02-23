@@ -32,7 +32,7 @@
 						<a href="/api/stats" class="nav-link" target="_blank">Статистика</a>
 					</nav>
 					<button class="dark-toggle" id="darkModeToggle" onclick="toggleDarkMode()" title="Тёмная тема">
-						<i class="fas fa-moon" id="darkModeIcon"></i>
+						<span id="darkModeIcon">🌙</span>
 					</button>
             </div>
         </div>
@@ -804,6 +804,7 @@
     </div>
 
     <div id="toastContainer"></div>
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

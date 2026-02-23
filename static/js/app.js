@@ -187,13 +187,13 @@ function toggleDarkMode() {
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('lawchecker.theme', next);
     const icon = document.getElementById('darkModeIcon');
-    if (icon) icon.className = next === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    if (icon) icon.textContent = next === 'dark' ? '☀️' : '🌙';
 }
 function initTheme() {
     const saved = localStorage.getItem('lawchecker.theme') || 'light';
     document.documentElement.setAttribute('data-theme', saved);
     const icon = document.getElementById('darkModeIcon');
-    if (icon) icon.className = saved === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    if (icon) icon.textContent = saved === 'dark' ? '☀️' : '🌙';
 }
 
 // ── Toast уведомления ──────────────────────────────────────────
