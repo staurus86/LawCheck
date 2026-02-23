@@ -321,6 +321,7 @@
                                 Проверить
                             </button>
                         </div>
+                        <div id="wordHistory" class="word-history"></div>
                     </div>
                 </div>
 
@@ -846,6 +847,7 @@
     </div>
 
     <div id="toastContainer"></div>
+    <button id="backToTop" class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Наверх">↑</button>
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

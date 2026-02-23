@@ -303,12 +303,14 @@ document.addEventListener('DOMContentLoaded', () => {
     initFieldMetrics();
     initKeyboardShortcuts();
     initDragDrop();
+    initBackToTop();
     loadStats();
     loadRunHistory();
     onImagesProviderChange();
     loadImageTokenStatus();
     onMultiProviderChange();
     onMultiModeChange();
+    renderWordHistory();
     console.log('App loaded');
 });
 
@@ -358,6 +360,14 @@ function initDragDrop() {
         };
         reader.readAsText(file, 'UTF-8');
     });
+}
+
+function initBackToTop() {
+    const btn = document.getElementById('backToTop');
+    if (!btn) return;
+    const onScroll = () => btn.classList.toggle('visible', window.scrollY > 400);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
 }
 
 function initSectionMotion() {
@@ -1769,6 +1779,7 @@ async function checkWord() {
             currentResults.word = data.result;
             currentDeepResults.word = null;
             displayWordResult(data.result);
+            saveWordHistory(word);
             console.log('✅ Слово проверено:', data.result);
         } else {
             showToast('Ошибка: ' + data.error, 'error');
@@ -1953,6 +1964,16 @@ function displayResults(type, result, url = '') {
         }
 
         html += '</div>';
+
+        // Кнопка «Копировать все нарушения»
+        const allViolationWords = [
+            ...(result.latin_words || []),
+            ...(result.unknown_cyrillic || []),
+            ...(result.nenormative_words || [])
+        ];
+        if (allViolationWords.length > 0) {
+            html += `<button class="btn btn-sm btn-secondary" style="margin-bottom:0.75rem" onclick="copyViolationsList('${type}')" title="Скопировать список нарушающих слов в буфер обмена">📋 Копировать нарушения (${allViolationWords.length})</button>`;
+        }
 
         // Кнопка подсветки нарушений в тексте (для текстовой и URL вкладок)
         if (type === 'text' || type === 'url' || type === 'images') {
@@ -2199,6 +2220,12 @@ function displayBatchResults(results) {
             </div>
         `;
         batchList.insertAdjacentElement('beforebegin', toolbar);
+        // Пустое состояние — показывается когда все элементы скрыты фильтром/поиском
+        const emptyState = document.createElement('div');
+        emptyState.id = 'batchEmptyState';
+        emptyState.className = 'batch-empty-state';
+        emptyState.textContent = 'Нет результатов по выбранному фильтру или запросу.';
+        batchList.insertAdjacentElement('afterend', emptyState);
     }
 
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2211,11 +2238,11 @@ function searchBatchItems(query) {
         const urlEl = item.querySelector('.batch-url');
         const urlText = urlEl ? (urlEl.textContent || urlEl.href || '').toLowerCase() : '';
         item.dataset.searchHidden = q && !urlText.includes(q) ? '1' : '';
-        // Переприменяем текущий фильтр
         const activeFilter = document.querySelector('.batch-filter-btn.active');
         const filter = activeFilter ? activeFilter.dataset.filter : 'all';
         applyBatchVisibility(item, filter);
     });
+    updateBatchEmptyState();
 }
 
 // Фильтрация batch-элементов по статусу
@@ -2229,6 +2256,7 @@ function filterBatchItems(filter, btn) {
         item.dataset.searchHidden = '';
         applyBatchVisibility(item, filter);
     });
+    updateBatchEmptyState();
 }
 
 function applyBatchVisibility(item, filter) {
@@ -2998,6 +3026,81 @@ function hideLoading() {
     if (overlay) {
         overlay.style.display = 'none';
     }
+}
+
+// === История недавних слов (word-tab) ===
+const WORD_HISTORY_KEY = 'lawchecker.wordHistory';
+const WORD_HISTORY_MAX = 10;
+
+function saveWordHistory(word) {
+    try {
+        let hist = JSON.parse(localStorage.getItem(WORD_HISTORY_KEY) || '[]');
+        hist = [word, ...hist.filter(w => w !== word)].slice(0, WORD_HISTORY_MAX);
+        localStorage.setItem(WORD_HISTORY_KEY, JSON.stringify(hist));
+        renderWordHistory();
+    } catch(e) {}
+}
+
+function removeWordFromHistory(word) {
+    try {
+        let hist = JSON.parse(localStorage.getItem(WORD_HISTORY_KEY) || '[]');
+        hist = hist.filter(w => w !== word);
+        localStorage.setItem(WORD_HISTORY_KEY, JSON.stringify(hist));
+        renderWordHistory();
+    } catch(e) {}
+}
+
+function renderWordHistory() {
+    const container = document.getElementById('wordHistory');
+    if (!container) return;
+    try {
+        const hist = JSON.parse(localStorage.getItem(WORD_HISTORY_KEY) || '[]');
+        if (!hist.length) { container.innerHTML = ''; return; }
+        container.innerHTML = `<span class="word-history-label">Недавние:</span>` +
+            hist.map(w => `<span class="word-history-chip" data-recheck="${escAttr(w)}">${escAttr(w)}<button class="chip-remove" data-remove="${escAttr(w)}" title="Удалить из истории">×</button></span>`).join('');
+    } catch(e) { container.innerHTML = ''; }
+}
+
+// Делегирование кликов для word history
+document.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.chip-remove[data-remove]');
+    if (removeBtn) {
+        e.stopPropagation();
+        removeWordFromHistory(removeBtn.dataset.remove);
+        return;
+    }
+    const chip = e.target.closest('.word-history-chip[data-recheck]');
+    if (chip) {
+        const word = chip.dataset.recheck;
+        const inp = document.getElementById('wordInput');
+        if (inp) { inp.value = word; checkWord(); }
+        return;
+    }
+});
+
+// === Копирование всех нарушений в буфер ===
+function copyViolationsList(type) {
+    const result = currentResults[type];
+    if (!result) return;
+    const words = [
+        ...(result.latin_words || []),
+        ...(result.unknown_cyrillic || []),
+        ...(result.nenormative_words || [])
+    ];
+    if (!words.length) { showToast('Нарушений не найдено', 'info'); return; }
+    navigator.clipboard.writeText(words.join(', ')).then(
+        () => showToast(`Скопировано ${words.length} слов`, 'success'),
+        () => showToast('Не удалось скопировать', 'error')
+    );
+}
+
+// === Пустое состояние batch после фильтрации ===
+function updateBatchEmptyState() {
+    const items = document.querySelectorAll('.batch-item');
+    let visible = 0;
+    items.forEach(item => { if (item.style.display !== 'none') visible++; });
+    const emptyState = document.getElementById('batchEmptyState');
+    if (emptyState) emptyState.classList.toggle('visible', items.length > 0 && visible === 0);
 }
 
 // Горячие клавиши

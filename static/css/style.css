@@ -3493,3 +3493,90 @@ label.text-muted {
 [data-theme="dark"] .batch-search-input:focus {
     border-color: #3B82F6;
 }
+
+/* История недавних слов (word-tab) */
+.word-history {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.6rem;
+}
+.word-history:empty { display: none; }
+.word-history-label {
+    font-size: 0.78rem;
+    color: #94A3B8;
+    flex-shrink: 0;
+}
+.word-history-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.18rem 0.55rem;
+    background: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    color: #334155;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+}
+.word-history-chip:hover { background: #E2E8F0; border-color: #94A3B8; }
+.word-history-chip .chip-remove {
+    background: none;
+    border: none;
+    color: #94A3B8;
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.15s;
+}
+.word-history-chip .chip-remove:hover { color: #EF4444; }
+[data-theme="dark"] .word-history-chip {
+    background: #334155;
+    border-color: #475569;
+    color: #CBD5E1;
+}
+[data-theme="dark"] .word-history-chip:hover { background: #475569; }
+
+/* Кнопка «Наверх» */
+.back-to-top {
+    position: fixed;
+    bottom: 5.5rem;
+    right: 1.5rem;
+    z-index: 9000;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #3B82F6;
+    color: white;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(59,130,246,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateY(12px);
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease, background 0.15s;
+}
+.back-to-top.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+.back-to-top:hover { background: #2563EB; }
+
+/* Batch — пустое состояние при фильтрации */
+.batch-empty-state {
+    display: none;
+    text-align: center;
+    padding: 2rem 1rem;
+    color: #94A3B8;
+    font-size: 0.95rem;
+}
+.batch-empty-state.visible { display: block; }
