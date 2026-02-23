@@ -1149,7 +1149,7 @@ function sleepMs(ms) {
 function renderImageBatchItem(item, index) {
     if (!item.success || !item.result) {
         return `
-            <div class="batch-item error">
+            <div class="batch-item error" data-imgbatch-status="error">
                 <div class="batch-item-header">
                     <span class="batch-number">[${index + 1}]</span>
                     <a href="${escAttr(item.url)}" target="_blank" rel="noopener" class="batch-url">${escHtml(item.url)}</a>
@@ -1160,20 +1160,31 @@ function renderImageBatchItem(item, index) {
     }
 
     const r = item.result;
+    const statusCls = r.law_compliant ? 'success' : 'warning';
     const statusIcon = r.law_compliant ? '✅' : '⚠️';
     const statusText = r.law_compliant ? 'соответствует' : `нарушений: ${r.violations_count || 0}`;
+    const forbiddenWords = [
+        ...(r.nenormative_words || []),
+        ...(r.latin_words || []),
+        ...(r.unknown_cyrillic || [])
+    ].filter((w, i, a) => a.indexOf(w) === i); // unique
+    const wordsHtml = forbiddenWords.length
+        ? `<div class="batch-global-violations"><span class="text-muted">Слова: </span>${forbiddenWords.map(w => `<span class="word-tag critical">${escHtml(w)}</span>`).join(' ')}</div>`
+        : '';
+    const ocrLen = (r.extracted_text || '').length;
     return `
-        <div class="batch-item ${r.law_compliant ? 'success' : 'warning'}">
+        <div class="batch-item ${statusCls}" data-imgbatch-status="${statusCls}">
             <div class="batch-item-header">
                 <span class="batch-icon">${statusIcon}</span>
                 <span class="batch-number">[${index + 1}]</span>
                 <a href="${escAttr(item.url)}" target="_blank" rel="noopener" class="batch-url">${escHtml(item.url)}</a>
             </div>
             <div class="batch-item-stats">
-                <span class="batch-violations-count">${statusText}</span>
+                <span class="batch-violations-count">${escHtml(statusText)}</span>
                 <span class="batch-words-count">слов: ${r.total_words || 0}</span>
-                <span class="batch-words-count">OCR символов: ${(r.extracted_text || '').length}</span>
+                ${ocrLen > 0 ? `<span class="batch-words-count">OCR: ${ocrLen} симв.</span>` : ''}
             </div>
+            ${wordsHtml}
         </div>
     `;
 }
@@ -1184,9 +1195,10 @@ function displayImagesBatchResults(results) {
     if (!resultsCard || !resultsContent) return;
 
     const total = results.length;
-    const success = results.filter(r => r.success).length;
-    const failed = total - success;
+    const successful = results.filter(r => r.success).length;
+    const failed = total - successful;
     const withViolations = results.filter(r => r.success && r.result && !r.result.law_compliant).length;
+    const okCount = successful - withViolations;
 
     let html = `
         <div class="batch-summary">
@@ -1196,7 +1208,7 @@ function displayImagesBatchResults(results) {
                     <span class="summary-label">Всего изображений</span>
                 </div>
                 <div class="summary-stat success">
-                    <span class="summary-value">${success}</span>
+                    <span class="summary-value">${successful}</span>
                     <span class="summary-label">Обработано</span>
                 </div>
                 <div class="summary-stat warning">
@@ -1209,14 +1221,98 @@ function displayImagesBatchResults(results) {
                 </div>
             </div>
         </div>
-        <div class="batch-results-list">
+        <div class="batch-results-list" id="imgsBatchList">
             ${results.map((item, idx) => renderImageBatchItem(item, idx)).join('')}
         </div>
     `;
 
     resultsContent.innerHTML = html;
+
+    // Панель фильтров + поиск
+    const imgList = resultsContent.querySelector('#imgsBatchList');
+    if (imgList) {
+        const toolbar = document.createElement('div');
+        toolbar.className = 'batch-toolbar';
+        toolbar.innerHTML = `
+            <div class="batch-filter-group">
+                <span class="batch-filter-label">Показать:</span>
+                <button class="batch-filter-btn active" data-imgfilter="all" onclick="filterImagesBatchItems('all', this)">Все (${total})</button>
+                <button class="batch-filter-btn" data-imgfilter="violations" onclick="filterImagesBatchItems('violations', this)">⚠️ Нарушения (${withViolations})</button>
+                <button class="batch-filter-btn success" data-imgfilter="ok" onclick="filterImagesBatchItems('ok', this)">✅ OK (${okCount})</button>
+                ${failed > 0 ? `<button class="batch-filter-btn error" data-imgfilter="errors" onclick="filterImagesBatchItems('errors', this)">❌ Ошибки (${failed})</button>` : ''}
+            </div>
+            <div class="batch-search-group">
+                <input type="search" id="imgsBatchSearch" class="batch-search-input" placeholder="Поиск по URL…" oninput="searchImagesBatchItems(this.value)">
+            </div>
+            <span id="imgsBatchVisibleCount" class="batch-visible-count"></span>
+        `;
+        imgList.insertAdjacentElement('beforebegin', toolbar);
+        const emptyState = document.createElement('div');
+        emptyState.id = 'imgsBatchEmptyState';
+        emptyState.className = 'batch-empty-state';
+        emptyState.textContent = 'Нет результатов по выбранному фильтру или запросу.';
+        imgList.insertAdjacentElement('afterend', emptyState);
+    }
+
     resultsCard.style.display = 'block';
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function filterImagesBatchItems(filter, btn) {
+    const content = document.getElementById('imagesBatchResultsContent');
+    if (!content) return;
+    content.querySelectorAll('[data-imgfilter]').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    const searchInput = document.getElementById('imgsBatchSearch');
+    if (searchInput) searchInput.value = '';
+    content.querySelectorAll('#imgsBatchList .batch-item').forEach(item => {
+        item.dataset.searchHidden = '';
+        applyImagesBatchVisibility(item, filter);
+    });
+    updateImagesBatchEmptyState();
+}
+
+function applyImagesBatchVisibility(item, filter) {
+    if (item.dataset.searchHidden === '1') { item.style.display = 'none'; return; }
+    const status = item.dataset.imgbatchStatus || '';
+    if (filter === 'all') {
+        item.style.display = '';
+    } else if (filter === 'violations') {
+        item.style.display = status === 'warning' ? '' : 'none';
+    } else if (filter === 'ok') {
+        item.style.display = status === 'success' ? '' : 'none';
+    } else if (filter === 'errors') {
+        item.style.display = status === 'error' ? '' : 'none';
+    }
+}
+
+function searchImagesBatchItems(query) {
+    const q = (query || '').toLowerCase().trim();
+    const content = document.getElementById('imagesBatchResultsContent');
+    if (!content) return;
+    const activeBtn = content.querySelector('[data-imgfilter].active');
+    const filter = activeBtn ? activeBtn.dataset.imgfilter : 'all';
+    content.querySelectorAll('#imgsBatchList .batch-item').forEach(item => {
+        const urlEl = item.querySelector('.batch-url');
+        const urlText = urlEl ? (urlEl.textContent || urlEl.href || '').toLowerCase() : '';
+        item.dataset.searchHidden = q && !urlText.includes(q) ? '1' : '';
+        applyImagesBatchVisibility(item, filter);
+    });
+    updateImagesBatchEmptyState();
+}
+
+function updateImagesBatchEmptyState() {
+    const content = document.getElementById('imagesBatchResultsContent');
+    if (!content) return;
+    const items = content.querySelectorAll('#imgsBatchList .batch-item');
+    let visible = 0;
+    items.forEach(item => { if (item.style.display !== 'none') visible++; });
+    const emptyState = document.getElementById('imgsBatchEmptyState');
+    if (emptyState) emptyState.classList.toggle('visible', items.length > 0 && visible === 0);
+    const countEl = document.getElementById('imgsBatchVisibleCount');
+    if (countEl && items.length > 0) {
+        countEl.textContent = visible < items.length ? `Показано: ${visible} из ${items.length}` : '';
+    }
 }
 
 async function checkImagesBatchQueue() {
@@ -2593,6 +2689,49 @@ function exportBatchCsv() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `batch_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    showToast(`CSV экспортирован (${results.length} строк)`, 'success');
+}
+
+// Экспорт результатов пакетной проверки изображений в CSV
+function exportImagesBatchCsv() {
+    const results = currentResults.imagesBatch;
+    if (!results || !results.length) {
+        showToast('Нет данных для экспорта! Сначала выполните проверку.', 'warning');
+        return;
+    }
+    const csvRow = (cells) => cells.map(c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`).join(',');
+    const rows = [
+        csvRow(['URL', 'Статус', 'Нарушений', 'Латиница', 'Ненорматив', 'Иностр. слова', 'Всего слов', 'OCR символов', 'Ошибка'])
+    ];
+    results.forEach(item => {
+        if (!item.success) {
+            rows.push(csvRow([item.url, 'ошибка', '', '', '', '', '', '', item.error || '']));
+        } else {
+            const r = item.result || {};
+            const ocrLen = (r.extracted_text || '').length;
+            rows.push(csvRow([
+                item.url,
+                r.law_compliant ? 'соответствует' : 'нарушения',
+                r.violations_count ?? 0,
+                (r.latin_words || []).length,
+                (r.nenormative_words || []).length,
+                (r.unknown_cyrillic || []).length,
+                r.total_words ?? 0,
+                ocrLen,
+                ''
+            ]));
+        }
+    });
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `images_batch_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
