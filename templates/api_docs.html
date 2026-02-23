@@ -34,7 +34,7 @@
     <section class="page-hero">
         <div class="container">
             <h1 class="page-hero-title">API документация</h1>
-            <p class="page-hero-subtitle">Готовые endpoint-ы для интеграции проверки в ваш сервис.</p>
+            <p class="page-hero-subtitle">REST API для интеграции языковой проверки в ваши сервисы и автоматические процессы</p>
             <div class="quick-links">
                 <a class="btn btn-secondary" href="/">← Назад к проверке</a>
                 <a class="btn btn-primary" href="/">Открыть интерфейс</a>
@@ -52,33 +52,33 @@
                 <div class="card-body content-page">
                     <p class="text-muted">Базовый адрес: <code>https://lawcheck-production.up.railway.app</code></p>
 
-                    <h2>Quick Start (3 шага)</h2>
+                    <h2>Быстрый старт</h2>
                     <ol class="step-list">
                         <li>
-                            <h2>Получите токен OCR</h2>
-                            <p>Во вкладке «Картинка» или «Мульти-скан» выберите провайдера и сохраните API token.</p>
+                            <h2>Токен OCR (если нужен)</h2>
+                            <p>Для проверки изображений или PDF — во вкладке «Картинка» или «Мульти-скан» выберите провайдера (OpenAI / Google / OCR.space) и сохраните токен.</p>
                         </li>
                         <li>
                             <h2>Сделайте запрос</h2>
-                            <p>Для текста используйте <code>POST /api/check</code>, для больших задач — <code>/api/multiscan/run</code>.</p>
+                            <p>Для проверки текста — <code>POST /api/check</code>. Для сайта или списка ссылок — <code>POST /api/batch-check</code> или <code>POST /api/multiscan/run</code>.</p>
                         </li>
                         <li>
-                            <h2>Сохраните отчёт</h2>
-                            <p>В UI доступны экспорт обычного и deep-отчёта. Через API — endpoints <code>/api/export/*</code>.</p>
+                            <h2>Получите отчёт</h2>
+                            <p>Через API — <code>/api/export/txt</code> или <code>/api/export/batch-txt</code>. Из UI — кнопки «Скачать отчёт» и «Word» в карточке результатов.</p>
                         </li>
                     </ol>
 
-                    <h2>Основные методы</h2>
+                    <h2>Endpoints</h2>
                     <ul class="feature-list">
-                        <li><code>POST /api/check</code> — проверка текста.</li>
-                        <li><code>POST /api/check-url</code> — проверка одной страницы по URL.</li>
-                        <li><code>POST /api/batch-check</code> — пакетная проверка списка URL.</li>
-                        <li><code>POST /api/deep-check</code> — глубокая проверка слов.</li>
-                        <li><code>POST /api/images/ocr</code> — OCR изображения.</li>
-                        <li><code>POST /api/images/check</code> — OCR + проверка текста с изображения.</li>
-                        <li><code>POST /api/multiscan/run</code> — мультискан сайта/списка URL (HTML/PDF/IMG).</li>
-                        <li><code>GET /api/metrics</code> — сервисные метрики по событиям и ошибкам.</li>
-                        <li><code>GET /api/run-history</code> — последние запуски проверок из БД.</li>
+                        <li><code>POST /api/check</code> — проверка текста, возвращает нарушения и статистику.</li>
+                        <li><code>POST /api/check-url</code> — загружает страницу по URL и проверяет её текст.</li>
+                        <li><code>POST /api/batch-check</code> — пакетная проверка списка URL (до 500).</li>
+                        <li><code>POST /api/deep-check</code> — детальный анализ слов: формы, типы, замены.</li>
+                        <li><code>POST /api/images/ocr</code> — OCR изображения через выбранного провайдера.</li>
+                        <li><code>POST /api/images/check</code> — OCR + языковая проверка за один запрос.</li>
+                        <li><code>POST /api/multiscan/run</code> — сканирует сайт или список URL (HTML/PDF/изображения).</li>
+                        <li><code>GET /api/metrics</code> — счётчики событий и ошибок сервиса.</li>
+                        <li><code>GET /api/run-history</code> — история последних запусков проверок.</li>
                     </ul>
 
                     <h2>Пример запроса</h2>
@@ -95,18 +95,21 @@
 const data = await resp.json();
 console.log(data);</pre>
 
-                    <h2>Экспорт отчетов</h2>
+                    <h2>Экспорт отчётов</h2>
                     <ul class="feature-list">
-                        <li><code>POST /api/export/txt</code> — отчет по одиночной проверке.</li>
-                        <li><code>POST /api/export/batch-txt</code> — отчет пакетной проверки.</li>
-                        <li><code>POST /api/export/multiscan-txt</code> — отчет MultiScan.</li>
+                        <li><code>POST /api/export/txt</code> — TXT-отчёт по одиночной проверке.</li>
+                        <li><code>POST /api/export/docx</code> — Word-отчёт по одиночной проверке.</li>
+                        <li><code>POST /api/export/batch-txt</code> — сводный TXT-отчёт пакетной проверки.</li>
+                        <li><code>POST /api/export/batch-docx</code> — Word-отчёт пакетной проверки.</li>
+                        <li><code>POST /api/export/multiscan-txt</code> — TXT-отчёт мульти-скана.</li>
+                        <li><code>POST /api/export/multiscan-docx</code> — Word-отчёт мульти-скана.</li>
                     </ul>
 
-                    <h2>Лимиты и стабильность</h2>
+                    <h2>Рекомендации по использованию</h2>
                     <ul class="feature-list">
-                        <li>Используйте задержку <code>delay_ms</code> для очередей URL.</li>
-                        <li>Для больших задач (100/500/2000 URL) задавайте адекватные <code>max_urls</code>, <code>max_pages</code>, <code>max_resources</code>.</li>
-                        <li>Пакетная обработка безопаснее, чем один большой запрос без лимитов.</li>
+                        <li>Используйте параметр <code>delay_ms</code> при обработке очередей URL, чтобы не перегружать удалённые серверы.</li>
+                        <li>Для больших задач явно задавайте <code>max_urls</code>, <code>max_pages</code> и <code>max_resources</code> — без лимитов запрос может выполняться очень долго.</li>
+                        <li>Разбивайте большие списки на пакеты по 50–100 URL вместо одного запроса на 500+.</li>
                     </ul>
 
                     <h2>Коды ответов</h2>
@@ -149,7 +152,7 @@ console.log(data);</pre>
 
                     <div class="cta-box">
                         <h3>Сервис бесплатный</h3>
-                        <p>Если сервис вам полезен, можно поддержать развитие проекта.</p>
+                        <p>API открыт без ключей авторизации. Если сервис полезен в работе — будем рады поддержке.</p>
                         <div class="btn-group">
                             <a href="/admin/metrics" class="btn btn-secondary">Admin Metrics</a>
                             <a href="/payment" class="btn btn-info">Тарифы и оплата</a>
@@ -166,7 +169,7 @@ console.log(data);</pre>
             <div class="footer-content">
                 <div class="footer-section">
                     <h3>LawChecker Online</h3>
-                    <p>API для интеграции проверки языка в ваши процессы.</p>
+                    <p>REST API для автоматической проверки текстов, сайтов и медиафайлов.</p>
                 </div>
                 <div class="footer-section">
                     <h3>Навигация</h3>

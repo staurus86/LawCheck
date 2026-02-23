@@ -29,10 +29,10 @@
         </div>
     </header>
 
-    <section class="page-hero">
+        <section class="page-hero">
         <div class="container">
-            <h1 class="page-hero-title">Тарифы и оплата</h1>
-            <p class="page-hero-subtitle">Сервис бесплатный. Сумма поддержки условная: вы сами решаете, сколько отправить на развитие проекта.</p>
+            <h1 class="page-hero-title">Тарифы и поддержка</h1>
+            <p class="page-hero-subtitle">Сервис полностью бесплатный. Поддержка — добровольная: вы сами выбираете сумму.</p>
             <div class="quick-links">
                 <a class="btn btn-secondary" href="/">← Назад к проверке</a>
                 <a class="btn btn-primary" href="/">Открыть проверку</a>
@@ -46,58 +46,57 @@
             <div class="card">
                 <div class="card-header">
                     <h2>Поддержка проекта</h2>
-                    <p class="text-muted">Любая сумма поддержки помогает развивать бесплатный сервис</p>
+                    <p class="text-muted">Любая сумма помогает покрывать инфраструктуру и развивать функции</p>
                 </div>
                 <div class="card-body">
                     <div class="pricing-grid">
                         <article class="pricing-card {% if selected_tariff == 'symbols-20000' %}active{% endif %}">
                             <h3>Базовая поддержка</h3>
-                            <p class="pricing-meta">Для тех, кто просто хочет сказать спасибо проекту</p>
+                            <p class="pricing-meta">Если сервис оказался полезным разово</p>
                             <ul class="feature-list">
-                                <li>Проверка текста и URL</li>
-                                <li>OCR + базовый deep-check</li>
-                                <li>Экспорт отчётов</li>
+                                <li>Проверка текста, URL и слов</li>
+                                <li>OCR и глубокий анализ слов</li>
+                                <li>Экспорт в TXT и Word</li>
                             </ul>
-                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Оплатить</a>
+                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Поддержать</a>
                         </article>
 
                         <article class="pricing-card {% if selected_tariff == 'symbols-100000' %}active{% endif %}">
                             <h3>Командная поддержка</h3>
-                            <p class="pricing-meta">Для команд, которые активно используют проверку</p>
+                            <p class="pricing-meta">Для регулярного использования командой</p>
                             <ul class="feature-list">
-                                <li>Batch и MultiScan</li>
-                                <li>TXT/CSV загрузка URL</li>
-                                <li>Deep-отчёты</li>
+                                <li>Пакетная проверка и мульти-скан</li>
+                                <li>Загрузка списков ссылок</li>
+                                <li>Расширенные deep-отчёты</li>
                             </ul>
-                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Оплатить</a>
+                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Поддержать</a>
                         </article>
 
                         <article class="pricing-card {% if selected_tariff == 'symbols-500000' %}active{% endif %}">
                             <h3>Расширенная поддержка</h3>
-                            <p class="pricing-meta">Для агентств и потоковой проверки большого объема материалов</p>
+                            <p class="pricing-meta">Для агентств с большим объёмом материалов</p>
                             <ul class="feature-list">
-                                <li>Большие очереди URL</li>
-                                <li>Параллельные процессы команды</li>
-                                <li>Расширенные лимиты</li>
+                                <li>Очереди до 2000 URL</li>
+                                <li>Параллельная работа команды</li>
+                                <li>Настройка лимитов и задержек</li>
                             </ul>
-                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Оплатить</a>
+                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Поддержать</a>
                         </article>
 
                         <article class="pricing-card {% if selected_tariff == 'api' %}active{% endif %}">
-                            <h3>Поддержка API-направления</h3>
-                            <p class="pricing-meta">Для тех, кто развивает интеграции и автоматизацию</p>
+                            <h3>Поддержка API и интеграций</h3>
+                            <p class="pricing-meta">Для разработчиков и автоматических процессов</p>
                             <ul class="feature-list">
-                                <li>REST endpoint-ы</li>
-                                <li>JSON ответы и отчёты</li>
-                                <li>Quick Start примеры</li>
+                                <li>Готовые REST API endpoints</li>
+                                <li>JSON-ответы и экспорт отчётов</li>
+                                <li>Примеры запросов и документация</li>
                             </ul>
-                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Оплатить</a>
+                            <a href="https://www.tbank.ru/cf/6xCsQ66z0jA" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Поддержать</a>
                         </article>
                     </div>
 
                     <div class="legal-note" style="margin-top: 1rem;">
-                        Сумма поддержки условная и определяется вами. Обязательных тарифов нет: сервис остаётся бесплатным,
-                        а донат помогает поддерживать инфраструктуру и развитие функций.
+                        Никаких обязательных платежей. Сервис полностью бесплатен — донат помогает поддерживать инфраструктуру и развивать новые функции.
                     </div>
                 </div>
             </div>
