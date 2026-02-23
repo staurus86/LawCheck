@@ -613,7 +613,7 @@ async function checkText() {
         return;
     }
     
-    showLoading();
+    showLoading('Анализирую текст...');
     
     try {
         const response = await fetch(`${API_BASE}/api/check`, {
@@ -650,7 +650,7 @@ async function checkUrl() {
         return;
     }
 
-    showLoading();
+    showLoading('Загружаю страницу...');
     document.getElementById('urlProgress').style.display = 'block';
 
     const controller = new AbortController();
@@ -933,7 +933,7 @@ async function scrapTextFromImageAndCheck() {
     const payload = await buildImagesPayload();
     if (!payload) return;
 
-    showLoading();
+    showLoading('Распознаю текст на изображении...');
     try {
         const response = await fetch(`${API_BASE}/api/images/ocr`, {
             method: 'POST',
@@ -984,7 +984,7 @@ async function checkImagesByDatabase() {
     if (!payload) return;
     const extractedTextArea = document.getElementById('imagesInput');
 
-    showLoading();
+    showLoading('Распознаю и проверяю изображение...');
     try {
         const response = await fetch(`${API_BASE}/api/images/check`, {
             method: 'POST',
@@ -1466,7 +1466,7 @@ async function runMultiScan() {
     }
     if (progressText) progressText.textContent = 'Обработка...';
 
-    showLoading();
+    showLoading('Запускаю мульти-скан...');
     try {
         const response = await fetch(`${API_BASE}/api/multiscan/run`, {
             method: 'POST',
@@ -1720,7 +1720,7 @@ async function checkWord() {
         return;
     }
     
-    showLoading();
+    showLoading('Проверяю слово...');
     
     try {
         const response = await fetch(`${API_BASE}/api/check-word`, {
@@ -2432,7 +2432,7 @@ async function deepCheck(type) {
     const wordsToProcess = wordsToCheck.slice(0, maxWords);
     const skippedCount = wordsToCheck.length - maxWords;
 
-    showLoading();
+    showLoading('Глубокий анализ слов...');
     console.log('🔬 Глубокая проверка:', wordsToProcess.length, 'слов из', wordsToCheck.length);
 
     try {
@@ -2507,7 +2507,7 @@ async function deepCheckBatch() {
     const batchSize = 100; // Обрабатываем по 100 слов за раз
     const totalBatches = Math.ceil(wordArray.length / batchSize);
 
-    showLoading();
+    showLoading('Глубокий анализ (пакетная)...');
     console.log('🔬 Глубокая проверка batch:', wordArray.length, 'слов,', totalBatches, 'батчей');
 
     try {
@@ -2855,14 +2855,12 @@ function clearImageInputs() {
     updateImagesBatchInputMeta();
 }
 
-function showLoading() {
+function showLoading(message = 'Проверяю...') {
     const overlay = document.getElementById('loadingOverlay');
-    document.querySelectorAll('.btn').forEach(btn => {
-        btn.disabled = true;
-    });
-    if (overlay) {
-        overlay.style.display = 'flex';
-    }
+    const msg = document.getElementById('loadingMessage');
+    if (msg) msg.textContent = message;
+    document.querySelectorAll('.btn').forEach(btn => { btn.disabled = true; });
+    if (overlay) overlay.style.display = 'flex';
 }
 
 function hideLoading() {

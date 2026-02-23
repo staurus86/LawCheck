@@ -3314,3 +3314,33 @@ label.text-muted {
     transform: translateY(-1px);
     transition: filter 0.15s, transform 0.15s;
 }
+
+/* Danger button */
+.btn-danger {
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    color: white;
+    border-color: transparent;
+}
+.btn-danger:hover {
+    background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%);
+}
+
+/* Loading overlay: контекстное сообщение */
+.loading-overlay p {
+    font-size: 1rem;
+    font-weight: 600;
+    color: white;
+    margin-top: 0.75rem;
+    letter-spacing: 0.02em;
+}
+
+/* Batch results: обновлённый заголовок со сводкой */
+#batchResults .card-header h2,
+#multiResults .card-header h2 {
+    font-size: 1.05rem;
+}
+
+/* Step-group label */
+.images-step-label {
+    font-size: 0.78rem;
+}

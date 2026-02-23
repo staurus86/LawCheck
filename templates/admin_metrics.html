@@ -20,6 +20,9 @@
                     <a href="/api-docs" class="nav-link">API</a>
                     <a href="/admin/metrics" class="nav-link active">Admin Metrics</a>
                 </nav>
+                <button class="dark-toggle" id="darkModeToggle" onclick="toggleDarkMode()" title="Тёмная тема">
+                    <span id="darkModeIcon">🌙</span>
+                </button>
             </div>
         </div>
     </header>
@@ -311,5 +314,6 @@
 
         refreshDashboard();
     </script>
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
 </body>
 </html>
