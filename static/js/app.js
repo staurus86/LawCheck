@@ -95,6 +95,91 @@ function toggleHighlight(type, btn) {
     btn.textContent = '✖ Скрыть подсветку';
 }
 
+// Подсветка нарушений в batch-item
+function toggleBatchHighlight(index, btn) {
+    const ovId = `batch-hl-${index}`;
+    let overlay = document.getElementById(ovId);
+    if (overlay && overlay.style.display !== 'none') {
+        overlay.style.display = 'none';
+        btn.textContent = '🖍 Подсветить';
+        return;
+    }
+    const item = (currentResults.batch || [])[index];
+    if (!item) return;
+    const source = item.source_text || '';
+    if (!source) { alert('Исходный текст недоступен'); return; }
+    const result = item.result || {};
+    const latinSet   = new Set((result.latin_words     || []).map(w => w.toLowerCase()));
+    const unknownSet = new Set((result.unknown_cyrillic || []).map(w => w.toLowerCase()));
+    const nenormSet  = new Set((result.nenormative_words || []).map(w => w.toLowerCase()));
+    const escaped = source.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const highlighted = escaped.replace(/[а-яёА-ЯЁa-zA-Z][а-яёА-ЯЁa-zA-Z\-]*/g, match => {
+        const lower = match.toLowerCase();
+        if (nenormSet.has(lower)) return `<mark class="hl-critical">${match}</mark>`;
+        if (latinSet.has(lower))  return `<mark class="hl-latin">${match}</mark>`;
+        if (unknownSet.has(lower))return `<mark class="hl-unknown">${match}</mark>`;
+        return match;
+    });
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = ovId;
+        overlay.className = 'highlight-overlay';
+        btn.closest('.batch-item').appendChild(overlay);
+    }
+    overlay.innerHTML = `
+        <div class="highlight-legend">
+            <span class="hl-badge hl-critical-badge">🚫 Ненормативная</span>
+            <span class="hl-badge hl-latin-badge">🌍 Латиница</span>
+            <span class="hl-badge hl-unknown-badge">❓ Неизвестные</span>
+        </div>
+        <div class="highlight-text">${highlighted}</div>`;
+    overlay.style.display = 'block';
+    btn.textContent = '✖ Скрыть';
+}
+
+// Подсветка нарушений в multiscan-item
+function toggleMultiHighlight(index, btn) {
+    const ovId = `multi-hl-${index}`;
+    let overlay = document.getElementById(ovId);
+    if (overlay && overlay.style.display !== 'none') {
+        overlay.style.display = 'none';
+        btn.textContent = '🖍 Подсветить';
+        return;
+    }
+    const results = (currentResults.multi && currentResults.multi.results) || [];
+    const item = results[index];
+    if (!item) return;
+    const source = item.source_text || '';
+    if (!source) { alert('Исходный текст недоступен'); return; }
+    const result = item.result || {};
+    const latinSet   = new Set((result.latin_words     || []).map(w => w.toLowerCase()));
+    const unknownSet = new Set((result.unknown_cyrillic || []).map(w => w.toLowerCase()));
+    const nenormSet  = new Set((result.nenormative_words || []).map(w => w.toLowerCase()));
+    const escaped = source.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const highlighted = escaped.replace(/[а-яёА-ЯЁa-zA-Z][а-яёА-ЯЁa-zA-Z\-]*/g, match => {
+        const lower = match.toLowerCase();
+        if (nenormSet.has(lower)) return `<mark class="hl-critical">${match}</mark>`;
+        if (latinSet.has(lower))  return `<mark class="hl-latin">${match}</mark>`;
+        if (unknownSet.has(lower))return `<mark class="hl-unknown">${match}</mark>`;
+        return match;
+    });
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = ovId;
+        overlay.className = 'highlight-overlay';
+        btn.closest('.batch-item').appendChild(overlay);
+    }
+    overlay.innerHTML = `
+        <div class="highlight-legend">
+            <span class="hl-badge hl-critical-badge">🚫 Ненормативная</span>
+            <span class="hl-badge hl-latin-badge">🌍 Латиница</span>
+            <span class="hl-badge hl-unknown-badge">❓ Неизвестные</span>
+        </div>
+        <div class="highlight-text">${highlighted}</div>`;
+    overlay.style.display = 'block';
+    btn.textContent = '✖ Скрыть';
+}
+
 // Global variables
 let currentResults = {
     text: null,
@@ -1059,12 +1144,15 @@ function renderMultiItem(item, index) {
 
     const statusClass = item.law_compliant ? 'success' : 'warning';
     const forbidden = item.forbidden_words || [];
+    const hasViol = !item.law_compliant && forbidden.length > 0;
+    const hasText = !!item.source_text;
     return `
         <div class="batch-item ${statusClass}">
             <div class="batch-item-header">
                 <span class="batch-number">[${index + 1}]</span>
                 <a href="${item.url}" target="_blank" class="batch-url">${item.url}</a>
                 <span class="word-tag">${item.resource_type || 'неизвестно'}</span>
+                ${hasViol && hasText ? `<button class="batch-details-btn" onclick="toggleMultiHighlight(${index}, this)">🖍 Подсветить</button>` : ''}
             </div>
             <div class="batch-item-stats">
                 <span class="batch-violations-count">${item.law_compliant ? 'соответствует' : `нарушений: ${item.violations_count || 0}`}</span>
@@ -1845,6 +1933,9 @@ function displayBatchResults(results) {
                             Показать детали
                         </button>
                     ` : ''}
+                    ${hasDetails && item.source_text ? `
+                        <button class="batch-details-btn" onclick="toggleBatchHighlight(${index}, this)">🖍 Подсветить</button>
+                    ` : ''}
                 </div>
                 ${item.success ? `
                     <div class="batch-item-stats">
@@ -2119,6 +2210,10 @@ async function exportDocx(type) {
             endpoint = '/api/export/batch-docx';
             payload  = { results: result };
             prefix   = 'lawcheck_batch_';
+        } else if (type === 'multi') {
+            endpoint = '/api/export/multiscan-docx';
+            payload  = { scan: result };
+            prefix   = 'lawcheck_multiscan_';
         } else {
             endpoint = '/api/export/docx';
             const urlVal = type === 'url' ? (document.getElementById('urlInput')?.value || '') : '';

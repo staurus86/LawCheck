@@ -175,8 +175,11 @@
                             </button>
                         </div>
                         
-                        <div class="progress" id="urlProgress" style="display: none;">
-                            <div class="progress-bar"></div>
+                        <div class="progress-container" id="urlProgress" style="display: none;">
+                            <p class="progress-label">🔄 Загружаю страницу…</p>
+                            <div class="progress">
+                                <div class="progress-bar"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -239,9 +242,12 @@
                             Проверить все
                         </button>
                         
-                        <div class="progress" id="batchProgress" style="display: none;">
-                            <div class="progress-bar" id="batchProgressBar"></div>
-                            <span class="progress-text" id="batchProgressText">0 / 0</span>
+                        <div class="progress-container" id="batchProgress" style="display: none;">
+                            <p class="progress-label">🔄 Пакетная проверка…</p>
+                            <div class="progress">
+                                <div class="progress-bar" id="batchProgressBar"></div>
+                                <span class="progress-text" id="batchProgressText">0 / 0</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -332,9 +338,9 @@
                             <div>
                                 <label class="text-muted" for="imagesProviderSelect">Провайдер распознавания</label>
                                 <select id="imagesProviderSelect" class="form-input" onchange="onImagesProviderChange()">
-                                    <option value="openai">ОпенАИ</option>
-                                    <option value="google">Гугл Вижн</option>
-                                    <option value="ocrspace">ОСР Спейс</option>
+                                    <option value="openai">OpenAI (GPT-4 Vision)</option>
+                                    <option value="google">Google Vision AI</option>
+                                    <option value="ocrspace">OCR.space</option>
                                 </select>
                             </div>
                             <div>
@@ -351,7 +357,8 @@
                                 </div>
                                 <div>
                                     <label class="text-muted" for="imagesTokenInput">Токен доступа</label>
-                                    <input type="password" id="imagesTokenInput" class="form-input" placeholder="Токен провайдера" autocomplete="new-password">
+                                    <input type="password" id="imagesTokenInput" class="form-input" placeholder="sk-... (OpenAI) / API-key (Google/OCR.space)" autocomplete="new-password">
+                                    <p class="text-muted" style="font-size:0.8rem;margin-top:0.25rem">OCR.space имеет бесплатный тариф</p>
                                 </div>
                             </div>
 
@@ -414,9 +421,12 @@
                                 Пакетное распознавание и проверка
                             </button>
 
-                            <div class="progress" id="imagesBatchProgress" style="display: none;">
-                                <div class="progress-bar" id="imagesBatchProgressBar"></div>
-                                <span class="progress-text" id="imagesBatchProgressText">0 / 0</span>
+                            <div class="progress-container" id="imagesBatchProgress" style="display: none;">
+                                <p class="progress-label">🔄 Распознавание изображений…</p>
+                                <div class="progress">
+                                    <div class="progress-bar" id="imagesBatchProgressBar"></div>
+                                    <span class="progress-text" id="imagesBatchProgressText">0 / 0</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -495,9 +505,9 @@
                             <div>
                                 <label class="text-muted" for="multiProviderSelect">Провайдер распознавания</label>
                                 <select id="multiProviderSelect" class="form-input" onchange="onMultiProviderChange()">
-                                    <option value="openai">ОпенАИ</option>
-                                    <option value="google">Гугл Вижн</option>
-                                    <option value="ocrspace">ОСР Спейс</option>
+                                    <option value="openai">OpenAI (GPT-4 Vision)</option>
+                                    <option value="google">Google Vision AI</option>
+                                    <option value="ocrspace">OCR.space</option>
                                 </select>
                             </div>
                             <div>
@@ -562,9 +572,12 @@
                             </button>
                         </div>
 
-                        <div class="progress" id="multiProgress" style="display: none;">
-                            <div class="progress-bar" id="multiProgressBar"></div>
-                            <span class="progress-text" id="multiProgressText">Обработка...</span>
+                        <div class="progress-container" id="multiProgress" style="display: none;">
+                            <p class="progress-label">🔄 Мульти-скан…</p>
+                            <div class="progress">
+                                <div class="progress-bar" id="multiProgressBar"></div>
+                                <span class="progress-text" id="multiProgressText">Обработка...</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -580,6 +593,10 @@
                             <button class="btn btn-sm btn-success" onclick="exportReport('multi')">
                                 <i class="fas fa-download"></i>
                                 Скачать отчет
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="exportDocx('multi')" title="Скачать отчёт в Word">
+                                <i class="fas fa-file-word"></i>
+                                Word
                             </button>
                         </div>
                     </div>

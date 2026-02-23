@@ -317,7 +317,7 @@ def _extract_pdf_text(raw_bytes):
     return '\n'.join(text_parts).strip()
 
 
-def _build_resource_result(url, resource_type, check_result, source_meta=None):
+def _build_resource_result(url, resource_type, check_result, source_meta=None, source_text=''):
     source_meta = source_meta or {}
     forbidden_words = sorted(set(
         (check_result.get('nenormative_words') or [])
@@ -331,6 +331,7 @@ def _build_resource_result(url, resource_type, check_result, source_meta=None):
         'violations_count': check_result.get('violations_count', 0),
         'law_compliant': bool(check_result.get('law_compliant', True)),
         'forbidden_words': forbidden_words,
+        'source_text': source_text[:3000] if source_text else '',
         'result': check_result,
         'meta': source_meta
     }
@@ -531,7 +532,8 @@ def batch_check():
                 return {
                     'url': url,
                     'success': True,
-                    'result': result
+                    'result': result,
+                    'source_text': text[:8000]
                 }
             except Exception as e:
                 return {
@@ -1157,7 +1159,7 @@ def multiscan_run():
             checked_text = (text or '')[:max_text_chars]
             checked = checker_instance.check_text(checked_text)
             checked['recommendations'] = generate_recommendations(checked)
-            add_result(_build_resource_result(url, resource_type, checked, source_meta=source_meta))
+            add_result(_build_resource_result(url, resource_type, checked, source_meta=source_meta, source_text=checked_text[:3000]))
 
         def process_image_resource(image_url):
             if not token:
@@ -1195,7 +1197,7 @@ def multiscan_run():
             checked['source_type'] = 'image'
             checked['source_url'] = image_url
             checked['extracted_text'] = extracted_text
-            add_result(_build_resource_result(image_url, 'image', checked))
+            add_result(_build_resource_result(image_url, 'image', checked, source_text=extracted_text[:3000]))
 
         def process_pdf_resource(pdf_url):
             raw, _content_type = _fetch_url_bytes(pdf_url, timeout_sec=timeout_sec)
@@ -1868,6 +1870,218 @@ def export_multiscan_txt():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/export/multiscan-docx', methods=['POST'])
+def export_multiscan_docx():
+    """Экспорт отчёта MultiScan в DOCX (Word)"""
+    try:
+        from docx import Document
+        from docx.shared import Pt, RGBColor, Cm
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
+    except ImportError:
+        return jsonify({'error': 'python-docx не установлен на сервере'}), 500
+    try:
+        data    = request.get_json(silent=True) or {}
+        scan    = data.get('scan') or {}
+        results = scan.get('results') or []
+        if not results:
+            return jsonify({'error': 'Нет данных для экспорта'}), 400
+
+        doc = Document()
+        for section in doc.sections:
+            section.top_margin    = Cm(2); section.bottom_margin = Cm(2)
+            section.left_margin   = Cm(2.5); section.right_margin = Cm(2.5)
+
+        def set_cell_bg(cell, hex6):
+            tc = cell._tc; tcPr = tc.get_or_add_tcPr()
+            shd = OxmlElement('w:shd')
+            shd.set(qn('w:val'), 'clear'); shd.set(qn('w:color'), 'auto')
+            shd.set(qn('w:fill'), hex6); tcPr.append(shd)
+
+        def add_hr(color='CCCCCC'):
+            p = doc.add_paragraph(); pPr = p._p.get_or_add_pPr()
+            pBdr = OxmlElement('w:pBdr'); bot = OxmlElement('w:bottom')
+            bot.set(qn('w:val'), 'single'); bot.set(qn('w:sz'), '6')
+            bot.set(qn('w:space'), '1'); bot.set(qn('w:color'), color)
+            pBdr.append(bot); pPr.append(pBdr)
+
+        # ── Заголовок ──────────────────────────────────────────────
+        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run('МУЛЬТИ-СКАН: ОТЧЁТ ПРОВЕРКИ САЙТА')
+        r.font.size = Pt(20); r.font.bold = True; r.font.color.rgb = RGBColor(0x1F, 0x38, 0x64)
+
+        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run('Соответствие Федеральному закону №168-ФЗ «О русском языке»')
+        r.font.size = Pt(11); r.font.color.rgb = RGBColor(0x44, 0x72, 0xC4)
+
+        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        mode_str  = scan.get('mode', '-')
+        prov_str  = scan.get('provider', '-')
+        model_str = scan.get('model') or '-'
+        r = p.add_run(f'Дата: {datetime.now().strftime("%d.%m.%Y %H:%M")}     Режим: {mode_str}     Провайдер: {prov_str}     Модель: {model_str}')
+        r.font.size = Pt(9); r.font.color.rgb = RGBColor(0x80, 0x80, 0x80)
+        add_hr()
+
+        # ── Сводка ─────────────────────────────────────────────────
+        total   = len(results)
+        success = sum(1 for it in results if it.get('success'))
+        errors  = total - success
+        by_type = {}
+        for it in results:
+            t = it.get('resource_type', 'unknown')
+            by_type[t] = by_type.get(t, 0) + 1
+        with_viol = sum(1 for it in results if it.get('success') and not it.get('law_compliant', True))
+        all_words = set()
+        for it in results:
+            all_words.update(it.get('forbidden_words') or [])
+
+        p = doc.add_paragraph()
+        r = p.add_run('Общая сводка'); r.font.size = Pt(13); r.font.bold = True
+        r.font.color.rgb = RGBColor(0x1F, 0x38, 0x64)
+
+        tbl = doc.add_table(rows=2, cols=5); tbl.style = 'Table Grid'
+        hdrs = ['Всего ресурсов', 'Обработано', 'С нарушениями', 'Ошибок', 'Уник. нарушений']
+        vals = [str(total), str(success), str(with_viol), str(errors), str(len(all_words))]
+        for i, (h_txt, v_txt) in enumerate(zip(hdrs, vals)):
+            c = tbl.rows[0].cells[i]; set_cell_bg(c, '1F3864')
+            c.text = h_txt
+            c.paragraphs[0].runs[0].font.bold = True; c.paragraphs[0].runs[0].font.size = Pt(8)
+            c.paragraphs[0].runs[0].font.color.rgb = RGBColor(0xFF,0xFF,0xFF)
+            c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            c2 = tbl.rows[1].cells[i]; c2.text = v_txt
+            c2.paragraphs[0].runs[0].font.size = Pt(14)
+            c2.paragraphs[0].runs[0].font.bold = True
+            c2.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        doc.add_paragraph()
+        p = doc.add_paragraph()
+        r = p.add_run(f"Типы ресурсов: страниц — {by_type.get('page',0)},  изображений — {by_type.get('image',0)},  PDF — {by_type.get('pdf',0)}")
+        r.font.size = Pt(9); r.font.color.rgb = RGBColor(0x60,0x60,0x60)
+
+        doc.add_paragraph()
+
+        # ── Таблица URL ─────────────────────────────────────────────
+        add_hr('E0E0E0')
+        p = doc.add_paragraph()
+        r = p.add_run('Обзор ресурсов')
+        r.font.size = Pt(13); r.font.bold = True; r.font.color.rgb = RGBColor(0x1F,0x38,0x64)
+
+        tbl2 = doc.add_table(rows=1 + len(results), cols=5); tbl2.style = 'Table Grid'
+        for i, h_txt in enumerate(['№', 'Тип', 'URL', 'Статус', 'Нарушений']):
+            c = tbl2.rows[0].cells[i]; set_cell_bg(c, '2E4057')
+            c.text = h_txt
+            c.paragraphs[0].runs[0].font.bold = True; c.paragraphs[0].runs[0].font.size = Pt(9)
+            c.paragraphs[0].runs[0].font.color.rgb = RGBColor(0xFF,0xFF,0xFF)
+            c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        for idx, item in enumerate(results, 1):
+            row = tbl2.rows[idx]
+            url_str  = (item.get('url') or '')[:55]
+            rtype    = item.get('resource_type', '-')
+            if item.get('success'):
+                compliant    = item.get('law_compliant', True)
+                status_str   = 'OK' if compliant else 'НАРУШЕНИЯ'
+                viol_str     = str(item.get('violations_count', 0))
+                status_color = RGBColor(0x00,0xB0,0x50) if compliant else RGBColor(0xC0,0x00,0x00)
+            else:
+                status_str   = 'ОШИБКА'
+                viol_str     = '—'
+                status_color = RGBColor(0x80,0x80,0x80)
+            for ci, txt in enumerate([str(idx), rtype, url_str, status_str, viol_str]):
+                cell = row.cells[ci]; cell.text = txt
+                cell.paragraphs[0].runs[0].font.size = Pt(8)
+                if ci == 3:
+                    cell.paragraphs[0].runs[0].font.color.rgb = status_color
+
+        doc.add_paragraph()
+
+        # ── Детали нарушений ───────────────────────────────────────
+        violating = [it for it in results if it.get('success') and not it.get('law_compliant', True)]
+        if violating:
+            add_hr('E0E0E0')
+            p = doc.add_paragraph()
+            r = p.add_run('Детали нарушений')
+            r.font.size = Pt(13); r.font.bold = True; r.font.color.rgb = RGBColor(0xC0,0x00,0x00)
+
+            SECTION_CFG = [
+                ('nenormative_words', '🚫 Ненормативная лексика', 'C00000'),
+                ('latin_words',       '🌍 Латиница',              '1F3864'),
+                ('unknown_cyrillic',  '❓ Англицизмы',            '4472C4'),
+            ]
+
+            for item in violating:
+                p = doc.add_paragraph()
+                r = p.add_run(f"[{item.get('resource_type','?')}] {item.get('url','')}"); r.font.size = Pt(10); r.font.bold = True
+                r.font.color.rgb = RGBColor(0x1F,0x38,0x64)
+                has_any = False
+                for field, label, hex_color in SECTION_CFG:
+                    words = (item.get('forbidden_words') and []) or []
+                    # Берем из forbidden_words по типу через result
+                    result_obj = item.get('result') or {}
+                    words = result_obj.get(field) or []
+                    if not words:
+                        words = [w for w in (item.get('forbidden_words') or []) if field == 'latin_words']  # fallback
+                    if not words:
+                        continue
+                    has_any = True
+                    p2 = doc.add_paragraph()
+                    r2 = p2.add_run(f'{label} ({len(words)}):')
+                    r2.font.size = Pt(9); r2.font.bold = True
+                    hc = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+                    r2.font.color.rgb = RGBColor(*hc)
+                    cols = 3; rows_n = (len(words) + cols - 1) // cols
+                    t = doc.add_table(rows=rows_n, cols=cols); t.style = 'Table Grid'
+                    widx = 0
+                    for row in t.rows:
+                        for cell in row.cells:
+                            if widx < len(words):
+                                w = words[widx]
+                                if field == 'nenormative_words':
+                                    w = w[0] + '*' * max(0, len(w) - 2) + w[-1] if len(w) > 2 else w
+                                cell.text = f'{widx+1}. {w}'
+                                cell.paragraphs[0].runs[0].font.size = Pt(9)
+                            widx += 1
+                if not has_any:
+                    p3 = doc.add_paragraph(); r3 = p3.add_run(f"Запрещённых слов: {', '.join(item.get('forbidden_words') or [])}")
+                    r3.font.size = Pt(9)
+                doc.add_paragraph()
+
+        # ── Все уникальные слова ───────────────────────────────────
+        if all_words:
+            add_hr()
+            p = doc.add_paragraph()
+            r = p.add_run(f'Все уникальные слова-нарушения — {len(all_words)} слов')
+            r.font.size = Pt(13); r.font.bold = True; r.font.color.rgb = RGBColor(0x1F,0x38,0x64)
+            sorted_words = sorted(all_words)
+            cols = 4; rows_n = (len(sorted_words) + cols - 1) // cols
+            t = doc.add_table(rows=rows_n, cols=cols); t.style = 'Table Grid'
+            widx = 0
+            for row in t.rows:
+                for cell in row.cells:
+                    if widx < len(sorted_words):
+                        cell.text = sorted_words[widx]
+                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                    widx += 1
+
+        # ── Подвал ─────────────────────────────────────────────────
+        add_hr()
+        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run(f'LawChecker Online   |   ФЗ №168-ФЗ «О русском языке»   |   {datetime.now().strftime("%d.%m.%Y")}')
+        r.font.size = Pt(8); r.font.color.rgb = RGBColor(0xA0,0xA0,0xA0)
+
+        output = io.BytesIO(); doc.save(output); output.seek(0)
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            as_attachment=True,
+            download_name=f'lawcheck_multiscan_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx'
+        )
+    except Exception as e:
+        app.logger.error(f'MultiScan DOCX export error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 # ==================== DOCX EXPORT ====================
 
 def _build_docx_single(result, source_url=''):
@@ -2120,12 +2334,15 @@ def export_batch_docx():
         add_hr()
 
         # ── Общая сводка ───────────────────────────────────────────
-        ok  = sum(1 for r in results if r.get('success') and r.get('law_compliant', True))
+        ok  = sum(1 for r in results if r.get('success') and (r.get('result') or {}).get('law_compliant', True))
         err = sum(1 for r in results if not r.get('success'))
         viol= len(results) - ok - err
         all_words = set()
         for item in results:
-            all_words.update(item.get('forbidden_words') or [])
+            _r = item.get('result') or {}
+            all_words.update(_r.get('latin_words') or [])
+            all_words.update(_r.get('unknown_cyrillic') or [])
+            all_words.update(_r.get('nenormative_words') or [])
 
         p = doc.add_paragraph()
         r = p.add_run('Общая сводка'); r.font.size = Pt(13); r.font.bold = True
@@ -2165,9 +2382,10 @@ def export_batch_docx():
             row = tbl2.rows[idx]
             url_str = item.get('url', '')[:60]
             if item.get('success'):
-                status_str  = 'OK' if item.get('law_compliant', True) else 'НАРУШЕНИЯ'
-                viol_str    = str(item.get('violations_count', 0))
-                status_color = RGBColor(0x00,0xB0,0x50) if item.get('law_compliant', True) else RGBColor(0xC0,0x00,0x00)
+                _ir = item.get('result') or {}
+                status_str  = 'OK' if _ir.get('law_compliant', True) else 'НАРУШЕНИЯ'
+                viol_str    = str(_ir.get('violations_count', 0))
+                status_color = RGBColor(0x00,0xB0,0x50) if _ir.get('law_compliant', True) else RGBColor(0xC0,0x00,0x00)
             else:
                 status_str  = 'ОШИБКА'
                 viol_str    = '—'
@@ -2181,28 +2399,50 @@ def export_batch_docx():
         doc.add_paragraph()
 
         # ── Детали нарушений по URL ────────────────────────────────
-        violating = [it for it in results if it.get('success') and not it.get('law_compliant', True)]
+        violating = [it for it in results if it.get('success') and not (it.get('result') or {}).get('law_compliant', True)]
         if violating:
             add_hr('E0E0E0')
             p = doc.add_paragraph()
             r = p.add_run('Детали нарушений')
             r.font.size = Pt(13); r.font.bold = True; r.font.color.rgb = RGBColor(0xC0,0x00,0x00)
 
+            SECTION_CFG = [
+                ('nenormative_words', '🚫 Ненормативная лексика', 'C00000'),
+                ('latin_words',       '🌍 Латиница',              '1F3864'),
+                ('unknown_cyrillic',  '❓ Англицизмы',            '4472C4'),
+            ]
+
             for item in violating:
                 p = doc.add_paragraph()
                 r = p.add_run(item.get('url', '')); r.font.size = Pt(10); r.font.bold = True
                 r.font.color.rgb = RGBColor(0x1F,0x38,0x64)
-                words = item.get('forbidden_words') or []
-                if words:
-                    cols = 3; rows = (len(words) + cols - 1) // cols
-                    t = doc.add_table(rows=rows, cols=cols); t.style = 'Table Grid'
+                _ir = item.get('result') or {}
+                has_any = False
+                for field, label, hex_color in SECTION_CFG:
+                    words = _ir.get(field) or []
+                    if not words:
+                        continue
+                    has_any = True
+                    p2 = doc.add_paragraph()
+                    r2 = p2.add_run(f'{label} ({len(words)}):')
+                    r2.font.size = Pt(9); r2.font.bold = True
+                    hc = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+                    r2.font.color.rgb = RGBColor(*hc)
+                    cols = 3; rows_n = (len(words) + cols - 1) // cols
+                    t = doc.add_table(rows=rows_n, cols=cols); t.style = 'Table Grid'
                     widx = 0
                     for row in t.rows:
                         for cell in row.cells:
                             if widx < len(words):
-                                cell.text = f'{widx+1}. {words[widx]}'
+                                w = words[widx]
+                                if field == 'nenormative_words':
+                                    w = w[0] + '*' * max(0, len(w) - 2) + w[-1] if len(w) > 2 else w
+                                cell.text = f'{widx+1}. {w}'
                                 cell.paragraphs[0].runs[0].font.size = Pt(9)
                             widx += 1
+                if not has_any:
+                    p3 = doc.add_paragraph(); r3 = p3.add_run('Нарушения в деталях не найдены.')
+                    r3.font.size = Pt(9)
                 doc.add_paragraph()
 
         # ── Все уникальные слова ───────────────────────────────────

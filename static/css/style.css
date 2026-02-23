@@ -890,12 +890,25 @@ p, li, .text-muted { font-size: var(--text-sm); }
 }
 
 /* Progress Bar */
+.progress-container {
+    margin: 1rem 0;
+    padding: 0.25rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.progress-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
 .progress {
-    height: 8px;
+    height: 28px;
     background: #E0E0E0;
-    border-radius: 4px;
+    border-radius: 14px;
     overflow: hidden;
-    margin-top: 1rem;
     position: relative;
 }
 
@@ -904,6 +917,7 @@ p, li, .text-muted { font-size: var(--text-sm); }
     background: linear-gradient(90deg, var(--primary), var(--success));
     animation: progress 1.5s infinite;
     width: 100%;
+    border-radius: 14px;
 }
 
 .progress-text {
@@ -911,9 +925,12 @@ p, li, .text-muted { font-size: var(--text-sm); }
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-primary);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    white-space: nowrap;
+    pointer-events: none;
 }
 
 @keyframes progress {
