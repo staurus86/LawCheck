@@ -3693,9 +3693,11 @@ document.addEventListener('keydown', (e) => {
 // Модальное окно с горячими клавишами
 function toggleKeyboardHelpModal() {
     const modal = document.getElementById('keyboardHelpModal');
-    if (!modal) return;
-    const isVisible = modal.style.display !== 'none';
-    if (isVisible) closeKeyboardHelpModal(); else openKeyboardHelpModal();
+    if (!modal || modal.style.display === 'none' || modal.style.display === '') {
+        openKeyboardHelpModal();
+    } else {
+        closeKeyboardHelpModal();
+    }
 }
 function openKeyboardHelpModal() {
     let modal = document.getElementById('keyboardHelpModal');
