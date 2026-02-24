@@ -497,6 +497,16 @@
                 <div class="card results-card" id="imagesBatchResults" style="display: none;">
                     <div class="card-header">
                         <h2>Результаты пакетной проверки изображений</h2>
+                        <div class="btn-group">
+                            <button class="btn btn-ghost btn-sm" onclick="exportImagesBatchCsv()" title="Скачать таблицу CSV (для Excel)">
+                                <i class="fas fa-file-csv"></i>
+                                CSV
+                            </button>
+                            <button class="btn btn-ghost btn-sm" onclick="printCard('imagesBatchResults')" title="Распечатать результаты">
+                                <i class="fas fa-print"></i>
+                                Печать
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div id="imagesBatchResultsContent"></div>
