@@ -15,7 +15,7 @@ except:
 try:
     from pyaspeller import YandexSpeller
     PYASPELLER_AVAILABLE = True
-except:
+except Exception:
     PYASPELLER_AVAILABLE = False
 
 _RE_URL = re.compile(r'https?://[^\s]+')
@@ -815,6 +815,9 @@ class RussianLanguageChecker:
         self._nenormative_cache[word_lower] = result
         return result
 
+    # Максимальный размер текста для обработки (защита от ReDoS и DoS)
+    MAX_TEXT_CHARS = 500_000
+
     def check_text(self, text):
         """Быстрая проверка текста - O(1) на слово"""
         if not text or not text.strip():
@@ -830,6 +833,10 @@ class RussianLanguageChecker:
                 'total_words': 0,
                 'unique_words': 0
             }
+
+        # Обрезаем слишком длинный текст (защита от ReDoS)
+        if len(text) > self.MAX_TEXT_CHARS:
+            text = text[:self.MAX_TEXT_CHARS]
 
         text = _RE_URL.sub(' ', text)
         text = _RE_PHONE.sub(' ', text)

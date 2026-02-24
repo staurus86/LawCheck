@@ -649,9 +649,10 @@ def deep_check():
     except Exception as e:
         app.logger.error(f"Deep check error: {str(e)}", exc_info=True)
         log_error('/api/deep-check', 500, str(e))
-        return jsonify({'error': str(e), 'details': 'Check server logs'}), 500
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 @app.route('/api/stats', methods=['GET'])
+@limiter.limit("60 per minute")
 def get_stats():
     """API: Статистика словарей"""
     try:
@@ -702,6 +703,7 @@ def cleanup_metrics():
 
 
 @app.route('/api/metrics', methods=['GET'])
+@limiter.limit("30 per minute")
 def get_metrics():
     """Мини-метрики по событиям сервиса из PostgreSQL"""
     if db_engine is None:
@@ -823,6 +825,7 @@ def get_metrics():
 
 
 @app.route('/api/run-history', methods=['GET'])
+@limiter.limit("30 per minute")
 def get_run_history():
     """Последние запуски проверок из БД (минимальная агрегированная история)"""
     if db_engine is None:
@@ -878,6 +881,7 @@ def get_run_history():
         return jsonify({'enabled': True, 'error': 'Внутренняя ошибка сервера'}), 500
 
 @app.route('/api/check-word', methods=['POST'])
+@limiter.limit("60 per minute")
 def check_word():
     """API: Проверка одного слова"""
     try:
@@ -951,6 +955,7 @@ def check_word():
         return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 @app.route('/api/images/token', methods=['GET', 'POST'])
+@limiter.limit("30 per minute")
 def image_api_token():
     try:
         provider = (request.args.get('provider') or '').strip().lower()
@@ -981,6 +986,7 @@ def image_api_token():
 
 
 @app.route('/api/images/ocr', methods=['POST'])
+@limiter.limit("20 per minute")
 def image_ocr():
     try:
         started_at = time.perf_counter()
@@ -998,6 +1004,10 @@ def image_ocr():
             return jsonify({'error': f'Set API token first for provider={provider}'}), 401
         if not image_url and not image_data_url:
             return jsonify({'error': 'Pass image_url or image_data_url'}), 400
+
+        # SSRF protection: validate image_url before passing to OCR service
+        if image_url and not _is_safe_url(image_url):
+            return jsonify({'error': 'Недопустимый image_url (приватный или зарезервированный адрес)'}), 400
 
         ocr_started = time.perf_counter()
         if provider == 'openai':
@@ -1039,6 +1049,7 @@ def image_ocr():
 
 
 @app.route('/api/images/check', methods=['POST'])
+@limiter.limit("20 per minute")
 def check_images():
     try:
         started_at = time.perf_counter()
@@ -1056,6 +1067,10 @@ def check_images():
             return jsonify({'error': f'Set API token first for provider={provider}'}), 401
         if not image_url and not image_data_url:
             return jsonify({'error': 'Pass image_url or image_data_url'}), 400
+
+        # SSRF protection: validate image_url before passing to OCR service
+        if image_url and not _is_safe_url(image_url):
+            return jsonify({'error': 'Недопустимый image_url (приватный или зарезервированный адрес)'}), 400
 
         ocr_started = time.perf_counter()
         if provider == 'openai':
@@ -1130,6 +1145,7 @@ def check_images():
 
 
 @app.route('/api/multiscan/run', methods=['POST'])
+@limiter.limit("10 per hour")
 def multiscan_run():
     try:
         started_at = time.perf_counter()
@@ -1451,6 +1467,7 @@ def multiscan_run():
         return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 @app.route('/api/history', methods=['GET'])
+@limiter.limit("60 per minute")
 def get_history():
     """API: История проверок"""
     limit = _safe_int(request.args.get('limit', 10), 10, 1, 1000)
@@ -1461,6 +1478,7 @@ def get_history():
     })
 
 @app.route('/api/export/txt', methods=['POST'])
+@limiter.limit("30 per minute")
 def export_txt():
     """Экспорт отчета в TXT с полной информацией и правильной кодировкой"""
     try:
@@ -1623,6 +1641,7 @@ def export_txt():
         return jsonify({'error': 'Ошибка при создании файла'}), 500
 
 @app.route('/api/export/json', methods=['POST'])
+@limiter.limit("30 per minute")
 def export_json():
     """Экспорт отчета в JSON"""
     try:
@@ -1649,6 +1668,7 @@ def export_json():
         return jsonify({'error': 'Ошибка при создании файла'}), 500
 
 @app.route('/api/export/batch-txt', methods=['POST'])
+@limiter.limit("20 per minute")
 def export_batch_txt():
     """Экспорт пакетного отчета в TXT с детализацией всех нарушений"""
     try:
@@ -1799,6 +1819,7 @@ def export_batch_txt():
 
 
 @app.route('/api/export/multiscan-txt', methods=['POST'])
+@limiter.limit("20 per minute")
 def export_multiscan_txt():
     """Экспорт отчета MultiScan в TXT с разбивкой по типам ресурсов"""
     try:
@@ -1901,6 +1922,7 @@ def export_multiscan_txt():
         return jsonify({'error': 'Ошибка при создании файла'}), 500
 
 @app.route('/api/export/multiscan-docx', methods=['POST'])
+@limiter.limit("10 per minute")
 def export_multiscan_docx():
     """Экспорт отчёта MultiScan в DOCX (Word)"""
     try:
@@ -2289,6 +2311,7 @@ def _build_docx_single(result, source_url=''):
 
 
 @app.route('/api/export/docx', methods=['POST'])
+@limiter.limit("10 per minute")
 def export_docx():
     """Экспорт одиночного отчёта в DOCX (Word)"""
     try:
@@ -2314,6 +2337,7 @@ def export_docx():
 
 
 @app.route('/api/export/batch-docx', methods=['POST'])
+@limiter.limit("10 per minute")
 def export_batch_docx():
     """Экспорт пакетного отчёта в DOCX (Word)"""
     try:
