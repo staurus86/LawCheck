@@ -243,8 +243,9 @@ function showToast(message, type = 'info', duration = 4500) {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span>
-        <span class="toast-message">${message}</span>
-        <button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
+        <span class="toast-message">${escHtml(message)}</span>
+        <button class="toast-close" aria-label="Закрыть">✕</button>`;
+    toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
     container.appendChild(toast);
     requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('toast-visible')));
     setTimeout(() => {
@@ -264,9 +265,10 @@ function showToastWithUndo(message, undoCallback, duration = 7000) {
     const toast = document.createElement('div');
     toast.className = 'toast toast-info';
     toast.innerHTML = `<span class="toast-icon">ℹ️</span>
-        <span class="toast-message">${message}</span>
+        <span class="toast-message">${escHtml(message)}</span>
         <button class="toast-undo-btn">Отменить</button>
-        <button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
+        <button class="toast-close" aria-label="Закрыть">✕</button>`;
+    toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
     let done = false;
     const undoBtn = toast.querySelector('.toast-undo-btn');
     undoBtn.onclick = () => {

@@ -102,6 +102,18 @@ CORS(app, resources={
     }
 })
 
+
+@app.after_request
+def set_security_headers(response):
+    """Добавляем security headers к каждому ответу"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Не добавляем строгий CSP — inline-стили и скрипты используются в шаблоне
+    return response
+
+
 # Инициализация сервисов
 ocr_service = OCRService(
     openai_base_url=config.OPENAI_OCR_BASE_URL,
@@ -396,10 +408,11 @@ def check_text():
         })
     
     except Exception as e:
+        app.logger.error(f"/api/check error: {e}", exc_info=True)
         log_error('/api/check', 500, str(e))
         log_event(event_type='check', endpoint='/api/check', success=False, source_type='text', items_total=1, items_error=1)
         insert_run_history(check_type='text', endpoint='/api/check', success=False, source_type='text', context_short='text input')
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 @app.route('/api/check-url', methods=['POST'])
 @limiter.limit("20 per minute")
@@ -584,10 +597,11 @@ def batch_check():
         })
     
     except Exception as e:
+        app.logger.error(f"/api/batch-check error: {e}", exc_info=True)
         log_error('/api/batch-check', 500, str(e))
         log_event(event_type='batch', endpoint='/api/batch-check', success=False, source_type='url', items_error=1)
         insert_run_history(check_type='batch', endpoint='/api/batch-check', success=False, source_type='url')
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 @app.route('/api/deep-check', methods=['POST'])
 @limiter.limit("20 per minute")
@@ -602,6 +616,9 @@ def deep_check():
 
         if not words:
             return jsonify({'error': 'Список слов пуст'}), 400
+
+        if len(words) > 500:
+            return jsonify({'error': 'Слишком много слов (максимум 500)'}), 400
 
         # Используем метод через checker_service
         checker_instance = get_checker()
@@ -668,12 +685,9 @@ def cleanup_metrics():
         data = request.get_json(silent=True) or {}
         secret = data.get('secret', '').strip()
 
-        # Вариант 1: SECRET_KEY (первые 16 символов)
-        # Вариант 2: Простой пароль "CLEANUP_DB" (для удобства)
         valid_secret = app.secret_key[:16]
-        simple_password = "CLEANUP_DB"
 
-        if secret != valid_secret and secret != simple_password:
+        if secret != valid_secret:
             return jsonify({'error': 'Неверный пароль'}), 401
 
         if db_manager:
@@ -684,7 +698,7 @@ def cleanup_metrics():
             return jsonify({'error': 'Database not available'}), 503
     except Exception as e:
         app.logger.error(f"Cleanup metrics error: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 
 @app.route('/api/metrics', methods=['GET'])
@@ -859,8 +873,9 @@ def get_run_history():
             'timestamp': datetime.now().isoformat()
         })
     except Exception as e:
+        app.logger.error(f"/api/run-history error: {e}", exc_info=True)
         log_error('/api/run-history', 500, str(e))
-        return jsonify({'enabled': True, 'error': str(e)}), 500
+        return jsonify({'enabled': True, 'error': 'Внутренняя ошибка сервера'}), 500
 
 @app.route('/api/check-word', methods=['POST'])
 def check_word():
@@ -932,7 +947,8 @@ def check_word():
         })
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"/api/check-word error: {e}", exc_info=True)
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 @app.route('/api/images/token', methods=['GET', 'POST'])
 def image_api_token():
@@ -960,7 +976,8 @@ def image_api_token():
 
         return jsonify({'success': True, 'provider': provider, 'token_masked': _mask_token(token)})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"/api/images/token error: {e}", exc_info=True)
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 
 @app.route('/api/images/ocr', methods=['POST'])
@@ -1017,7 +1034,8 @@ def image_ocr():
             'timestamp': datetime.now().isoformat()
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"/api/images/ocr error: {e}", exc_info=True)
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 
 @app.route('/api/images/check', methods=['POST'])
@@ -1104,10 +1122,11 @@ def check_images():
 
         return jsonify({'success': True, 'provider': provider, 'result': result, 'timestamp': datetime.now().isoformat()})
     except Exception as e:
+        app.logger.error(f"/api/images/check error: {e}", exc_info=True)
         log_error('/api/images/check', 500, str(e))
         log_event(event_type='ocr_check', endpoint='/api/images/check', success=False, source_type='image', items_total=1, items_error=1)
         insert_run_history(check_type='image', endpoint='/api/images/check', success=False, source_type='image')
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 
 @app.route('/api/multiscan/run', methods=['POST'])
@@ -1423,12 +1442,13 @@ def multiscan_run():
         log_error('/api/multiscan/run', 400, str(e))
         log_event(event_type='multiscan', endpoint='/api/multiscan/run', success=False, source_type='mixed', items_error=1)
         insert_run_history(check_type='multiscan', endpoint='/api/multiscan/run', success=False, source_type='mixed')
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': str(e)}), 400  # RuntimeError — пользовательская ошибка, показываем текст
     except Exception as e:
+        app.logger.error(f"/api/multiscan/run error: {e}", exc_info=True)
         log_error('/api/multiscan/run', 500, str(e))
         log_event(event_type='multiscan', endpoint='/api/multiscan/run', success=False, source_type='mixed', items_error=1)
         insert_run_history(check_type='multiscan', endpoint='/api/multiscan/run', success=False, source_type='mixed')
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 @app.route('/api/history', methods=['GET'])
 def get_history():
@@ -1597,9 +1617,10 @@ def export_txt():
             as_attachment=True,
             download_name=f'lawcheck_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
         )
-        
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"/api/export/txt error: {e}", exc_info=True)
+        return jsonify({'error': 'Ошибка при создании файла'}), 500
 
 @app.route('/api/export/json', methods=['POST'])
 def export_json():
@@ -1622,9 +1643,10 @@ def export_json():
             as_attachment=True,
             download_name=f'lawcheck_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
         )
-        
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"/api/export/json error: {e}", exc_info=True)
+        return jsonify({'error': 'Ошибка при создании файла'}), 500
 
 @app.route('/api/export/batch-txt', methods=['POST'])
 def export_batch_txt():
@@ -1770,9 +1792,10 @@ def export_batch_txt():
             as_attachment=True,
             download_name=f'lawcheck_batch_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
         )
-        
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"/api/export/batch-txt error: {e}", exc_info=True)
+        return jsonify({'error': 'Ошибка при создании файла'}), 500
 
 
 @app.route('/api/export/multiscan-txt', methods=['POST'])
@@ -1874,7 +1897,8 @@ def export_multiscan_txt():
             download_name=f'lawcheck_multiscan_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
         )
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"/api/export/multiscan-txt error: {e}", exc_info=True)
+        return jsonify({'error': 'Ошибка при создании файла'}), 500
 
 @app.route('/api/export/multiscan-docx', methods=['POST'])
 def export_multiscan_docx():
@@ -2084,8 +2108,8 @@ def export_multiscan_docx():
             download_name=f'lawcheck_multiscan_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx'
         )
     except Exception as e:
-        app.logger.error(f'MultiScan DOCX export error: {e}')
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f'MultiScan DOCX export error: {e}', exc_info=True)
+        return jsonify({'error': 'Ошибка при создании DOCX файла'}), 500
 
 
 # ==================== DOCX EXPORT ====================
@@ -2285,8 +2309,8 @@ def export_docx():
             download_name=f'lawcheck_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx'
         )
     except Exception as e:
-        app.logger.error(f'DOCX export error: {e}')
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f'DOCX export error: {e}', exc_info=True)
+        return jsonify({'error': 'Ошибка при создании DOCX файла'}), 500
 
 
 @app.route('/api/export/batch-docx', methods=['POST'])
@@ -2482,8 +2506,8 @@ def export_batch_docx():
             download_name=f'lawcheck_batch_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx'
         )
     except Exception as e:
-        app.logger.error(f'Batch DOCX export error: {e}')
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f'Batch DOCX export error: {e}', exc_info=True)
+        return jsonify({'error': 'Ошибка при создании DOCX файла'}), 500
 
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
@@ -2509,6 +2533,11 @@ def update_statistics(result):
         statistics['most_common_violations'][word] += 1
     for word in result.get('unknown_cyrillic', [])[:10]:
         statistics['most_common_violations'][word] += 1
+
+    # Ограничиваем размер словаря — оставляем только топ-5000 по частоте
+    if len(statistics['most_common_violations']) > 10000:
+        top = sorted(statistics['most_common_violations'].items(), key=lambda x: x[1], reverse=True)[:5000]
+        statistics['most_common_violations'] = defaultdict(int, top)
 
 def generate_recommendations(result):
     """Генерация рекомендаций по исправлению"""
