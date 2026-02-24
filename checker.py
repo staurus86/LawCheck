@@ -43,7 +43,7 @@ class _BoundedDict(dict):
 
 class RussianLanguageChecker:
     __slots__ = ('normative_words', 'foreign_allowed', 'nenormative_words',
-                 'speller_cache', 'forms_cache', 'all_forms', 'morph', 'speller',
+                 'speller_cache', 'forms_cache', 'morph', 'speller',
                  '_word_prefixes', '_skip_words', 'abbreviations', '_normal_form_cache',
                  '_nenormative_cache')
 
@@ -51,12 +51,11 @@ class RussianLanguageChecker:
         self.normative_words = set()
         self.foreign_allowed = set()
         self.nenormative_words = set()
-        self.speller_cache = _BoundedDict(maxsize=50_000)
-        self.forms_cache = _BoundedDict(maxsize=50_000)
-        self.all_forms = set()
+        self.speller_cache = _BoundedDict(maxsize=5_000)
+        self.forms_cache = _BoundedDict(maxsize=5_000)
         self.abbreviations = {}
-        self._normal_form_cache = _BoundedDict(maxsize=50_000)  # Кэш нормальных форм (str → str или dict)
-        self._nenormative_cache = _BoundedDict(maxsize=50_000)  # Кэш результатов is_nenormative (str → bool)
+        self._normal_form_cache = _BoundedDict(maxsize=5_000)  # Кэш нормальных форм (str → str или dict)
+        self._nenormative_cache = _BoundedDict(maxsize=5_000)  # Кэш результатов is_nenormative (str → bool)
 
         print("\n" + "="*60)
         print("INIT RussianLanguageChecker (OPTIMIZED)")
@@ -566,12 +565,7 @@ class RussianLanguageChecker:
 
     def _is_known_fast(self, word_lower):
         """Мгновенная проверка - только словари"""
-        if word_lower in self.all_forms:
-            return True
-        if word_lower in self.normative_words:
-            self.all_forms.add(word_lower)
-            return True
-        return False
+        return word_lower in self.normative_words
 
     def deep_check_words(self, words):
         """Глубокая проверка списка слов с кэшированием"""
@@ -783,13 +777,20 @@ class RussianLanguageChecker:
             except Exception as e:
                 print(f"[ERROR] abbreviations.txt: {e}")
 
-        self.all_forms = set(self.normative_words)
-        self.all_forms.update(self.foreign_allowed)
-        print(f"[OK] Ready with {len(self.all_forms):,} total forms")
+        # Сливаем foreign_allowed в normative_words (убираем дублирующий all_forms set)
+        self.normative_words.update(self.foreign_allowed)
+        print(f"[OK] Ready with {len(self.normative_words):,} total forms")
     
     def is_known_word(self, word):
         """Мгновенная проверка - только словари"""
         return self._is_known_fast(word.lower())
+
+    def clear_caches(self):
+        """Очищает все in-memory кеши для освобождения памяти при простое"""
+        self.speller_cache.clear()
+        self.forms_cache.clear()
+        self._normal_form_cache.clear()
+        self._nenormative_cache.clear()
 
     def get_word_normal_form(self, word):
         return word.lower()

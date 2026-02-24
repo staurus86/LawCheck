@@ -37,6 +37,9 @@ class DatabaseManager:
                 self.db_engine = create_engine(
                     database_url,
                     pool_pre_ping=True,
+                    pool_size=2,        # Railway: 2 idle соединения хватает
+                    max_overflow=3,     # максимум +3 при пике
+                    pool_recycle=1800,  # переподключение через 30 мин (Railway закрывает idle TCP)
                     future=True
                 )
                 logger.info("Database engine initialized successfully")

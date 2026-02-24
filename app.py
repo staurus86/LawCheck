@@ -10,6 +10,8 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import os
+import gc
+import threading
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
@@ -103,6 +105,12 @@ CORS(app, resources={
 })
 
 
+@app.before_request
+def _track_request_time():
+    global _last_request_ts
+    _last_request_ts = time.time()
+
+
 @app.after_request
 def set_security_headers(response):
     """Добавляем security headers к каждому ответу"""
@@ -128,12 +136,33 @@ def get_checker():
     return get_checker_service().get_checker()
 
 # Хранилище истории проверок (в продакшене используйте Redis/Database)
-check_history = deque(maxlen=1000)
+check_history = deque(maxlen=200)
 statistics = {
     'total_checks': 0,
     'total_violations': 0,
     'most_common_violations': defaultdict(int)
 }
+
+# Idle memory cleaner — освобождает кеши checker'а после простоя
+_last_request_ts = time.time()
+
+def _idle_memory_cleaner():
+    """Фоновый поток: очищает кеши и запускает GC после 10 минут простоя."""
+    while True:
+        time.sleep(120)  # проверяем каждые 2 минуты
+        idle_sec = time.time() - _last_request_ts
+        if idle_sec > 600:  # 10 минут простоя
+            try:
+                svc = get_checker_service()
+                if svc._checker is not None:
+                    svc._checker.clear_caches()
+                gc.collect()
+                app.logger.info(f"Idle cleanup: кеши очищены после {idle_sec:.0f}s простоя")
+            except Exception as e:
+                app.logger.warning(f"Idle cleanup error: {e}")
+
+_idle_cleaner = threading.Thread(target=_idle_memory_cleaner, daemon=True, name="idle-mem-cleaner")
+_idle_cleaner.start()
 
 # Регистрация page routes blueprint
 app.register_blueprint(page_bp)
