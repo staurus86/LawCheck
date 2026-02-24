@@ -38,7 +38,7 @@ from utils.helpers import (
     mask_token, extract_data_url_payload, normalize_http_url,
     safe_int, safe_bool, extract_openai_text, extract_ocr_usage
 )
-from services import get_checker_service, OCRService
+from services import get_checker_service, CheckerService, OCRService
 from routes import page_bp
 
 try:
@@ -147,17 +147,15 @@ statistics = {
 _last_request_ts = time.time()
 
 def _idle_memory_cleaner():
-    """Фоновый поток: очищает кеши и запускает GC после 10 минут простоя."""
+    """Фоновый поток: уничтожает checker (словари ~200 МБ) после 10 минут простоя."""
     while True:
         time.sleep(120)  # проверяем каждые 2 минуты
         idle_sec = time.time() - _last_request_ts
-        if idle_sec > 600:  # 10 минут простоя
+        if idle_sec > 600 and CheckerService._checker is not None:  # 10 минут простоя
             try:
-                svc = get_checker_service()
-                if svc._checker is not None:
-                    svc._checker.clear_caches()
+                CheckerService._checker = None
                 gc.collect()
-                app.logger.info(f"Idle cleanup: кеши очищены после {idle_sec:.0f}s простоя")
+                app.logger.info(f"Idle cleanup: checker уничтожен после {idle_sec:.0f}s простоя, словари освобождены")
             except Exception as e:
                 app.logger.warning(f"Idle cleanup error: {e}")
 
