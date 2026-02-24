@@ -3310,12 +3310,24 @@ label.text-muted {
 [data-theme="dark"] .images-step-label { color: #475569; }
 
 /* Empty state hint в карточках результатов */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 2rem 1rem;
+}
+.empty-state-icon {
+    font-size: 2rem;
+    line-height: 1;
+    opacity: 0.5;
+}
 .empty-state-hint {
     color: #94A3B8;
     font-size: 0.9rem;
     text-align: center;
-    padding: 1.5rem 0;
     font-style: italic;
+    margin: 0;
 }
 [data-theme="dark"] .empty-state-hint { color: #475569; }
 
@@ -3786,6 +3798,56 @@ label.text-muted {
 [data-theme="dark"] .kb-table tr:nth-child(even) td { background: #0F172A; }
 [data-theme="dark"] .kb-table kbd { background: #334155; border-color: #475569; color: #CBD5E1; box-shadow: 0 1px 0 #475569; }
 [data-theme="dark"] .kb-modal-close:hover { background: #334155; }
+
+
+/* ── Mobile UX: touch targets, nav overflow, highlight overlay ─ */
+
+/* Touch targets: мин. 44px на мобильных для всех мелких кнопок */
+@media (max-width: 768px) {
+    .spoiler-toggle-btn,
+    .batch-details-btn,
+    .url-clear-btn,
+    .dark-toggle,
+    .back-to-top {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    .spoiler-toggle-btn {
+        padding: 0.4rem 0.9rem;
+    }
+}
+
+/* Nav: горизонтальный скролл при нехватке места (< 420px) */
+@media (max-width: 420px) {
+    .nav {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 2px;
+    }
+    .nav::-webkit-scrollbar { display: none; }
+    .nav-link { flex-shrink: 0; }
+}
+
+/* highlight-overlay: не выше 70vh на мобильных */
+@media (max-width: 768px) {
+    .highlight-overlay {
+        max-height: min(380px, 70vh);
+    }
+}
+
+/* word-tag hover только на устройствах с мышью */
+@media (hover: none) {
+    .word-tag:hover { transform: none; box-shadow: none; }
+    .word-tag:active { opacity: 0.75; }
+}
+
+/* stat-icon уменьшаем на маленьких экранах */
+@media (max-width: 480px) {
+    .stat-icon { font-size: 1.25rem; }
+    .stat-card  { padding: 0.75rem; }
+}
 
 
 

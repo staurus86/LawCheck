@@ -31,9 +31,9 @@
 						<a href="/payment" class="nav-link">Тарифы</a>
 						<a href="/api/stats" class="nav-link" target="_blank">Статистика</a>
 					</nav>
-					<button class="dark-toggle" onclick="toggleKeyboardHelpModal()" title="Горячие клавиши (?)">⌨️</button>
-					<button class="dark-toggle" id="darkModeToggle" onclick="toggleDarkMode()" title="Тёмная тема">
-						<span id="darkModeIcon">🌙</span>
+					<button class="dark-toggle" onclick="toggleKeyboardHelpModal()" title="Горячие клавиши (?)" aria-label="Горячие клавиши">⌨️</button>
+					<button class="dark-toggle" id="darkModeToggle" onclick="toggleDarkMode()" title="Тёмная тема" aria-label="Переключить тёмную тему">
+						<span id="darkModeIcon" aria-hidden="true">🌙</span>
 					</button>
             </div>
         </div>
@@ -122,7 +122,7 @@
                         <p class="text-muted" style="font-size:0.78rem;margin-top:0.3rem;">Или перетащите .txt-файл прямо в поле выше</p>
                         
                         <div class="btn-group">
-                            <button class="btn btn-primary" onclick="checkText()" title="Проверить текст (Ctrl+Enter)">
+                            <button class="btn btn-primary" id="checkTextBtn" onclick="checkText()" title="Проверить текст (Ctrl+Enter)">
                                 <i class="fas fa-search"></i>
                                 Проверить текст
                                 <span class="kbd-hint">Ctrl+Enter</span>
@@ -144,7 +144,7 @@
                 </div>
 
                 <!-- Results -->
-                <div class="card results-card" id="textResults" style="display: none;">
+                <div class="card results-card" id="textResults" role="region" aria-label="Результаты проверки текста" aria-live="polite" style="display: none;">
                     <div class="card-header">
                         <h2>Результаты проверки <span class="check-timestamp text-muted" style="font-size:0.75rem;font-weight:400"></span></h2>
                         <div class="btn-group">
@@ -171,7 +171,7 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div id="textResultsContent"><p class="empty-state-hint">Нажмите «Проверить текст» — результаты появятся здесь.</p></div>
+                        <div id="textResultsContent"><div class="empty-state"><span class="empty-state-icon" aria-hidden="true">⚖️</span><p class="empty-state-hint">Введите текст выше и нажмите «Проверить текст»</p></div></div>
                     </div>
                 </div>
             </div>
@@ -193,7 +193,7 @@
                                     placeholder="https://example.com"
                                     value="https://"
                                 >
-                                <button class="url-clear-btn" onclick="document.getElementById('urlInput').value='https://'; document.getElementById('urlInput').focus()" title="Очистить поле">&#x2715;</button>
+                                <button class="url-clear-btn" onclick="document.getElementById('urlInput').value='https://'; document.getElementById('urlInput').focus()" title="Очистить поле" aria-label="Очистить поле URL">&#x2715;</button>
                             </div>
                             <button class="btn btn-primary" onclick="checkUrl()" title="Загрузить страницу и проверить текст (Ctrl+Enter)">
                                 <i class="fas fa-search"></i>
@@ -212,7 +212,7 @@
                 </div>
 
                 <!-- URL Results -->
-                <div class="card results-card" id="urlResults" style="display: none;">
+                <div class="card results-card" id="urlResults" role="region" aria-label="Результаты проверки URL" aria-live="polite" style="display: none;">
                     <div class="card-header">
                         <h2>Результаты проверки <span class="check-timestamp text-muted" style="font-size:0.75rem;font-weight:400"></span> сайта</h2>
                         <div class="btn-group">
@@ -300,7 +300,7 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div id="batchResultsContent"><p class="empty-state-hint">Результаты пакетной проверки появятся здесь.</p></div>
+                        <div id="batchResultsContent"><div class="empty-state"><span class="empty-state-icon" aria-hidden="true">📋</span><p class="empty-state-hint">Введите URL-адреса сайтов (по одному на строку) и нажмите «Проверить»</p></div></div>
                     </div>
                 </div>
             </div>
@@ -331,7 +331,7 @@
                 </div>
 
                 <!-- Word Results -->
-                <div class="card results-card" id="wordResults" style="display: none;">
+                <div class="card results-card" id="wordResults" role="region" aria-label="Результаты проверки слова" aria-live="polite" style="display: none;">
                     <div class="card-header">
                         <h2>Результат проверки</h2>
                         <div class="btn-group">
@@ -631,7 +631,7 @@
                     </div>
                 </div>
 
-                <div class="card results-card" id="multiResults" style="display: none;">
+                <div class="card results-card" id="multiResults" role="region" aria-label="Результаты MultiScan" aria-live="polite" style="display: none;">
                     <div class="card-header">
                         <h2>Результаты мульти-скана</h2>
                         <div class="btn-group">
@@ -870,7 +870,7 @@
     </div>
 
     <div id="toastContainer"></div>
-    <button id="backToTop" class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Наверх">↑</button>
+    <button id="backToTop" class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Наверх" aria-label="Наверх">↑</button>
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

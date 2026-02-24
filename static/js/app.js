@@ -603,7 +603,9 @@ function initFieldMetrics() {
         textInput.addEventListener('input', () => {
             debouncedTextMeta();
             localStorage.setItem(TEXT_AUTOSAVE_KEY, textInput.value);
+            _syncBtnDisabled('checkTextBtn', !textInput.value.trim());
         });
+        _syncBtnDisabled('checkTextBtn', !textInput.value.trim());
     }
 
     if (batchInput) {
@@ -619,6 +621,14 @@ function initFieldMetrics() {
     updateImagesInputMeta();
     updateImagesBatchInputMeta();
     updateMultiUrlsInputMeta();
+}
+
+/** Включает/выключает кнопку (disabled + aria-disabled) */
+function _syncBtnDisabled(id, shouldDisable) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.disabled = shouldDisable;
+    btn.setAttribute('aria-disabled', String(shouldDisable));
 }
 
 async function loadStats() {
@@ -758,15 +768,19 @@ async function checkText() {
             body: JSON.stringify({ text })
         });
         
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${response.status}`);
+        }
         const data = await response.json();
-        
+
         if (data.success) {
             currentResults.text = data.result;
             currentDeepResults.text = null;
             displayResults('text', data.result);
             console.log('✅ Текст проверен:', data.result);
         } else {
-            showToast('Ошибка: ' + data.error, 'error');
+            showToast('Ошибка: ' + (data.error || 'Неизвестная ошибка'), 'error');
         }
     } catch (error) {
         showToast('Ошибка проверки: ' + error.message, 'error');
@@ -798,6 +812,10 @@ async function checkUrl() {
             signal: controller.signal
         });
 
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${response.status}`);
+        }
         const data = await response.json();
 
         if (data.success) {
@@ -809,7 +827,7 @@ async function checkUrl() {
             if (urlOverlay) urlOverlay.dataset.source = data.source_text || '';
             console.log('✅ URL проверен:', data.result);
         } else {
-            showToast('Ошибка: ' + data.error, 'error');
+            showToast('Ошибка: ' + (data.error || 'Неизвестная ошибка'), 'error');
         }
     } catch (error) {
         if (error.name === 'AbortError') {
@@ -827,7 +845,10 @@ async function checkUrl() {
 // Пакетная проверка
 async function checkBatch() {
     const input = document.getElementById('batchInput').value.trim();
-    const urls = input.split('\n').filter(u => u.trim() && u.startsWith('http'));
+    const urls = input.split('\n').map(u => u.trim()).filter(u => {
+        if (!u) return false;
+        try { new URL(u); return true; } catch { return false; }
+    });
     
     if (urls.length === 0) {
         showToast('Введите хотя бы один URL!', 'warning');
@@ -851,9 +872,13 @@ async function checkBatch() {
             body: JSON.stringify({ urls })
         });
 
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${response.status}`);
+        }
         const data = await response.json();
         if (!data.success) {
-            throw new Error(data.error || 'Batch check failed');
+            throw new Error(data.error || 'Ошибка пакетной проверки');
         }
 
         const results = data.results || [];
@@ -1031,14 +1056,14 @@ function appendImageOcrSummary(ocr, targetEl) {
     if (!targetEl || !ocr) return;
     const timings = ocr.timings_ms || {};
     const usage = ocr.usage || {};
-    targetEl.innerHTML += `
+    targetEl.insertAdjacentHTML('beforeend', `
         <div class="image-db-summary">
             <h4>Лог OCR</h4>
-            <p>Провайдер: ${ocr.provider || '-'} | Модель: ${ocr.model || '-'} | Источник: ${ocr.source || '-'}</p>
+            <p>Провайдер: ${escHtml(ocr.provider || '-')} | Модель: ${escHtml(ocr.model || '-')} | Источник: ${escHtml(ocr.source || '-')}</p>
             <p>Время (мс): ocr=${timings.ocr ?? '-'}, проверка=${timings.text_check ?? '-'}, всего=${timings.total ?? '-'}</p>
-            <p>Использование: ${Object.keys(usage).length ? Object.entries(usage).map(([k, v]) => `${k}=${v}`).join(', ') : 'нет данных'}</p>
+            <p>Использование: ${Object.keys(usage).length ? Object.entries(usage).map(([k, v]) => `${escHtml(k)}=${escHtml(String(v))}`).join(', ') : 'нет данных'}</p>
         </div>
-    `;
+    `);
 }
 
 async function runStandardCheckForImageText(text, sourceUrl = '', ocr = null) {
@@ -1961,7 +1986,7 @@ function displayMultiDeepResults(results, deepResults) {
     });
 
     html += `</div>`;
-    resultsContent.innerHTML += html;
+    resultsContent.insertAdjacentHTML('beforeend', html);
     resultsContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -3269,7 +3294,7 @@ function displayBatchDeepResults(results, deepResults, urlMap) {
 
     html += '</div>';
 
-    resultsContent.innerHTML += html;
+    resultsContent.insertAdjacentHTML('beforeend', html);
     resultsContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -3336,7 +3361,7 @@ function displayDeepResults(type, results) {
 
     html += '</div>';
 
-    resultsContent.innerHTML += html;
+    resultsContent.insertAdjacentHTML('beforeend', html);
     resultsContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
