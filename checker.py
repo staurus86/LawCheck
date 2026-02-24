@@ -777,9 +777,8 @@ class RussianLanguageChecker:
             except Exception as e:
                 print(f"[ERROR] abbreviations.txt: {e}")
 
-        # Сливаем foreign_allowed в normative_words (убираем дублирующий all_forms set)
+        # Сливаем foreign_allowed в normative_words для быстрой проверки
         self.normative_words.update(self.foreign_allowed)
-        self.foreign_allowed.clear()  # освобождаем ~20 МБ — данные теперь в normative_words
         print(f"[OK] Ready with {len(self.normative_words):,} total forms")
     
     def is_known_word(self, word):
@@ -862,7 +861,8 @@ class RussianLanguageChecker:
                 continue
 
             if _RE_LATIN.search(word):
-                latin_words.add(word)
+                if wlower not in self.foreign_allowed:
+                    latin_words.add(word)
                 continue
 
             if not self._is_known_fast(wlower):
