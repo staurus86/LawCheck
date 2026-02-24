@@ -779,6 +779,7 @@ class RussianLanguageChecker:
 
         # Сливаем foreign_allowed в normative_words (убираем дублирующий all_forms set)
         self.normative_words.update(self.foreign_allowed)
+        self.foreign_allowed.clear()  # освобождаем ~20 МБ — данные теперь в normative_words
         print(f"[OK] Ready with {len(self.normative_words):,} total forms")
     
     def is_known_word(self, word):
