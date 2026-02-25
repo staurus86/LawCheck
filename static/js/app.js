@@ -438,10 +438,12 @@ function printCard(cardId) {
     document.querySelectorAll('.main .card').forEach(c => {
         if (c.id !== cardId) c.classList.add('print-hidden');
     });
-    window.print();
-    setTimeout(() => {
+    function restore() {
         document.querySelectorAll('.print-hidden').forEach(c => c.classList.remove('print-hidden'));
-    }, 500);
+        window.removeEventListener('afterprint', restore);
+    }
+    window.addEventListener('afterprint', restore);
+    window.print();
 }
 
 function initSectionMotion() {

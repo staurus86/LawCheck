@@ -3460,20 +3460,36 @@ label.text-muted {
 }
 
 /* ── Print стили ──────────────────────────────────────────────── */
+@page {
+    size: A4;
+    margin: 1.5cm 2cm;
+}
+
 @media print {
+    /* Скрыть интерфейсные элементы */
     .header, .hero, .tabs, .btn-group, .batch-toolbar,
     .loading-overlay, #toastContainer, .back-to-top,
     .reveal-item:not(.is-visible), footer, .field-meta,
     .progress-container, .images-action-groups,
-    .deep-check-trigger, nav, .quick-links {
+    .deep-check-trigger, nav, .quick-links,
+    /* Скрыть все кнопки внутри результатов */
+    .btn, button, .highlight-btn,
+    /* Скрыть overlay подсветки */
+    .highlight-overlay {
         display: none !important;
     }
-    body {
-        background: white;
-        color: #0F172A;
-        font-size: 11pt;
+
+    /* Сброс фона и нормальный шрифт */
+    html, body {
+        background: white !important;
+        color: #0F172A !important;
+        font-size: 10pt !important;
+        min-height: 0 !important;
+        height: auto !important;
     }
+
     .container { max-width: 100%; padding: 0; }
+
     .card {
         border: 1px solid #CBD5E1;
         box-shadow: none;
@@ -3482,12 +3498,23 @@ label.text-muted {
         margin-bottom: 1rem;
     }
     .card-header { background: #F8FAFC !important; }
-    .result-status { break-inside: avoid; }
-    .batch-item { break-inside: avoid; border: 1px solid #E2E8F0; }
-    .word-tag { border: 1px solid #CBD5E1; background: #F1F5F9; color: #334155; }
+
+    /* Не разрывать секции нарушений и статистику */
+    .violation-section,
+    .result-status,
+    .stats-summary,
+    .batch-item,
+    .multi-item {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .batch-item { border: 1px solid #E2E8F0; }
+    .word-tag { border: 1px solid #CBD5E1; background: #F1F5F9 !important; color: #334155 !important; }
     .result-stats-grid { grid-template-columns: repeat(3, 1fr); }
-    a[href]::after { content: " (" attr(href) ")"; font-size: 0.75em; color: #64748B; }
-    a.batch-url::after { content: ""; }
+
+    /* Не дописывать URL рядом со ссылками */
+    a[href]::after { content: none !important; }
 }
 
 /* chip-row теги в knowledge-cards — не кликабельные */
