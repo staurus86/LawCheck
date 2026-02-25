@@ -140,7 +140,6 @@ check_history = deque(maxlen=200)
 statistics = {
     'total_checks': 0,
     'total_violations': 0,
-    'most_common_violations': defaultdict(int)
 }
 
 # Idle memory cleaner — освобождает кеши checker'а после простоя
@@ -192,14 +191,6 @@ def insert_run_history(check_type, endpoint, success, duration_ms=None, source_t
     if db_manager:
         db_manager.insert_run_history(check_type, endpoint, success, duration_ms, source_type, context_short, violations_count)
 
-
-def upsert_violation_words(words):
-    """Обновление счетчиков слов-нарушений через db_manager"""
-    try:
-        if db_manager:
-            db_manager.upsert_violation_words(words)
-    except Exception as e:
-        app.logger.warning(f"upsert_violation_words skipped: {e}")
 
 
 def cleanup_analytics_db(force=False):
@@ -421,12 +412,7 @@ def check_text():
             context_short='text input',
             violations_count=result.get('violations_count', 0)
         )
-        upsert_violation_words(
-            (result.get('latin_words') or [])
-            + (result.get('unknown_cyrillic') or [])
-            + (result.get('nenormative_words') or [])
-        )
-        
+
         return jsonify({
             'success': True,
             'result': result,
@@ -508,12 +494,7 @@ def check_url():
             context_short=url[:255],
             violations_count=result.get('violations_count', 0)
         )
-        upsert_violation_words(
-            (result.get('latin_words') or [])
-            + (result.get('unknown_cyrillic') or [])
-            + (result.get('nenormative_words') or [])
-        )
-        
+
         return jsonify({
             'success': True,
             'url': url,
@@ -607,14 +588,6 @@ def batch_check():
             context_short=f'urls={len(clean_urls)} ok={len(success_items)} err={len(error_items)}',
             violations_count=violations_total
         )
-        all_words = []
-        for item in success_items:
-            r = item.get('result') or {}
-            all_words.extend(r.get('latin_words') or [])
-            all_words.extend(r.get('unknown_cyrillic') or [])
-            all_words.extend(r.get('nenormative_words') or [])
-        upsert_violation_words(all_words)
-        
         return jsonify({
             'success': True,
             'total': len(clean_urls),
@@ -783,13 +756,6 @@ def get_metrics():
                 ORDER BY created_at DESC
                 LIMIT 20
             """)).mappings().all()
-            top_words = conn.execute(text("""
-                SELECT word, count, last_seen_at
-                FROM violation_words
-                WHERE last_seen_at >= NOW() - make_interval(days => :days)
-                ORDER BY count DESC, last_seen_at DESC
-                LIMIT 20
-            """), {'days': days}).mappings().all()
             trend_rows = conn.execute(text(f"""
                 SELECT date_trunc('day', created_at) AS day, COUNT(*) AS total, COUNT(*) FILTER (WHERE success = FALSE) AS errors
                 FROM events
@@ -819,14 +785,6 @@ def get_metrics():
                 'endpoint': endpoint_filter or None
             },
             'top_endpoints_7d': [{'endpoint': row['endpoint'], 'total': int(row['total'])} for row in by_endpoint],
-            'top_violation_words': [
-                {
-                    'word': row['word'],
-                    'count': int(row['count']),
-                    'last_seen_at': row['last_seen_at'].isoformat() if row.get('last_seen_at') else None
-                }
-                for row in top_words
-            ],
             'trend_by_day': [
                 {
                     'day': row['day'].date().isoformat() if row.get('day') else None,
@@ -1156,12 +1114,6 @@ def check_images():
             context_short=(image_url or 'uploaded_file')[:255],
             violations_count=result.get('violations_count', 0)
         )
-        upsert_violation_words(
-            (result.get('latin_words') or [])
-            + (result.get('unknown_cyrillic') or [])
-            + (result.get('nenormative_words') or [])
-        )
-
         return jsonify({'success': True, 'provider': provider, 'result': result, 'timestamp': datetime.now().isoformat()})
     except Exception as e:
         app.logger.error(f"/api/images/check error: {e}", exc_info=True)
@@ -1453,11 +1405,6 @@ def multiscan_run():
             context_short=f'mode={mode} total={len(results)} err={len(error_items)}',
             violations_count=violations_total
         )
-        all_words = []
-        for item in success_items:
-            all_words.extend(item.get('forbidden_words') or [])
-        upsert_violation_words(all_words)
-
         return jsonify({
             'success': True,
             'mode': mode,
@@ -2578,17 +2525,6 @@ def update_statistics(result):
     """Обновление статистики"""
     statistics['total_checks'] += 1
     statistics['total_violations'] += result['violations_count']
-    
-    # Подсчет частых нарушений
-    for word in result.get('latin_words', [])[:10]:
-        statistics['most_common_violations'][word] += 1
-    for word in result.get('unknown_cyrillic', [])[:10]:
-        statistics['most_common_violations'][word] += 1
-
-    # Ограничиваем размер словаря — оставляем только топ-5000 по частоте
-    if len(statistics['most_common_violations']) > 10000:
-        top = sorted(statistics['most_common_violations'].items(), key=lambda x: x[1], reverse=True)[:5000]
-        statistics['most_common_violations'] = defaultdict(int, top)
 
 def generate_recommendations(result):
     """Генерация рекомендаций по исправлению"""
