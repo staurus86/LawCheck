@@ -136,7 +136,7 @@ def get_checker():
     return get_checker_service().get_checker()
 
 # Хранилище истории проверок (в продакшене используйте Redis/Database)
-check_history = deque(maxlen=200)
+check_history = deque(maxlen=5)
 statistics = {
     'total_checks': 0,
     'total_violations': 0,
@@ -809,13 +809,27 @@ def get_metrics():
         return jsonify({'enabled': True, 'error': str(e)}), 500
 
 
+def _mask_context(s):
+    """Маскирует URL в строке контекста — показывает только схему+домен"""
+    if not s:
+        return s
+    if s.startswith('http://') or s.startswith('https://'):
+        try:
+            from urllib.parse import urlparse
+            p = urlparse(s)
+            return f"{p.scheme}://{p.netloc}/***"
+        except Exception:
+            return '***'
+    return s
+
+
 @app.route('/api/run-history', methods=['GET'])
 @limiter.limit("30 per minute")
 def get_run_history():
     """Последние запуски проверок из БД (минимальная агрегированная история)"""
     if db_engine is None:
         return jsonify({'enabled': False, 'error': 'Database is not configured'}), 503
-    limit = _safe_int(request.args.get('limit', 20), 20, 1, 100)
+    limit = _safe_int(request.args.get('limit', 5), 5, 1, 5)
     days = _safe_int(request.args.get('days', 7), 7, 1, 90)
     check_type = (request.args.get('check_type') or '').strip().lower()
     status_filter = (request.args.get('status') or '').strip().lower()
@@ -851,7 +865,7 @@ def get_run_history():
                     'check_type': row.get('check_type'),
                     'endpoint': row.get('endpoint'),
                     'source_type': row.get('source_type'),
-                    'context_short': row.get('context_short'),
+                    'context_short': _mask_context(row.get('context_short')),
                     'success': bool(row.get('success')),
                     'duration_ms': round(float(row.get('duration_ms') or 0), 2),
                     'violations_count': int(row.get('violations_count') or 0)
@@ -864,6 +878,23 @@ def get_run_history():
         app.logger.error(f"/api/run-history error: {e}", exc_info=True)
         log_error('/api/run-history', 500, str(e))
         return jsonify({'enabled': True, 'error': 'Внутренняя ошибка сервера'}), 500
+
+
+@app.route('/api/run-history', methods=['DELETE'])
+@limiter.limit("10 per hour")
+def clear_run_history():
+    """Очистка истории проверок"""
+    if db_engine is None:
+        return jsonify({'error': 'Database is not configured'}), 503
+    try:
+        with db_engine.begin() as conn:
+            conn.execute(text("DELETE FROM run_history"))
+        check_history.clear()
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"/api/run-history DELETE error: {e}", exc_info=True)
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
+
 
 @app.route('/api/check-word', methods=['POST'])
 @limiter.limit("60 per minute")

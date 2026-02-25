@@ -739,7 +739,7 @@ async function loadRunHistory() {
     const container = document.getElementById('runHistoryContent');
     if (!container) return;
     try {
-        const response = await fetch(`${API_BASE}/api/run-history?limit=20`);
+        const response = await fetch(`${API_BASE}/api/run-history?limit=5`);
         const data = await response.json();
         if (!response.ok || !data.enabled) {
             throw new Error(data.error || 'History unavailable');
@@ -747,6 +747,17 @@ async function loadRunHistory() {
         renderRunHistory(data.items || []);
     } catch (_e) {
         container.innerHTML = '<div class="text-muted">История недоступна (БД не подключена или пуста).</div>';
+    }
+}
+
+async function clearRunHistory() {
+    try {
+        const response = await fetch(`${API_BASE}/api/run-history`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Ошибка очистки');
+        await loadRunHistory();
+        showToast('История очищена', 'success');
+    } catch (_e) {
+        showToast('Не удалось очистить историю', 'error');
     }
 }
 

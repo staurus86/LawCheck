@@ -226,6 +226,13 @@ class DatabaseManager:
                     'duration_ms': float(duration_ms) if duration_ms is not None else None,
                     'violations_count': int(violations_count or 0)
                 })
+                # Удаляем всё старше последних 5 записей
+                conn.execute(text("""
+                    DELETE FROM run_history
+                    WHERE id NOT IN (
+                        SELECT id FROM run_history ORDER BY created_at DESC LIMIT 5
+                    )
+                """))
         except Exception as e:
             logger.error(f"Failed to insert run history: {e}")
 
