@@ -30,6 +30,7 @@ from urllib.parse import urljoin, urldefrag, urlparse
 from sqlalchemy import text
 import socket
 import ipaddress
+from functools import wraps
 
 # Импорты новых модулей
 from config import get_config
@@ -89,7 +90,16 @@ METRICS_CLEANUP_INTERVAL_SEC = config.METRICS_CLEANUP_INTERVAL_SEC
 db_manager = init_db_manager(
     database_url=config.DATABASE_URL,
     retention_days=config.METRICS_RETENTION_DAYS,
-    cleanup_interval_sec=config.METRICS_CLEANUP_INTERVAL_SEC
+    cleanup_interval_sec=config.METRICS_CLEANUP_INTERVAL_SEC,
+    free_limits={
+        'text_chars': config.FREE_LIMIT_TEXT_CHARS,
+        'site_checks': config.FREE_LIMIT_SITE_URLS,
+        'word_checks': config.FREE_LIMIT_WORDS,
+        'batch_urls': config.FREE_LIMIT_BATCH_URLS,
+        'multiscan_urls': config.FREE_LIMIT_MULTISCAN_URLS,
+    },
+    default_admin_username=config.DEFAULT_ADMIN_USERNAME,
+    default_admin_password=config.DEFAULT_ADMIN_PASSWORD,
 )
 
 # Для совместимости с существующим кодом
@@ -197,6 +207,188 @@ def cleanup_analytics_db(force=False):
     """Очистка старых данных через db_manager"""
     if db_manager:
         db_manager.cleanup_old_data(force=force)
+
+
+FREE_LIMITS = {
+    'text_chars': int(config.FREE_LIMIT_TEXT_CHARS),
+    'site_checks': int(config.FREE_LIMIT_SITE_URLS),
+    'word_checks': int(config.FREE_LIMIT_WORDS),
+    'batch_urls': int(config.FREE_LIMIT_BATCH_URLS),
+    'multiscan_urls': int(config.FREE_LIMIT_MULTISCAN_URLS),
+}
+
+LIMIT_LABELS = {
+    'text_chars': 'символов текста',
+    'site_checks': 'URL в разделе "Сайт"',
+    'word_checks': 'слов',
+    'batch_urls': 'URL в пакетной проверке',
+    'multiscan_urls': 'URL в мульти-скане',
+}
+
+
+def _zero_usage():
+    return {key: 0 for key in FREE_LIMITS}
+
+
+def _normalize_limits(raw_limits=None, *, unlimited=False):
+    if unlimited:
+        return {key: None for key in FREE_LIMITS}
+
+    limits = {}
+    raw_limits = raw_limits or {}
+    for key, default_value in FREE_LIMITS.items():
+        value = raw_limits.get(key)
+        if value is None:
+            limits[key] = int(default_value)
+        else:
+            limits[key] = max(0, int(value))
+    return limits
+
+
+def _compute_remaining(limits, usage):
+    remaining = {}
+    for key in FREE_LIMITS:
+        limit_value = limits.get(key)
+        if limit_value is None:
+            remaining[key] = None
+        else:
+            remaining[key] = max(0, int(limit_value) - int(usage.get(key, 0)))
+    return remaining
+
+
+def _clear_auth_session():
+    session.pop('user_id', None)
+    session.pop('user_role', None)
+    session.pop('username', None)
+
+
+def _ensure_guest_subject_key():
+    guest_key = (session.get('guest_subject_key') or '').strip()
+    if not guest_key:
+        guest_key = f'guest:{uuid.uuid4().hex}'
+        session['guest_subject_key'] = guest_key
+        session.modified = True
+    return guest_key
+
+
+def _get_current_user():
+    user_id = session.get('user_id')
+    if not user_id or not db_manager:
+        return None
+    user = db_manager.get_user_by_id(int(user_id))
+    if not user or not user.get('is_active'):
+        _clear_auth_session()
+        return None
+    session['user_role'] = user.get('role')
+    session['username'] = user.get('username')
+    session.modified = True
+    return user
+
+
+def _get_auth_context():
+    user = _get_current_user()
+    if user:
+        subject_key = f"user:{user['id']}"
+        limits = _normalize_limits(user.get('limits'), unlimited=user.get('is_unlimited', False))
+    else:
+        subject_key = _ensure_guest_subject_key()
+        limits = _normalize_limits()
+
+    usage = db_manager.get_usage_for_subject(subject_key) if db_manager else _zero_usage()
+    remaining = _compute_remaining(limits, usage)
+    return {
+        'user': user,
+        'subject_key': subject_key,
+        'limits': limits,
+        'usage': usage,
+        'remaining': remaining,
+        'is_unlimited': bool(user and user.get('is_unlimited')),
+    }
+
+
+def _auth_payload(ctx=None):
+    ctx = ctx or _get_auth_context()
+    user = ctx.get('user')
+    return {
+        'authenticated': bool(user),
+        'username': user.get('username') if user else None,
+        'role': user.get('role') if user else 'guest',
+        'display_name': user.get('username') if user else 'Гость',
+        'can_manage_users': bool(user and user.get('role') == 'admin'),
+        'is_unlimited': bool(ctx.get('is_unlimited')),
+        'limits': ctx.get('limits') or _normalize_limits(),
+        'usage': ctx.get('usage') or _zero_usage(),
+        'remaining': ctx.get('remaining') or _compute_remaining(_normalize_limits(), _zero_usage()),
+        'reset_policy': 'daily',
+    }
+
+
+def _json_with_auth(payload=None, status=200, ctx=None):
+    data = dict(payload or {})
+    data['auth'] = _auth_payload(ctx)
+    return jsonify(data), status
+
+
+def _limit_error(key, ctx, *, requested=None):
+    remaining = ctx['remaining'].get(key)
+    label = LIMIT_LABELS.get(key, key)
+    if remaining is None:
+        return None
+    if remaining <= 0:
+        return _json_with_auth({'error': f'Суточный лимит исчерпан: {label}.'}, 429, ctx)
+    if requested is not None and int(requested) > int(remaining):
+        return _json_with_auth({'error': f'Остаток на сегодня: {remaining} {label}.'}, 429, ctx)
+    return None
+
+
+def _consume_usage(ctx, deltas):
+    if not db_manager:
+        return ctx
+    usage = db_manager.increment_usage(
+        ctx['subject_key'],
+        ctx['user']['id'] if ctx.get('user') else None,
+        deltas,
+    )
+    ctx['usage'] = usage
+    ctx['remaining'] = _compute_remaining(ctx['limits'], usage)
+    return ctx
+
+
+def _parse_limit_value(raw_value):
+    if raw_value is None:
+        return None
+    text_value = str(raw_value).strip()
+    if not text_value:
+        return None
+    value = int(text_value)
+    if value < 0:
+        raise ValueError('Лимит не может быть отрицательным')
+    return value
+
+
+def _extract_limits_from_payload(data):
+    payload = data.get('limits') if isinstance(data, dict) else {}
+    if not isinstance(payload, dict):
+        raise ValueError('limits должен быть объектом')
+    return {
+        'text_chars': _parse_limit_value(payload.get('text_chars')),
+        'site_checks': _parse_limit_value(payload.get('site_checks')),
+        'word_checks': _parse_limit_value(payload.get('word_checks')),
+        'batch_urls': _parse_limit_value(payload.get('batch_urls')),
+        'multiscan_urls': _parse_limit_value(payload.get('multiscan_urls')),
+    }
+
+
+def _require_admin_api(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        user = _get_current_user()
+        if not user:
+            return _json_with_auth({'error': 'Требуется вход в систему'}, 401)
+        if user.get('role') != 'admin':
+            return _json_with_auth({'error': 'Недостаточно прав'}, 403)
+        return fn(*args, **kwargs)
+    return wrapper
 
 # Page routes moved to routes/page_routes.py (registered as blueprint above)
 
@@ -366,6 +558,108 @@ def _build_resource_result(url, resource_type, check_result, source_meta=None, s
         'meta': source_meta
     }
 
+
+@app.route('/api/auth/me', methods=['GET'])
+@limiter.limit("60 per minute")
+def auth_me():
+    return _json_with_auth({'success': True})
+
+
+@app.route('/api/auth/login', methods=['POST'])
+@limiter.limit("20 per minute")
+def auth_login():
+    if not db_manager:
+        return jsonify({'error': 'Database not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    username = (data.get('username') or '').strip().lower()
+    password = (data.get('password') or '').strip()
+    if not username or not password:
+        return _json_with_auth({'error': 'Укажите логин и пароль'}, 400)
+
+    user = db_manager.authenticate_user(username, password)
+    if not user:
+        return _json_with_auth({'error': 'Неверный логин или пароль'}, 401)
+
+    session['user_id'] = user['id']
+    session['user_role'] = user['role']
+    session['username'] = user['username']
+    session.modified = True
+    ctx = _get_auth_context()
+    return _json_with_auth({'success': True}, 200, ctx)
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+@limiter.limit("30 per minute")
+def auth_logout():
+    _clear_auth_session()
+    session['guest_subject_key'] = f'guest:{uuid.uuid4().hex}'
+    session.modified = True
+    return _json_with_auth({'success': True})
+
+
+@app.route('/api/admin/users', methods=['GET'])
+@limiter.limit("60 per minute")
+@_require_admin_api
+def admin_list_users():
+    if not db_manager:
+        return jsonify({'error': 'Database not available'}), 503
+    return _json_with_auth({'success': True, 'users': db_manager.list_users()})
+
+
+@app.route('/api/admin/users', methods=['POST'])
+@limiter.limit("20 per minute")
+@_require_admin_api
+def admin_create_user():
+    if not db_manager:
+        return jsonify({'error': 'Database not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    username = (data.get('username') or '').strip().lower()
+    password = (data.get('password') or '').strip()
+    if len(username) < 3:
+        return _json_with_auth({'error': 'Логин должен быть не короче 3 символов'}, 400)
+    if len(password) < 4:
+        return _json_with_auth({'error': 'Пароль должен быть не короче 4 символов'}, 400)
+
+    try:
+        user = db_manager.create_user(username, password, limits=_extract_limits_from_payload(data))
+        return _json_with_auth({'success': True, 'user': user, 'users': db_manager.list_users()})
+    except ValueError as e:
+        return _json_with_auth({'error': str(e)}, 400)
+    except Exception as e:
+        app.logger.error(f"/api/admin/users POST error: {e}", exc_info=True)
+        return _json_with_auth({'error': 'Не удалось создать пользователя'}, 400)
+
+
+@app.route('/api/admin/users/<int:user_id>', methods=['PUT'])
+@limiter.limit("30 per minute")
+@_require_admin_api
+def admin_update_user(user_id):
+    if not db_manager:
+        return jsonify({'error': 'Database not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    password = (data.get('password') or '').strip() or None
+    raw_is_active = data.get('is_active')
+    is_active = _safe_bool(raw_is_active, True) if raw_is_active is not None else None
+
+    try:
+        updated = db_manager.update_user(
+            user_id,
+            password=password,
+            is_active=is_active,
+            limits=_extract_limits_from_payload(data),
+        )
+    except ValueError as e:
+        return _json_with_auth({'error': str(e)}, 400)
+
+    if not updated:
+        return _json_with_auth({'error': 'Пользователь не найден'}, 404)
+
+    return _json_with_auth({'success': True, 'user': updated, 'users': db_manager.list_users()})
+
+
 # ==================== API ENDPOINTS ====================
 
 @app.route('/api/check', methods=['POST'])
@@ -377,9 +671,15 @@ def check_text():
         data = request.get_json(silent=True) or {}
         text = data.get('text', '')
         save_history = data.get('save_history', True)
+        ctx = _get_auth_context()
         
         if not text or not text.strip():
             return jsonify({'error': 'Текст не предоставлен'}), 400
+
+        text_length = len(text)
+        limit_error = _limit_error('text_chars', ctx, requested=text_length)
+        if limit_error:
+            return limit_error
         
         result = get_checker().check_text(text)
         
@@ -412,13 +712,14 @@ def check_text():
             context_short='text input',
             violations_count=result.get('violations_count', 0)
         )
+        ctx = _consume_usage(ctx, {'text_chars': text_length})
 
-        return jsonify({
+        return _json_with_auth({
             'success': True,
             'result': result,
             'timestamp': datetime.now().isoformat(),
             'check_id': str(uuid.uuid4())
-        })
+        }, 200, ctx)
     
     except Exception as e:
         app.logger.error(f"/api/check error: {e}", exc_info=True)
@@ -435,11 +736,15 @@ def check_url():
         started_at = time.perf_counter()
         data = request.get_json(silent=True) or {}
         url = data.get('url', '')
+        ctx = _get_auth_context()
         
         if not url or not url.startswith('http'):
             return jsonify({'error': 'Некорректный URL'}), 400
         if not _is_safe_url(url):
             return jsonify({'error': 'Недопустимый URL (приватный или зарезервированный адрес)'}), 400
+        limit_error = _limit_error('site_checks', ctx, requested=1)
+        if limit_error:
+            return limit_error
 
         # Загрузка страницы
         try:
@@ -494,14 +799,15 @@ def check_url():
             context_short=url[:255],
             violations_count=result.get('violations_count', 0)
         )
+        ctx = _consume_usage(ctx, {'site_checks': 1})
 
-        return jsonify({
+        return _json_with_auth({
             'success': True,
             'url': url,
             'result': result,
             'source_text': text[:50000],
             'timestamp': datetime.now().isoformat()
-        })
+        }, 200, ctx)
     
     except Exception as e:
         log_error('/api/check-url', 500, str(e))
@@ -517,6 +823,7 @@ def batch_check():
         started_at = time.perf_counter()
         data = request.get_json(silent=True) or {}
         urls = data.get('urls', [])
+        ctx = _get_auth_context()
         
         if not urls:
             return jsonify({'error': 'Список URL пуст'}), 400
@@ -524,6 +831,11 @@ def batch_check():
         max_urls = int(os.getenv('BATCH_MAX_URLS', '100'))
         max_workers = int(os.getenv('BATCH_MAX_WORKERS', '8'))
         max_workers = max(1, min(max_workers, 32))
+        remaining_batch = ctx['remaining'].get('batch_urls')
+        if remaining_batch is not None:
+            if remaining_batch <= 0:
+                return _limit_error('batch_urls', ctx, requested=1)
+            max_urls = min(max_urls, int(remaining_batch))
 
         # Нормализуем и ограничиваем список URL (SSRF-фильтрация)
         clean_urls = []
@@ -588,13 +900,14 @@ def batch_check():
             context_short=f'urls={len(clean_urls)} ok={len(success_items)} err={len(error_items)}',
             violations_count=violations_total
         )
-        return jsonify({
+        ctx = _consume_usage(ctx, {'batch_urls': len(clean_urls)})
+        return _json_with_auth({
             'success': True,
             'total': len(clean_urls),
             'results': results,
             'workers': max_workers,
             'timestamp': datetime.now().isoformat()
-        })
+        }, 200, ctx)
     
     except Exception as e:
         app.logger.error(f"/api/batch-check error: {e}", exc_info=True)
@@ -680,21 +993,14 @@ def get_stats():
 
 @app.route('/api/metrics/cleanup', methods=['POST'])
 @limiter.limit("5 per hour")
+@_require_admin_api
 def cleanup_metrics():
     """API: Очистка метрик (полная очистка для освобождения места)"""
     try:
-        data = request.get_json(silent=True) or {}
-        secret = data.get('secret', '').strip()
-
-        valid_secret = app.secret_key[:16]
-
-        if secret != valid_secret:
-            return jsonify({'error': 'Неверный пароль'}), 401
-
         if db_manager:
             result = db_manager.cleanup_all_metrics()
             app.logger.warning(f"Metrics cleaned up by admin: {result}")
-            return jsonify(result)
+            return _json_with_auth(result)
         else:
             return jsonify({'error': 'Database not available'}), 503
     except Exception as e:
@@ -704,6 +1010,7 @@ def cleanup_metrics():
 
 @app.route('/api/metrics', methods=['GET'])
 @limiter.limit("30 per minute")
+@_require_admin_api
 def get_metrics():
     """Мини-метрики по событиям сервиса из PostgreSQL"""
     if db_engine is None:
@@ -903,12 +1210,16 @@ def check_word():
     try:
         data = request.get_json(silent=True) or {}
         word = data.get('word', '').strip()
+        ctx = _get_auth_context()
         
         if not word:
             return jsonify({'error': 'Слово не предоставлено'}), 400
         
         if len(word) < 2:
             return jsonify({'error': 'Слишком короткое слово (минимум 2 символа)'}), 400
+        limit_error = _limit_error('word_checks', ctx, requested=1)
+        if limit_error:
+            return limit_error
         
         checker_instance = get_checker()
         
@@ -959,12 +1270,13 @@ def check_word():
             'is_potential_fine': is_potential_fine,
             'status': 'ok' if is_normative else ('warning' if is_foreign else 'danger')
         }
+        ctx = _consume_usage(ctx, {'word_checks': 1})
         
-        return jsonify({
+        return _json_with_auth({
             'success': True,
             'result': result,
             'timestamp': datetime.now().isoformat()
-        })
+        }, 200, ctx)
     
     except Exception as e:
         app.logger.error(f"/api/check-word error: {e}", exc_info=True)
@@ -1160,6 +1472,7 @@ def multiscan_run():
     try:
         started_at = time.perf_counter()
         data = request.get_json(silent=True) or {}
+        ctx = _get_auth_context()
 
         mode = (data.get('mode') or 'site').strip().lower()
         provider = (data.get('provider') or session.get('images_provider') or 'openai').strip().lower()
@@ -1184,6 +1497,11 @@ def multiscan_run():
         max_resources = _safe_int(data.get('max_resources', 2500), 2500, 1, MULTISCAN_MAX_RESOURCES_HARD)
         include_external = _safe_bool(data.get('include_external'), False)
         max_text_chars = _safe_int(data.get('max_text_chars', MULTISCAN_MAX_TEXT_CHARS), MULTISCAN_MAX_TEXT_CHARS, 2000, MULTISCAN_MAX_TEXT_CHARS)
+        remaining_multi = ctx['remaining'].get('multiscan_urls')
+        if remaining_multi is not None:
+            if remaining_multi <= 0:
+                return _limit_error('multiscan_urls', ctx, requested=1)
+            max_urls = min(max_urls, int(remaining_multi))
 
         checker_instance = get_checker()
         results = []
@@ -1436,7 +1754,8 @@ def multiscan_run():
             context_short=f'mode={mode} total={len(results)} err={len(error_items)}',
             violations_count=violations_total
         )
-        return jsonify({
+        ctx = _consume_usage(ctx, {'multiscan_urls': len(results)})
+        return _json_with_auth({
             'success': True,
             'mode': mode,
             'provider': provider,
@@ -1458,7 +1777,7 @@ def multiscan_run():
                 'total': duration_ms
             },
             'timestamp': datetime.now().isoformat()
-        })
+        }, 200, ctx)
     except RuntimeError as e:
         log_error('/api/multiscan/run', 400, str(e))
         log_event(event_type='multiscan', endpoint='/api/multiscan/run', success=False, source_type='mixed', items_error=1)

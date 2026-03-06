@@ -46,6 +46,15 @@ class Config:
 
     DATABASE_URL: Optional[str] = get_database_url.__func__()
 
+    # Пользовательские лимиты
+    FREE_LIMIT_TEXT_CHARS: int = int(os.getenv('FREE_LIMIT_TEXT_CHARS', '10000'))
+    FREE_LIMIT_SITE_URLS: int = int(os.getenv('FREE_LIMIT_SITE_URLS', '3'))
+    FREE_LIMIT_WORDS: int = int(os.getenv('FREE_LIMIT_WORDS', '10'))
+    FREE_LIMIT_BATCH_URLS: int = int(os.getenv('FREE_LIMIT_BATCH_URLS', '10'))
+    FREE_LIMIT_MULTISCAN_URLS: int = int(os.getenv('FREE_LIMIT_MULTISCAN_URLS', '15'))
+    DEFAULT_ADMIN_USERNAME: str = os.getenv('DEFAULT_ADMIN_USERNAME', 'admin').strip() or 'admin'
+    DEFAULT_ADMIN_PASSWORD: str = os.getenv('DEFAULT_ADMIN_PASSWORD', 'admin123')
+
     # CORS настройки
     CORS_ORIGINS: str = "*"
     CORS_METHODS: list = ["GET", "POST", "OPTIONS"]

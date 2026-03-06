@@ -332,6 +332,29 @@ let currentDeepResults = {
     multi: null
 };
 const ACTIVE_TAB_KEY = 'lawchecker.activeTab';
+const AUTH_LIMIT_KEYS = ['text_chars', 'site_checks', 'word_checks', 'batch_urls', 'multiscan_urls'];
+const AUTH_LIMIT_META = {
+    text_chars: { label: 'Текст', unit: 'симв.' },
+    site_checks: { label: 'Сайт', unit: 'URL' },
+    word_checks: { label: 'Слово', unit: 'пров.' },
+    batch_urls: { label: 'Пакетная', unit: 'URL' },
+    multiscan_urls: { label: 'Мульти-скан', unit: 'URL' }
+};
+const DEFAULT_FREE_LIMITS = {
+    text_chars: 10000,
+    site_checks: 3,
+    word_checks: 10,
+    batch_urls: 10,
+    multiscan_urls: 15
+};
+const EMPTY_LIMIT_USAGE = {
+    text_chars: 0,
+    site_checks: 0,
+    word_checks: 0,
+    batch_urls: 0,
+    multiscan_urls: 0
+};
+let currentAuthState = null;
 
 // App bootstrap
 document.addEventListener('DOMContentLoaded', () => {
@@ -344,6 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initBackToTop();
     loadStats();
     loadRunHistory();
+    loadAuthState();
     onImagesProviderChange();
     loadImageTokenStatus();
     onMultiProviderChange();
@@ -352,6 +376,413 @@ document.addEventListener('DOMContentLoaded', () => {
     initUrlValidation();
     console.log('App loaded');
 });
+
+function readAuthValue(source, key, suffix) {
+    if (!source || typeof source !== 'object') return undefined;
+    if (Object.prototype.hasOwnProperty.call(source, key)) return source[key];
+    const altKey = `${key}_${suffix}`;
+    if (Object.prototype.hasOwnProperty.call(source, altKey)) return source[altKey];
+    return undefined;
+}
+
+function toSafeNumber(value, fallback = 0) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : fallback;
+}
+
+function normalizeAuthState(auth) {
+    const payload = auth && typeof auth === 'object' ? auth : {};
+    const authenticated = Boolean(payload.authenticated);
+    const role = payload.role || (authenticated ? 'user' : 'guest');
+    const limitsSource = payload.limits || payload;
+    const usageSource = payload.usage || payload;
+    const remainingSource = payload.remaining || {};
+    const limits = {};
+    const usage = {};
+    const remaining = {};
+
+    AUTH_LIMIT_KEYS.forEach((key) => {
+        const rawLimit = readAuthValue(limitsSource, key, 'daily');
+        const rawUsage = readAuthValue(usageSource, key, 'used');
+        const rawRemaining = readAuthValue(remainingSource, key, 'remaining');
+
+        const fallbackLimit = role === 'admin' ? null : DEFAULT_FREE_LIMITS[key];
+        limits[key] = rawLimit === undefined || rawLimit === '' ? fallbackLimit : (rawLimit === null ? null : Math.max(0, Math.floor(toSafeNumber(rawLimit, 0))));
+        usage[key] = Math.max(0, Math.floor(toSafeNumber(rawUsage, 0)));
+        remaining[key] = rawRemaining === undefined || rawRemaining === ''
+            ? (limits[key] == null ? null : Math.max(0, limits[key] - usage[key]))
+            : (rawRemaining === null ? null : Math.max(0, Math.floor(toSafeNumber(rawRemaining, 0))));
+    });
+
+    const username = payload.username || payload.display_name || (authenticated ? 'Пользователь' : 'Гость');
+    const isUnlimited = Boolean(payload.is_unlimited) || role === 'admin';
+    const canManageUsers = Boolean(payload.can_manage_users) || role === 'admin';
+
+    return {
+        authenticated,
+        role,
+        username,
+        displayName: payload.display_name || username,
+        isUnlimited,
+        canManageUsers,
+        limits,
+        usage,
+        remaining
+    };
+}
+
+function formatAuthValue(key, value) {
+    if (value == null) return 'Без лимита';
+    const meta = AUTH_LIMIT_META[key] || { unit: '' };
+    return `${Number(value).toLocaleString('ru-RU')} ${meta.unit}`.trim();
+}
+
+function formatRoleLabel(auth) {
+    if (!auth) return 'Гость';
+    if (auth.role === 'admin') return 'Администратор';
+    if (auth.role === 'user') return 'Пользователь';
+    if (auth.authenticated) return 'Пользователь';
+    return 'Гость';
+}
+
+function normalizeManagedUser(user) {
+    const authLike = normalizeAuthState({
+        authenticated: true,
+        role: user.role || 'user',
+        username: user.username || 'user',
+        display_name: user.username || 'user',
+        can_manage_users: user.role === 'admin',
+        is_unlimited: Boolean(user.is_unlimited) || user.role === 'admin',
+        limits: user.limits || user,
+        usage: user.usage || user,
+        remaining: user.remaining || {}
+    });
+
+    return {
+        id: user.id,
+        username: user.username || 'user',
+        role: user.role || 'user',
+        isActive: user.is_active !== false,
+        isUnlimited: authLike.isUnlimited,
+        limits: authLike.limits,
+        usage: authLike.usage,
+        remaining: authLike.remaining
+    };
+}
+
+function renderAuthState() {
+    const auth = currentAuthState || normalizeAuthState({});
+    const summaryEl = document.getElementById('accountSummary');
+    const limitsEl = document.getElementById('limitsGrid');
+    const loginForm = document.getElementById('loginForm');
+    const logoutActions = document.getElementById('logoutActions');
+    const adminPanel = document.getElementById('adminPanel');
+    const adminUsersList = document.getElementById('adminUsersList');
+
+    if (summaryEl) {
+        const badgeClass = auth.role === 'admin'
+            ? 'account-badge admin'
+            : auth.authenticated
+                ? 'account-badge user'
+                : 'account-badge guest';
+        const statusText = auth.isUnlimited
+            ? 'Безлимитный доступ'
+            : auth.authenticated
+                ? 'Персональные суточные лимиты'
+                : 'Бесплатные лимиты гостя';
+
+        summaryEl.innerHTML = `
+            <div class="account-summary-head">
+                <div>
+                    <div class="account-user-name">${escHtml(auth.displayName)}</div>
+                    <div class="text-muted">${statusText}</div>
+                </div>
+                <span class="${badgeClass}">${escHtml(formatRoleLabel(auth))}</span>
+            </div>
+            <div class="account-meta-row">
+                <span class="account-meta-pill">Статус: ${auth.authenticated ? 'вход выполнен' : 'гостевой режим'}</span>
+                <span class="account-meta-pill">${auth.isUnlimited ? 'Квоты не ограничены' : 'Сброс лимитов раз в сутки'}</span>
+            </div>
+        `;
+    }
+
+    if (limitsEl) {
+        limitsEl.innerHTML = AUTH_LIMIT_KEYS.map((key) => {
+            const meta = AUTH_LIMIT_META[key];
+            const total = formatAuthValue(key, auth.limits[key]);
+            const used = formatAuthValue(key, auth.usage[key] || 0);
+            const remaining = auth.remaining[key] == null ? '∞' : formatAuthValue(key, auth.remaining[key]);
+            return `
+                <article class="limit-card">
+                    <div class="limit-card-top">
+                        <span class="limit-card-title">${escHtml(meta.label)}</span>
+                        <span class="limit-card-total">${escHtml(total)}</span>
+                    </div>
+                    <div class="limit-card-value">${escHtml(remaining)}</div>
+                    <div class="limit-card-meta">Использовано сегодня: ${escHtml(used)}</div>
+                </article>
+            `;
+        }).join('');
+    }
+
+    if (loginForm) loginForm.style.display = auth.authenticated ? 'none' : 'block';
+    if (logoutActions) logoutActions.style.display = auth.authenticated ? 'flex' : 'none';
+
+    if (adminPanel) {
+        adminPanel.style.display = auth.canManageUsers ? 'block' : 'none';
+        if (!auth.canManageUsers) {
+            adminPanel.dataset.loaded = '';
+            if (adminUsersList) {
+                adminUsersList.dataset.loaded = '';
+                adminUsersList.innerHTML = '<div class="account-empty">Войдите под администратором, чтобы управлять пользователями.</div>';
+            }
+        } else if (adminUsersList && adminUsersList.dataset.loaded !== '1') {
+            loadAdminUsers();
+        }
+    }
+}
+
+function applyAuthState(auth) {
+    currentAuthState = normalizeAuthState(auth);
+    renderAuthState();
+    return currentAuthState;
+}
+
+async function apiJson(url, options = {}) {
+    const requestOptions = Object.assign({ credentials: 'same-origin' }, options);
+    const response = await fetch(url, requestOptions);
+    const data = await response.json().catch(() => ({}));
+    if (data && data.auth) applyAuthState(data.auth);
+    if (!response.ok) {
+        const error = new Error(data.error || `HTTP ${response.status}`);
+        error.status = response.status;
+        error.payload = data;
+        throw error;
+    }
+    return data;
+}
+
+function getLimitInputValue(elementId) {
+    const el = document.getElementById(elementId);
+    if (!el) return null;
+    const raw = (el.value || '').trim();
+    if (!raw) return null;
+    const num = Number(raw);
+    return Number.isFinite(num) && num >= 0 ? Math.floor(num) : null;
+}
+
+function collectLimitPayload(prefix) {
+    return {
+        text_chars: getLimitInputValue(`${prefix}TextChars`),
+        site_checks: getLimitInputValue(`${prefix}SiteChecks`),
+        word_checks: getLimitInputValue(`${prefix}WordChecks`),
+        batch_urls: getLimitInputValue(`${prefix}BatchUrls`),
+        multiscan_urls: getLimitInputValue(`${prefix}MultiscanUrls`)
+    };
+}
+
+async function loadAuthState() {
+    try {
+        const data = await apiJson(`${API_BASE}/api/auth/me`);
+        applyAuthState(data.auth || data);
+    } catch (_error) {
+        applyAuthState({});
+    }
+}
+
+async function loginCurrentUser() {
+    const usernameEl = document.getElementById('loginUsernameInput');
+    const passwordEl = document.getElementById('loginPasswordInput');
+    const username = (usernameEl && usernameEl.value || '').trim();
+    const password = (passwordEl && passwordEl.value || '').trim();
+
+    if (!username || !password) {
+        showToast('Введите логин и пароль', 'warning');
+        return;
+    }
+
+    try {
+        const data = await apiJson(`${API_BASE}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        if (usernameEl) usernameEl.value = '';
+        if (passwordEl) passwordEl.value = '';
+        applyAuthState(data.auth || {});
+        showToast(`Вход выполнен: ${data.auth?.username || username}`, 'success');
+        if (currentAuthState && currentAuthState.canManageUsers) {
+            await loadAdminUsers(true);
+        }
+    } catch (error) {
+        showToast('Ошибка входа: ' + error.message, 'error');
+    }
+}
+
+async function logoutCurrentUser() {
+    try {
+        const data = await apiJson(`${API_BASE}/api/auth/logout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        applyAuthState(data.auth || {});
+        showToast('Вы вышли из аккаунта', 'success');
+    } catch (error) {
+        showToast('Ошибка выхода: ' + error.message, 'error');
+    }
+}
+
+function renderManagedUsers(users) {
+    const listEl = document.getElementById('adminUsersList');
+    if (!listEl) return;
+
+    if (!users.length) {
+        listEl.innerHTML = '<div class="account-empty">Пользователи ещё не добавлены.</div>';
+        return;
+    }
+
+    listEl.innerHTML = users.map((rawUser) => {
+        const user = normalizeManagedUser(rawUser);
+        const limitFields = AUTH_LIMIT_KEYS.map((key) => {
+            const meta = AUTH_LIMIT_META[key];
+            const inputId = `user-${user.id}-${key}`;
+            const value = user.limits[key] == null ? '' : String(user.limits[key]);
+            const used = formatAuthValue(key, user.usage[key] || 0);
+            const remaining = user.remaining[key] == null ? '∞' : formatAuthValue(key, user.remaining[key]);
+            return `
+                <label class="limit-form-item">
+                    <span>${escHtml(meta.label)}</span>
+                    <input type="number" id="${inputId}" class="form-input" min="0" step="1" value="${escAttr(value)}" placeholder="Без лимита">
+                    <small class="managed-user-usage">Сегодня: ${escHtml(used)} | Осталось: ${escHtml(remaining)}</small>
+                </label>
+            `;
+        }).join('');
+
+        return `
+            <article class="managed-user-card">
+                <div class="managed-user-head">
+                    <div>
+                        <div class="managed-user-name">${escHtml(user.username)}</div>
+                        <div class="managed-user-meta">
+                            <span class="account-meta-pill">${escHtml(formatRoleLabel(user))}</span>
+                            <span class="account-meta-pill">${user.isUnlimited ? 'Без лимита' : 'Ограниченный доступ'}</span>
+                        </div>
+                    </div>
+                    <label class="managed-user-toggle">
+                        <input type="checkbox" id="user-${user.id}-active" ${user.isActive ? 'checked' : ''}>
+                        <span>${user.isActive ? 'Активен' : 'Отключён'}</span>
+                    </label>
+                </div>
+
+                <div class="account-form-row managed-user-password-row">
+                    <input
+                        type="password"
+                        id="user-${user.id}-password"
+                        class="form-input"
+                        placeholder="Новый пароль (необязательно)"
+                        autocomplete="new-password"
+                    >
+                </div>
+
+                <div class="limit-form-grid">
+                    ${limitFields}
+                </div>
+
+                <div class="managed-user-actions">
+                    <button class="btn btn-primary" type="button" onclick="saveManagedUser(${user.id})">
+                        <i class="fas fa-save"></i>
+                        Сохранить
+                    </button>
+                </div>
+            </article>
+        `;
+    }).join('');
+}
+
+async function loadAdminUsers(force = false) {
+    const listEl = document.getElementById('adminUsersList');
+    if (!listEl || !currentAuthState || !currentAuthState.canManageUsers) return;
+    if (!force && listEl.dataset.loading === '1') return;
+
+    listEl.dataset.loading = '1';
+    if (force || listEl.dataset.loaded !== '1') {
+        listEl.innerHTML = '<div class="account-empty">Загрузка пользователей...</div>';
+    }
+
+    try {
+        const data = await apiJson(`${API_BASE}/api/admin/users`);
+        const items = data.items || data.users || [];
+        renderManagedUsers(items);
+        listEl.dataset.loaded = '1';
+    } catch (error) {
+        listEl.innerHTML = `<div class="account-empty">Не удалось загрузить пользователей: ${escHtml(error.message)}</div>`;
+    } finally {
+        listEl.dataset.loading = '';
+    }
+}
+
+async function createManagedUser() {
+    const username = ((document.getElementById('newUsernameInput') || {}).value || '').trim();
+    const password = ((document.getElementById('newUserPasswordInput') || {}).value || '').trim();
+
+    if (!username || !password) {
+        showToast('Укажите логин и пароль нового пользователя', 'warning');
+        return;
+    }
+
+    try {
+        await apiJson(`${API_BASE}/api/admin/users`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username,
+                password,
+                limits: collectLimitPayload('newLimit')
+            })
+        });
+
+        ['newUsernameInput', 'newUserPasswordInput', 'newLimitTextChars', 'newLimitSiteChecks', 'newLimitWordChecks', 'newLimitBatchUrls', 'newLimitMultiscanUrls']
+            .forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+
+        await loadAdminUsers(true);
+        showToast(`Пользователь ${username} создан`, 'success');
+    } catch (error) {
+        showToast('Ошибка создания пользователя: ' + error.message, 'error');
+    }
+}
+
+async function saveManagedUser(userId) {
+    const passwordEl = document.getElementById(`user-${userId}-password`);
+    const activeEl = document.getElementById(`user-${userId}-active`);
+    const payload = {
+        is_active: activeEl ? Boolean(activeEl.checked) : true,
+        limits: {
+            text_chars: getLimitInputValue(`user-${userId}-text_chars`),
+            site_checks: getLimitInputValue(`user-${userId}-site_checks`),
+            word_checks: getLimitInputValue(`user-${userId}-word_checks`),
+            batch_urls: getLimitInputValue(`user-${userId}-batch_urls`),
+            multiscan_urls: getLimitInputValue(`user-${userId}-multiscan_urls`)
+        }
+    };
+    const password = (passwordEl && passwordEl.value || '').trim();
+    if (password) payload.password = password;
+
+    try {
+        await apiJson(`${API_BASE}/api/admin/users/${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (passwordEl) passwordEl.value = '';
+        await loadAdminUsers(true);
+        showToast('Изменения пользователя сохранены', 'success');
+    } catch (error) {
+        showToast('Ошибка сохранения пользователя: ' + error.message, 'error');
+    }
+}
 
 // ── Горячие клавиши ────────────────────────────────────────────
 // Ctrl+Enter (Cmd+Enter на Mac) запускает проверку в активной вкладке
@@ -773,19 +1204,13 @@ async function checkText() {
     showLoading('Анализирую текст...');
     
     try {
-        const response = await fetch(`${API_BASE}/api/check`, {
+        const data = await apiJson(`${API_BASE}/api/check`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ text })
         });
-        
-        if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            throw new Error(err.error || `HTTP ${response.status}`);
-        }
-        const data = await response.json();
 
         if (data.success) {
             currentResults.text = data.result;
@@ -818,18 +1243,12 @@ async function checkUrl() {
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-        const response = await fetch(`${API_BASE}/api/check-url`, {
+        const data = await apiJson(`${API_BASE}/api/check-url`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url }),
             signal: controller.signal
         });
-
-        if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            throw new Error(err.error || `HTTP ${response.status}`);
-        }
-        const data = await response.json();
 
         if (data.success) {
             currentResults.url = data.result;
@@ -879,17 +1298,11 @@ async function checkBatch() {
     progressText.textContent = `Проверяю ${urls.length} ссылок…`;
 
     try {
-        const response = await fetch(`${API_BASE}/api/batch-check`, {
+        const data = await apiJson(`${API_BASE}/api/batch-check`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ urls })
         });
-
-        if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            throw new Error(err.error || `HTTP ${response.status}`);
-        }
-        const data = await response.json();
         if (!data.success) {
             throw new Error(data.error || 'Ошибка пакетной проверки');
         }
@@ -1781,13 +2194,12 @@ async function runMultiScan() {
 
     showLoading('Запускаю мульти-скан...');
     try {
-        const response = await fetch(`${API_BASE}/api/multiscan/run`, {
+        const data = await apiJson(`${API_BASE}/api/multiscan/run`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
             body: JSON.stringify(payload)
         });
-        const data = await response.json();
         if (!data.success) throw new Error(data.error || 'Ошибка мульти-скана');
         currentResults.multi = data;
         currentDeepResults.multi = null;
@@ -2022,15 +2434,13 @@ async function checkWord() {
     showLoading('Проверяю слово...');
     
     try {
-        const response = await fetch(`${API_BASE}/api/check-word`, {
+        const data = await apiJson(`${API_BASE}/api/check-word`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ word })
         });
-        
-        const data = await response.json();
         
         hideLoading();
         

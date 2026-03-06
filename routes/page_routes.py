@@ -5,7 +5,7 @@
 """
 
 from datetime import datetime
-from flask import Blueprint, render_template, request, send_file, Response
+from flask import Blueprint, render_template, request, send_file, Response, session, redirect
 
 page_bp = Blueprint('pages', __name__)
 
@@ -44,6 +44,8 @@ def payment():
 @page_bp.route('/admin/metrics')
 def admin_metrics():
     """Простой дашборд метрик (read-only)"""
+    if session.get('user_role') != 'admin':
+        return redirect('/')
     return render_template('admin_metrics.html')
 
 

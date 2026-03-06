@@ -75,7 +75,135 @@
     <!-- Main Content -->
     <main class="main">
         <div class="container">
-            
+            <div class="card account-card" id="accountCard">
+                <div class="card-header">
+                    <h2>Аккаунт и лимиты</h2>
+                    <p class="text-muted">Гость использует бесплатные суточные лимиты. Войдите под своим аккаунтом, чтобы увидеть персональные квоты.</p>
+                </div>
+                <div class="card-body">
+                    <div class="account-grid">
+                        <section class="account-panel">
+                            <div class="account-section-title">Текущий доступ</div>
+                            <div id="accountSummary" class="account-summary">
+                                <div class="account-empty">Загрузка данных аккаунта...</div>
+                            </div>
+                            <div class="account-inline-actions" id="logoutActions" style="display:none;">
+                                <button class="btn btn-secondary" type="button" onclick="logoutCurrentUser()">
+                                    <i class="fas fa-right-from-bracket"></i>
+                                    Выйти
+                                </button>
+                            </div>
+                        </section>
+
+                        <section class="account-panel">
+                            <div class="account-section-title">Вход</div>
+                            <form id="loginForm" class="account-form" onsubmit="loginCurrentUser(); return false;">
+                                <div class="account-form-row">
+                                    <input
+                                        type="text"
+                                        id="loginUsernameInput"
+                                        class="form-input"
+                                        placeholder="Логин"
+                                        autocomplete="username"
+                                    >
+                                    <input
+                                        type="password"
+                                        id="loginPasswordInput"
+                                        class="form-input"
+                                        placeholder="Пароль"
+                                        autocomplete="current-password"
+                                    >
+                                </div>
+                                <div class="btn-group">
+                                    <button class="btn btn-primary" type="submit" id="loginSubmitBtn">
+                                        <i class="fas fa-user-lock"></i>
+                                        Войти
+                                    </button>
+                                </div>
+                                <p class="text-muted" id="loginHint">Для обычных посетителей действуют бесплатные лимиты. Администратор может добавлять пользователей и задавать им отдельные квоты.</p>
+                            </form>
+                        </section>
+                    </div>
+
+                    <section class="account-limits-block">
+                        <div class="account-section-title">Суточные лимиты</div>
+                        <div id="limitsGrid" class="limits-grid">
+                            <div class="account-empty">Лимиты загружаются...</div>
+                        </div>
+                    </section>
+
+                    <section class="admin-panel" id="adminPanel" style="display:none;">
+                        <div class="admin-panel-head">
+                            <div>
+                                <div class="account-section-title">Управление пользователями</div>
+                                <p class="text-muted">Создавайте пользователей, меняйте им пароли, активность и суточные лимиты.</p>
+                            </div>
+                        </div>
+
+                        <div class="admin-grid-users">
+                            <div class="account-panel">
+                                <div class="account-section-title">Новый пользователь</div>
+                                <form id="adminCreateUserForm" class="admin-user-form" onsubmit="createManagedUser(); return false;">
+                                    <div class="account-form-row">
+                                        <input
+                                            type="text"
+                                            id="newUsernameInput"
+                                            class="form-input"
+                                            placeholder="Логин"
+                                            autocomplete="off"
+                                        >
+                                        <input
+                                            type="password"
+                                            id="newUserPasswordInput"
+                                            class="form-input"
+                                            placeholder="Пароль"
+                                            autocomplete="new-password"
+                                        >
+                                    </div>
+
+                                    <div class="limit-form-grid">
+                                        <label class="limit-form-item">
+                                            <span>Текст, символов</span>
+                                            <input type="number" id="newLimitTextChars" class="form-input" min="0" step="1" placeholder="10000">
+                                        </label>
+                                        <label class="limit-form-item">
+                                            <span>Сайт, URL</span>
+                                            <input type="number" id="newLimitSiteChecks" class="form-input" min="0" step="1" placeholder="3">
+                                        </label>
+                                        <label class="limit-form-item">
+                                            <span>Слово, проверок</span>
+                                            <input type="number" id="newLimitWordChecks" class="form-input" min="0" step="1" placeholder="10">
+                                        </label>
+                                        <label class="limit-form-item">
+                                            <span>Пакетная, URL</span>
+                                            <input type="number" id="newLimitBatchUrls" class="form-input" min="0" step="1" placeholder="10">
+                                        </label>
+                                        <label class="limit-form-item">
+                                            <span>Мульти-скан, URL</span>
+                                            <input type="number" id="newLimitMultiscanUrls" class="form-input" min="0" step="1" placeholder="15">
+                                        </label>
+                                    </div>
+
+                                    <div class="btn-group">
+                                        <button class="btn btn-primary" type="submit">
+                                            <i class="fas fa-user-plus"></i>
+                                            Создать пользователя
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <div class="account-panel">
+                                <div class="account-section-title">Пользователи</div>
+                                <div id="adminUsersList" class="managed-users-list">
+                                    <div class="account-empty">Список пользователей загружается...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+             
             <!-- Tabs -->
             <div class="tabs">
                 <button class="tab-btn active" data-tab="text">
